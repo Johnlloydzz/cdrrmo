@@ -4,16 +4,24 @@ const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
 
-// GET /api/barangays
+// GET /api/barangays  (excludes archived by default)
 router.get('/', async (req, res) => {
   try {
     const { search, risk } = req.query
-    let sql = 'SELECT * FROM barangays WHERE 1=1'
+    let sql = 'SELECT * FROM barangays WHERE (is_archived IS NULL OR is_archived = 0)'
     const params = []
     if (search) { sql += ' AND (name LIKE ? OR captain LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
     if (risk && risk !== 'All') { sql += ' AND risk_level = ?'; params.push(risk) }
     sql += ' ORDER BY name'
     res.json(await all(sql, params))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /api/barangays/archived  (list of archived/deleted barangays)
+router.get('/archived', async (req, res) => {
+  try {
+    const sql = 'SELECT * FROM barangays WHERE is_archived = 1 ORDER BY archived_at DESC'
+    res.json(await all(sql))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -54,12 +62,37 @@ router.put('/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// DELETE /api/barangays/:id
+// DELETE /api/barangays/:id  (soft delete -> moves to archive)
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await run('DELETE FROM barangays WHERE id = ?', [req.params.id])
+    const result = await run(
+      `UPDATE barangays SET is_archived = 1, archived_at = datetime('now') WHERE id = ?`,
+      [req.params.id]
+    )
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
-    res.json({ message: 'Deleted' })
+    res.json({ message: 'Archived' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /api/barangays/:id/restore  (restore from archive)
+router.post('/:id/restore', async (req, res) => {
+  try {
+    const result = await run(
+      `UPDATE barangays SET is_archived = 0, archived_at = NULL WHERE id = ?`,
+      [req.params.id]
+    )
+    if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
+    const restored = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
+    res.json(restored)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// DELETE /api/barangays/:id/permanent  (hard delete from archive, optional)
+router.delete('/:id/permanent', async (req, res) => {
+  try {
+    const result = await run('DELETE FROM barangays WHERE id = ? AND is_archived = 1', [req.params.id])
+    if (result.changes === 0) return res.status(404).json({ error: 'Not found or not archived' })
+    res.json({ message: 'Permanently deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

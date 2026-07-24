@@ -49,8 +49,25 @@ async function initDb() {
   for (const stmt of schema) {
     await run(stmt)
   }
+  await runMigrations()
   await seedDefaultAdmin()
   console.log('Database initialized.')
+}
+
+async function runMigrations() {
+  // Add is_archived / archived_at columns to barangays if they don't exist yet
+  const columns = await all('PRAGMA table_info(barangays)')
+  const columnNames = columns.map(c => c.name)
+
+  if (!columnNames.includes('is_archived')) {
+    await run('ALTER TABLE barangays ADD COLUMN is_archived INTEGER DEFAULT 0')
+    console.log('Migration: added is_archived to barangays')
+  }
+
+  if (!columnNames.includes('archived_at')) {
+    await run('ALTER TABLE barangays ADD COLUMN archived_at TEXT')
+    console.log('Migration: added archived_at to barangays')
+  }
 }
 
 async function seedDefaultAdmin() {

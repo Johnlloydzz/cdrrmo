@@ -28,6 +28,7 @@ const Analytics = lazy(() => import('./pages/Analytics'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Alerts = lazy(() => import('./pages/Alerts'))
+const Archive = lazy(() => import('./pages/Archive'))
 
 // Wraps a page element with RoleGuard so direct URL access is also blocked
 function Protected({ currentUser, children }) {
@@ -103,6 +104,7 @@ function App() {
           <Route path="reports"    element={<G><Reports /></G>} />
           <Route path="analytics"  element={<G><Analytics /></G>} />
           <Route path="audit-logs" element={<G><AuditLogs /></G>} />
+          <Route path="archive"    element={<G><Archive /></G>} />
           <Route path="settings"   element={<G><Settings /></G>} />
         </Route>
 

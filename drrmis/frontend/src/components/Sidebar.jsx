@@ -3,7 +3,7 @@ import {
   LayoutDashboard, MapPin, Home, Users, Shield, AlertTriangle,
   Tent, Package, Truck, CloudRain, Map, Bell, UserCog,
   FileText, BarChart2, ClipboardList, Settings, ChevronDown,
-  Building2, TreePine, LogOut
+  Building2, TreePine, LogOut, Archive
 } from 'lucide-react'
 import { useState } from 'react'
 import { ROLE_ACCESS, ROLE_COLORS } from '../data/users'
@@ -45,6 +45,7 @@ const navGroups = [
       { to: '/reports',    icon: FileText,    label: 'Reports' },
       { to: '/analytics',  icon: BarChart2,   label: 'Analytics' },
       { to: '/audit-logs', icon: ClipboardList, label: 'Audit Logs' },
+      { to: '/archive',    icon: Archive,     label: 'Archive' },
       { to: '/settings',   icon: Settings,    label: 'Settings' },
     ],
   },

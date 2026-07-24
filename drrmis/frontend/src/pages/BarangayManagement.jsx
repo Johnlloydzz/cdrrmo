@@ -1,44 +1,105 @@
-import { useState } from 'react'
-import { Search, Plus, Eye, Pencil, Trash2, Download } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Plus, Eye, Pencil, Trash2, Download, Archive as ArchiveIcon } from 'lucide-react'
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+import { getStoredUser } from '../utils/storage'
 
 const RISK_BADGE = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
 
-const initialBarangays = [
-  { id: 1, name: 'Barangay 1 (Pob.)',   captain: 'Juan Dela Cruz',   population: 3420, families: 684,  houses: 670, puroks: 5, risk: 'High',   status: 'Active' },
-  { id: 2, name: 'Barangay 2 (Pob.)',   captain: 'Maria Santos',     population: 2810, families: 562,  houses: 550, puroks: 4, risk: 'Medium', status: 'Active' },
-  { id: 3, name: 'Barangay 3 (Pob.)',   captain: 'Pedro Reyes',      population: 4100, families: 820,  houses: 800, puroks: 6, risk: 'High',   status: 'Active' },
-  { id: 4, name: 'Kioskos',             captain: 'Ana Villanueva',   population: 1950, families: 390,  houses: 380, puroks: 3, risk: 'High',   status: 'Active' },
-  { id: 5, name: 'Magsaysay',           captain: 'Roberto Lim',      population: 3200, families: 640,  houses: 620, puroks: 5, risk: 'Medium', status: 'Active' },
-  { id: 6, name: 'Daan Lungsod',        captain: 'Lorna Pascual',    population: 2600, families: 520,  houses: 505, puroks: 4, risk: 'Low',    status: 'Active' },
-  { id: 7, name: 'Guinalaban',          captain: 'Felix Morales',    population: 1800, families: 360,  houses: 350, puroks: 3, risk: 'Medium', status: 'Active' },
-  { id: 8, name: 'Kalambogan',          captain: 'Celia Torres',     population: 5200, families: 1040, houses: 1010, puroks: 7, risk: 'High',  status: 'Active' },
-]
-
 export default function BarangayManagement() {
-  const [barangays, setBarangays] = useState(initialBarangays)
+  const currentUser = getStoredUser()
+  const role = currentUser?.role
+
+  // Permission rules for this page
+  const canAdd    = role === 'CDRRMO Personnel'
+  const canEdit   = role === 'CDRRMO Personnel'
+  const canDelete = role === 'Super Administrator' // soft-delete → moves to Archive
+
+  const [barangays, setBarangays] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [filterRisk, setFilterRisk] = useState('All')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ name: '', captain: '', population: '', families: '', houses: '', puroks: '', risk: 'Low', status: 'Active' })
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active' })
 
-  const filtered = barangays.filter(b =>
-    (b.name.toLowerCase().includes(search.toLowerCase()) || b.captain.toLowerCase().includes(search.toLowerCase())) &&
-    (filterRisk === 'All' || b.risk === filterRisk)
-  )
-
-  const openAdd = () => { setEditing(null); setForm({ name: '', captain: '', population: '', families: '', houses: '', puroks: '', risk: 'Low', status: 'Active' }); setShowModal(true) }
-  const openEdit = (b) => { setEditing(b.id); setForm({ ...b, population: String(b.population), families: String(b.families), houses: String(b.houses), puroks: String(b.puroks) }); setShowModal(true) }
-  const handleDelete = (id) => { if (window.confirm('Delete this barangay?')) setBarangays(prev => prev.filter(b => b.id !== id)) }
-
-  const handleSave = () => {
-    if (!form.name.trim()) return
-    if (editing) {
-      setBarangays(prev => prev.map(b => b.id === editing ? { ...b, ...form, population: +form.population, families: +form.families, houses: +form.houses, puroks: +form.puroks } : b))
-    } else {
-      setBarangays(prev => [...prev, { ...form, id: Date.now(), population: +form.population, families: +form.families, houses: +form.houses, puroks: +form.puroks }])
+  const loadBarangays = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      if (filterRisk !== 'All') params.set('risk', filterRisk)
+      const data = await apiGet(`/barangays?${params.toString()}`)
+      setBarangays(data)
+    } catch (err) {
+      setError(err.message || 'Failed to load barangays.')
+    } finally {
+      setLoading(false)
     }
-    setShowModal(false)
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(loadBarangays, 300) // debounce search
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filterRisk])
+
+  const openAdd = () => {
+    setEditing(null)
+    setForm({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active' })
+    setShowModal(true)
+  }
+
+  const openEdit = (b) => {
+    setEditing(b.id)
+    setForm({
+      name: b.name || '',
+      captain: b.captain || '',
+      secretary: b.secretary || '',
+      population: String(b.population ?? ''),
+      families: String(b.families ?? ''),
+      houses: String(b.houses ?? ''),
+      risk_level: b.risk_level || 'Low',
+      status: b.status || 'Active',
+    })
+    setShowModal(true)
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Archive this barangay? You can restore it later from the Archive page.')) return
+    try {
+      await apiDelete(`/barangays/${id}`)
+      setBarangays(prev => prev.filter(b => b.id !== id))
+    } catch (err) {
+      alert(err.message || 'Failed to archive barangay.')
+    }
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    try {
+      const payload = {
+        ...form,
+        population: +form.population || 0,
+        families: +form.families || 0,
+        houses: +form.houses || 0,
+      }
+      if (editing) {
+        const updated = await apiPut(`/barangays/${editing}`, payload)
+        setBarangays(prev => prev.map(b => b.id === editing ? updated : b))
+      } else {
+        const created = await apiPost('/barangays', payload)
+        setBarangays(prev => [...prev, created])
+      }
+      setShowModal(false)
+    } catch (err) {
+      alert(err.message || 'Failed to save barangay.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -59,9 +120,24 @@ export default function BarangayManagement() {
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary flex items-center gap-2 text-sm"><Download size={15} /> Export</button>
-          <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Barangay</button>
+          {canDelete && (
+            <a href="/archive" className="btn-secondary flex items-center gap-2 text-sm">
+              <ArchiveIcon size={15} /> Archive
+            </a>
+          )}
+          {canAdd && (
+            <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}>
+              <Plus size={15} /> Add Barangay
+            </button>
+          )}
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Table */}
       <div className="card p-0 overflow-hidden">
@@ -75,37 +151,48 @@ export default function BarangayManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(b => (
+              {loading && (
+                <tr><td colSpan={9} className="table-cell text-center text-gray-400 py-8">Loading barangays…</td></tr>
+              )}
+              {!loading && barangays.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                   <td className="table-cell font-medium text-gray-800">{b.name}</td>
                   <td className="table-cell">{b.captain}</td>
-                  <td className="table-cell">{b.population.toLocaleString()}</td>
-                  <td className="table-cell">{b.families.toLocaleString()}</td>
-                  <td className="table-cell">{b.houses.toLocaleString()}</td>
-                  <td className="table-cell">{b.puroks}</td>
-                  <td className="table-cell"><span className={RISK_BADGE[b.risk]}>{b.risk}</span></td>
+                  <td className="table-cell">{(b.population || 0).toLocaleString()}</td>
+                  <td className="table-cell">{(b.families || 0).toLocaleString()}</td>
+                  <td className="table-cell">{(b.houses || 0).toLocaleString()}</td>
+                  <td className="table-cell">{b.puroks ?? '—'}</td>
+                  <td className="table-cell"><span className={RISK_BADGE[b.risk_level] || 'badge-green'}>{b.risk_level}</span></td>
                   <td className="table-cell"><span className="badge-green">{b.status}</span></td>
                   <td className="table-cell">
                     <div className="flex gap-2">
                       <button className="p-1.5 rounded hover:bg-blue-50 text-blue-600" title="View"><Eye size={15} /></button>
-                      <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" title="Edit" onClick={() => openEdit(b)}><Pencil size={15} /></button>
-                      <button className="p-1.5 rounded hover:bg-red-50 text-red-600" title="Delete" onClick={() => handleDelete(b.id)}><Trash2 size={15} /></button>
+                      {canEdit && (
+                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" title="Edit" onClick={() => openEdit(b)}>
+                          <Pencil size={15} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" title="Archive" onClick={() => handleDelete(b.id)}>
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {!loading && barangays.length === 0 && (
                 <tr><td colSpan={9} className="table-cell text-center text-gray-400 py-8">No barangays found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
         <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
-          Showing {filtered.length} of {barangays.length} barangays
+          Showing {barangays.length} barangay{barangays.length !== 1 ? 's' : ''}
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal — only rendered for roles allowed to add/edit */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
@@ -119,7 +206,7 @@ export default function BarangayManagement() {
                 <label className="label">Barangay Captain</label>
                 <input className="input" value={form.captain} onChange={e => setForm({...form, captain: e.target.value})} />
               </div>
-              {[['population','Population'],['families','Families'],['houses','Houses'],['puroks','Puroks']].map(([k,l]) => (
+              {[['population','Population'],['families','Families'],['houses','Houses']].map(([k,l]) => (
                 <div key={k}>
                   <label className="label">{l}</label>
                   <input className="input" type="number" value={form[k]} onChange={e => setForm({...form, [k]: e.target.value})} />
@@ -127,7 +214,7 @@ export default function BarangayManagement() {
               ))}
               <div>
                 <label className="label">Risk Level</label>
-                <select className="input" value={form.risk} onChange={e => setForm({...form, risk: e.target.value})}>
+                <select className="input" value={form.risk_level} onChange={e => setForm({...form, risk_level: e.target.value})}>
                   <option>Low</option><option>Medium</option><option>High</option>
                 </select>
               </div>
@@ -139,8 +226,10 @@ export default function BarangayManagement() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleSave}>{editing ? 'Save Changes' : 'Add Barangay'}</button>
+              <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn-primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add Barangay')}
+              </button>
             </div>
           </div>
         </div>
