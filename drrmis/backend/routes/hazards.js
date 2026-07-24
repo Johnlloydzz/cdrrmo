@@ -44,7 +44,18 @@ router.post('/', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [code, type_id, severity || 'Moderate', barangay_id, purok_id, latitude, longitude, description, reporter, reported_date, status || 'Active']
     )
-    res.status(201).json(await get('SELECT * FROM hazards WHERE id = ?', [r.lastID]))
+    const newHazard = await get('SELECT * FROM hazards WHERE id = ?', [r.lastID])
+
+    // 🔥 Firebase RTDB mirror - para sa real-time map sync
+    try {
+      const { db: rtdb } = require('../firebaseAdmin')
+      await rtdb.ref(`hazards/${newHazard.id}`).set(newHazard)
+    } catch (fbErr) {
+      console.error('Firebase sync failed (hindi critical):', fbErr.message)
+      // hindi natin i-fa-fail yung buong request kahit mabigo ang Firebase sync
+    }
+
+    res.status(201).json(newHazard)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -55,13 +66,32 @@ router.put('/:id', async (req, res) => {
       `UPDATE hazards SET severity=?, status=?, description=?, updated_at=datetime('now') WHERE id=?`,
       [severity, status, description, req.params.id]
     )
-    res.json(await get('SELECT * FROM hazards WHERE id = ?', [req.params.id]))
+    const updatedHazard = await get('SELECT * FROM hazards WHERE id = ?', [req.params.id])
+
+    // 🔥 Firebase RTDB mirror - i-update din yung live copy
+    try {
+      const { db: rtdb } = require('../firebaseAdmin')
+      await rtdb.ref(`hazards/${req.params.id}`).set(updatedHazard)
+    } catch (fbErr) {
+      console.error('Firebase sync failed (hindi critical):', fbErr.message)
+    }
+
+    res.json(updatedHazard)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 router.delete('/:id', async (req, res) => {
   try {
     await run('DELETE FROM hazards WHERE id = ?', [req.params.id])
+
+    // 🔥 Firebase RTDB mirror - alisin din sa live copy
+    try {
+      const { db: rtdb } = require('../firebaseAdmin')
+      await rtdb.ref(`hazards/${req.params.id}`).remove()
+    } catch (fbErr) {
+      console.error('Firebase sync failed (hindi critical):', fbErr.message)
+    }
+
     res.json({ message: 'Deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
