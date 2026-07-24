@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shield, Eye, EyeOff, Users } from 'lucide-react'
 import { DEMO_USERS, ROLE_COLORS } from '../../data/users'
+import { apiPost } from '../../utils/api'
+import { setStoredToken } from '../../utils/storage'
 
 export default function Login({ onLogin }) {
   const [form, setForm] = useState({ username: '', password: '', remember: false })
@@ -19,7 +21,7 @@ export default function Login({ onLogin }) {
     setError('')
   }
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     setError('')
     if (!form.username || !form.password) {
@@ -27,19 +29,18 @@ export default function Login({ onLogin }) {
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      const user = DEMO_USERS.find(
-        (u) => u.username === form.username && u.password === form.password
-      )
+    try {
+      const data = await apiPost('/auth/login', {
+        username: form.username,
+        password: form.password,
+      })
+      setStoredToken(data.token)
+      onLogin(data.user)
+    } catch (err) {
+      setError(err.message || 'Invalid username or password.')
+    } finally {
       setLoading(false)
-      if (!user) {
-        setError('Invalid username or password.')
-        return
-      }
-      // Don't store password in session
-      const { password: _pw, ...safeUser } = user
-      onLogin(safeUser)
-    }, 600)
+    }
   }
 
   return (

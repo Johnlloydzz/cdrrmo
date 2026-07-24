@@ -1,10 +1,8 @@
 export function getStoredUser() {
   if (typeof window === 'undefined' || !window.localStorage) return null
-
   try {
     const saved = window.localStorage.getItem('drrmis_user')
     if (!saved) return null
-
     const parsed = JSON.parse(saved)
     return parsed && typeof parsed === 'object' ? parsed : null
   } catch {
@@ -21,4 +19,19 @@ export function setStoredUser(user) {
 export function clearStoredUser() {
   if (typeof window === 'undefined' || !window.localStorage) return
   window.localStorage.removeItem('drrmis_user')
+}
+
+export function getStoredToken() {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  return window.localStorage.getItem('drrmis_token')
+}
+
+export function setStoredToken(token) {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  window.localStorage.setItem('drrmis_token', token)
+}
+
+export function clearStoredToken() {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  window.localStorage.removeItem('drrmis_token')
 }

@@ -54,15 +54,52 @@ async function initDb() {
 }
 
 async function seedDefaultAdmin() {
-  const existing = await get('SELECT id FROM users WHERE username = ?', ['sysadmin'])
-  if (!existing) {
-    const hash = await bcrypt.hash('Admin@1234', 12)
-    await run(
-      `INSERT INTO users (name, username, email, password_hash, role, barangay, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ['System Administrator', 'sysadmin', 'admin@gingoog.gov.ph', hash, 'Super Administrator', 'All', 'Active']
-    )
-    console.log('Default admin created: sysadmin / Admin@1234')
+  const demoUsers = [
+    {
+      name: 'System Administrator',
+      username: 'sysadmin',
+      email: 'admin@gingoog.gov.ph',
+      password: 'Admin@1234',
+      role: 'Super Administrator',
+      barangay: 'All',
+    },
+    {
+      name: 'Carlos Mendoza',
+      username: 'cdrrmo01',
+      email: 'carlos@cdrrmo.gov.ph',
+      password: 'Cdrrmo@1234',
+      role: 'CDRRMO Personnel',
+      barangay: 'All',
+    },
+    {
+      name: 'Ana Villanueva',
+      username: 'brgy.kioskos',
+      email: 'ana@kioskos.gov.ph',
+      password: 'Brgy@1234',
+      role: 'Barangay Admin',
+      barangay: 'Kioskos',
+    },
+    {
+      name: 'Mark Responder',
+      username: 'responder01',
+      email: 'mark@cdrrmo.gov.ph',
+      password: 'Resp@1234',
+      role: 'Field Responder',
+      barangay: 'All',
+    },
+  ]
+
+  for (const user of demoUsers) {
+    const existing = await get('SELECT id FROM users WHERE username = ?', [user.username])
+    if (!existing) {
+      const hash = await bcrypt.hash(user.password, 12)
+      await run(
+        `INSERT INTO users (name, username, email, password_hash, role, barangay, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [user.name, user.username, user.email, hash, user.role, user.barangay, 'Active']
+      )
+      console.log(`Demo user created: ${user.username} / ${user.password}`)
+    }
   }
 }
 
