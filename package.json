@@ -1,0 +1,9 @@
+{
+  "name": "hazard-tracking-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix drrmis/frontend run dev --",
+    "build": "npm --prefix drrmis/frontend run build",
+    "preview": "npm --prefix drrmis/frontend run preview"
+  }
+}
