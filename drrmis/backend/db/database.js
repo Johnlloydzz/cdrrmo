@@ -55,18 +55,25 @@ async function initDb() {
 }
 
 async function runMigrations() {
-  // Add is_archived / archived_at columns to barangays if they don't exist yet
-  const columns = await all('PRAGMA table_info(barangays)')
-  const columnNames = columns.map(c => c.name)
+  const barangayColumns = await all('PRAGMA table_info(barangays)')
+  const barangayColumnNames = barangayColumns.map(c => c.name)
 
-  if (!columnNames.includes('is_archived')) {
+  if (!barangayColumnNames.includes('is_archived')) {
     await run('ALTER TABLE barangays ADD COLUMN is_archived INTEGER DEFAULT 0')
     console.log('Migration: added is_archived to barangays')
   }
 
-  if (!columnNames.includes('archived_at')) {
+  if (!barangayColumnNames.includes('archived_at')) {
     await run('ALTER TABLE barangays ADD COLUMN archived_at TEXT')
     console.log('Migration: added archived_at to barangays')
+  }
+
+  const reliefColumns = await all('PRAGMA table_info(relief_distributions)')
+  const reliefColumnNames = reliefColumns.map(c => c.name)
+
+  if (!reliefColumnNames.includes('distributed_by')) {
+    await run('ALTER TABLE relief_distributions ADD COLUMN distributed_by INTEGER REFERENCES users(id)')
+    console.log('Migration: added distributed_by to relief_distributions')
   }
 }
 
