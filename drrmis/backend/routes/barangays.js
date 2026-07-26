@@ -37,12 +37,12 @@ router.get('/:id', async (req, res) => {
 // POST /api/barangays
 router.post('/', async (req, res) => {
   try {
-    const { name, captain, secretary, population, families, houses, risk_level, status } = req.body
+    const { name, captain, secretary, population, families, houses, risk_level, status, boundary_geojson, image_url } = req.body
     if (!name) return res.status(400).json({ error: 'Name is required' })
     const result = await run(
-      `INSERT INTO barangays (name, captain, secretary, population, families, houses, risk_level, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, captain, secretary, population || 0, families || 0, houses || 0, risk_level || 'Low', status || 'Active']
+      `INSERT INTO barangays (name, captain, secretary, population, families, houses, risk_level, status, boundary_geojson, image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, captain, secretary, population || 0, families || 0, houses || 0, risk_level || 'Low', status || 'Active', boundary_geojson || null, image_url || null]
     )
     const newRow = await get('SELECT * FROM barangays WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -52,10 +52,10 @@ router.post('/', async (req, res) => {
 // PUT /api/barangays/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, captain, secretary, population, families, houses, risk_level, status } = req.body
+    const { name, captain, secretary, population, families, houses, risk_level, status, boundary_geojson, image_url } = req.body
     await run(
-      `UPDATE barangays SET name=?, captain=?, secretary=?, population=?, families=?, houses=?, risk_level=?, status=?, updated_at=datetime('now') WHERE id=?`,
-      [name, captain, secretary, population, families, houses, risk_level, status, req.params.id]
+      `UPDATE barangays SET name=?, captain=?, secretary=?, population=?, families=?, houses=?, risk_level=?, status=?, boundary_geojson=?, image_url=?, updated_at=datetime('now') WHERE id=?`,
+      [name, captain, secretary, population, families, houses, risk_level, status, boundary_geojson, image_url, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
     res.json(updated)

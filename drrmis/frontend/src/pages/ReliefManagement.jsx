@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil, Trash2, Package, TrendingDown } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+import { getStoredUser } from '../utils/storage'
 
 const CATEGORY_BADGE = { Food: 'badge-green', Water: 'badge-blue', 'Non-Food': 'badge-yellow', Medical: 'badge-red' }
 
 export default function ReliefManagement() {
+  const currentUser = getStoredUser()
+  const role = currentUser?.role
+  const canManage = role === 'CDRRMO Personnel'
+
   const [tab, setTab] = useState('inventory')
   const [inventory, setInventory] = useState([])
   const [distributions, setDistributions] = useState([])
@@ -135,9 +140,10 @@ export default function ReliefManagement() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input className="input pl-9" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          {tab === 'inventory' ? (
+          {canManage && tab === 'inventory' && (
             <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAddInv}><Plus size={15} /> Add Item</button>
-          ) : (
+          )}
+          {canManage && tab === 'distributions' && (
             <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAddDist}><Plus size={15} /> Add Distribution</button>
           )}
         </div>
@@ -149,7 +155,7 @@ export default function ReliefManagement() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Item','Category','Quantity','Unit','Threshold','Last Updated','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}
+                  {['Item','Category','Quantity','Unit','Threshold','Last Updated', ...(canManage ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -165,16 +171,18 @@ export default function ReliefManagement() {
                     <td className="table-cell">{i.unit}</td>
                     <td className="table-cell text-gray-500">{i.threshold}</td>
                     <td className="table-cell text-gray-500">{i.updated_at ? String(i.updated_at).slice(0, 10) : '—'}</td>
-                    <td className="table-cell">
-                      <div className="flex gap-2">
-                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEditInv(i)}><Pencil size={15} /></button>
-                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDeleteInv(i.id)}><Trash2 size={15} /></button>
-                      </div>
-                    </td>
+                    {canManage && (
+                      <td className="table-cell">
+                        <div className="flex gap-2">
+                          <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEditInv(i)}><Pencil size={15} /></button>
+                          <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDeleteInv(i.id)}><Trash2 size={15} /></button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {filteredInv.length === 0 && (
-                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-8">No inventory items found.</td></tr>
+                  <tr><td colSpan={canManage ? 7 : 6} className="table-cell text-center text-gray-400 py-8">No inventory items found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -207,8 +215,8 @@ export default function ReliefManagement() {
         </div>
       </div>
 
-      {/* Inventory Modal */}
-      {showInvModal && (
+      {/* Inventory Modal — only rendered for CDRRMO Personnel */}
+      {canManage && showInvModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-5">{editingInv ? 'Edit Item' : 'Add Inventory Item'}</h3>
@@ -234,8 +242,8 @@ export default function ReliefManagement() {
         </div>
       )}
 
-      {/* Distribution Modal */}
-      {showDistModal && (
+      {/* Distribution Modal — only rendered for CDRRMO Personnel */}
+      {canManage && showDistModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-5">Add Distribution</h3>

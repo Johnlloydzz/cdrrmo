@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
+import { useState, useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { Layers, Search, MapPin, Navigation } from 'lucide-react'
+import { Layers, Search, MapPin, Navigation, Building2 } from 'lucide-react'
+import { apiGet } from '../utils/api'
 
 // Fix Leaflet default icons in Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -30,15 +31,46 @@ const LAYERS = [
 
 const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Evacuation Centers','Incident Locations','Household Locations']
 
+// Helper component: pans/zooms the map to fit the selected barangay's boundary
+function FlyToBoundary({ geojsonLayer }) {
+  const map = useMap()
+  useEffect(() => {
+    if (geojsonLayer) {
+      const bounds = geojsonLayer.getBounds()
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] })
+    }
+  }, [geojsonLayer, map])
+  return null
+}
+
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('street')
   const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Evacuation Centers','Incident Locations'])
   const [search, setSearch] = useState('')
-  const [showLayers, setShowLayers] = useState(false)
+  const [barangays, setBarangays] = useState([])
+  const [selectedBarangay, setSelectedBarangay] = useState(null)
+  const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
+
+  useEffect(() => {
+    apiGet('/barangays').then(setBarangays).catch(() => {})
+  }, [])
 
   const toggleOverlay = (o) => setActiveOverlays(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o])
 
   const layer = LAYERS.find(l => l.id === activeLayer)
+
+  const filteredBarangays = barangays.filter(b =>
+    b.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const selectedGeojson = (() => {
+    if (!selectedBarangay?.boundary_geojson) return null
+    try {
+      return JSON.parse(selectedBarangay.boundary_geojson)
+    } catch {
+      return null
+    }
+  })()
 
   return (
     <div className="flex gap-4 h-[calc(100vh-140px)] min-h-96">
@@ -47,8 +79,51 @@ export default function GISMap() {
         {/* Search */}
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
-          <input className="input text-sm" placeholder="Search barangay, purok, resident…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input text-sm" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+
+        {/* Barangay list — click to highlight boundary */}
+        <div className="card p-4">
+          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
+          <div className="space-y-0.5 max-h-56 overflow-y-auto">
+            {filteredBarangays.map(b => (
+              <button
+                key={b.id}
+                onClick={() => setSelectedBarangay(b)}
+                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                  selectedBarangay?.id === b.id ? 'bg-primary-100 text-primary-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                {b.name}
+                {!b.boundary_geojson && <span className="text-xs text-gray-400 ml-1">(no boundary)</span>}
+              </button>
+            ))}
+            {filteredBarangays.length === 0 && (
+              <p className="text-xs text-gray-400 py-2">No barangays found.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Selected barangay info */}
+        {selectedBarangay && (
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-2">{selectedBarangay.name}</h3>
+            {selectedBarangay.image_url && (
+              <img
+                src={selectedBarangay.image_url}
+                alt={selectedBarangay.name}
+                className="w-full h-32 object-cover rounded-lg mb-2 border border-gray-200"
+                onError={e => e.target.style.display = 'none'}
+              />
+            )}
+            <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain || '—'}</p>
+            <p className="text-xs text-gray-500">Population: {(selectedBarangay.population || 0).toLocaleString()}</p>
+            <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
+            {!selectedBarangay.boundary_geojson && (
+              <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
+            )}
+          </div>
+        )}
 
         {/* Base layers */}
         <div className="card p-4">
@@ -86,6 +161,7 @@ export default function GISMap() {
               { color: '#22c55e', label: 'Evacuation Center' },
               { color: '#3b82f6', label: 'Flood Zone' },
               { color: '#8b5cf6', label: 'Landslide Zone' },
+              { color: '#dc2626', label: 'Selected Barangay Boundary' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: l.color }} />
@@ -104,6 +180,26 @@ export default function GISMap() {
             url={layer.url}
             attribution='&copy; OpenStreetMap contributors'
           />
+
+          {/* Selected barangay boundary outline */}
+          {selectedGeojson && (
+            <>
+              <GeoJSON
+                key={selectedBarangay.id}
+                data={selectedGeojson}
+                style={{ color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.15 }}
+                ref={setGeojsonLayerRef}
+              >
+                <Popup>
+                  <strong>{selectedBarangay.name}</strong><br />
+                  {selectedBarangay.image_url && (
+                    <img src={selectedBarangay.image_url} alt={selectedBarangay.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
+                  )}
+                </Popup>
+              </GeoJSON>
+              <FlyToBoundary geojsonLayer={geojsonLayerRef} />
+            </>
+          )}
 
           {/* Flood zone circle */}
           {activeOverlays.includes('Flood Zones') && MARKERS.filter(m => m.type === 'Hazard').map(m => (

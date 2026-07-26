@@ -22,7 +22,7 @@ export default function BarangayManagement() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active' })
+  const [form, setForm] = useState({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active', boundary_geojson: '', image_url: '' })
 
   const loadBarangays = async () => {
     setLoading(true)
@@ -48,7 +48,7 @@ export default function BarangayManagement() {
 
   const openAdd = () => {
     setEditing(null)
-    setForm({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active' })
+    setForm({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active', boundary_geojson: '', image_url: '' })
     setShowModal(true)
   }
 
@@ -63,6 +63,8 @@ export default function BarangayManagement() {
       houses: String(b.houses ?? ''),
       risk_level: b.risk_level || 'Low',
       status: b.status || 'Active',
+      boundary_geojson: b.boundary_geojson || '',
+      image_url: b.image_url || '',
     })
     setShowModal(true)
   }
@@ -79,6 +81,14 @@ export default function BarangayManagement() {
 
   const handleSave = async () => {
     if (!form.name.trim()) return
+    if (form.boundary_geojson.trim()) {
+      try {
+        JSON.parse(form.boundary_geojson)
+      } catch {
+        alert('Boundary GeoJSON is not valid JSON. Please check the format and try again.')
+        return
+      }
+    }
     setSaving(true)
     try {
       const payload = {
@@ -86,6 +96,8 @@ export default function BarangayManagement() {
         population: +form.population || 0,
         families: +form.families || 0,
         houses: +form.houses || 0,
+        boundary_geojson: form.boundary_geojson.trim() || null,
+        image_url: form.image_url.trim() || null,
       }
       if (editing) {
         const updated = await apiPut(`/barangays/${editing}`, payload)
@@ -223,6 +235,21 @@ export default function BarangayManagement() {
                 <select className="input" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
                   <option>Active</option><option>Inactive</option>
                 </select>
+              </div>
+              <div className="col-span-2">
+                <label className="label">Barangay Image URL</label>
+                <input className="input" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://…" />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Boundary GeoJSON (Polygon/MultiPolygon)</label>
+                <textarea
+                  className="input font-mono text-xs"
+                  rows={5}
+                  value={form.boundary_geojson}
+                  onChange={e => setForm({...form, boundary_geojson: e.target.value})}
+                  placeholder='{"type":"Polygon","coordinates":[[[125.10,8.81],[125.11,8.81],[125.11,8.82],[125.10,8.82],[125.10,8.81]]]}'
+                />
+                <p className="text-xs text-gray-400 mt-1">Used by GIS Map to draw and highlight this barangay's boundary when selected.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">

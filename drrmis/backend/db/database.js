@@ -69,6 +69,16 @@ async function runMigrations() {
     console.log('Migration: added archived_at to barangays')
   }
 
+  if (!barangayColumnNames.includes('boundary_geojson')) {
+    await run('ALTER TABLE barangays ADD COLUMN boundary_geojson TEXT')
+    console.log('Migration: added boundary_geojson to barangays')
+  }
+
+  if (!barangayColumnNames.includes('image_url')) {
+    await run('ALTER TABLE barangays ADD COLUMN image_url TEXT')
+    console.log('Migration: added image_url to barangays')
+  }
+
   const reliefColumns = await all('PRAGMA table_info(relief_distributions)')
   const reliefColumnNames = reliefColumns.map(c => c.name)
 

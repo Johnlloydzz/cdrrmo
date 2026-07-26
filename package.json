@@ -5,5 +5,9 @@
     "dev": "npm --prefix drrmis/frontend run dev --",
     "build": "npm --prefix drrmis/frontend run build",
     "preview": "npm --prefix drrmis/frontend run preview"
+  },
+  "dependencies": {
+    "firebase": "^12.16.0",
+    "firebase-admin": "^14.2.0"
   }
 }
