@@ -37,6 +37,8 @@ const corsOptions = {
   'http://127.0.0.1:3001',
   'https://cdrrmo-aa070.web.app',
   'https://cdrrmo-aa070.firebaseapp.com',
+  'https://cdrrmo-gingoog.web.app',
+  'https://cdrrmo-gingoog.firebaseapp.com',
 ]
 
     if (!origin || allowedOrigins.includes(origin)) {
