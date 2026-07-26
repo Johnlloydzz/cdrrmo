@@ -51,6 +51,7 @@ async function initDb() {
   }
   await runMigrations()
   await seedDefaultAdmin()
+  await seedBarangays()
   console.log('Database initialized.')
 }
 
@@ -125,6 +126,38 @@ async function seedDefaultAdmin() {
       console.log(`Demo user created: ${user.username} / ${user.password}`)
     }
   }
+}
+
+async function seedBarangays() {
+  const poblacionBarangays = [
+    '1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17',
+    '18','18-A','19','20','21','22','22-A','23','24','24-A','25','26'
+  ].map(n => `Barangay ${n} (Pob.)`)
+
+  const ruralBarangays = [
+    'Agay-Ayan','Alagatan','Anakan','Bagubad','Bakidbakid','Bal-Ason','Bantaawan',
+    'Binakalan','Capitulangan','Daan-Lungsod','Dinawehan','Eureka','Hindangon',
+    'Kalagonoy','Kalipay','Kamanikan','Kianlagan','Kibuging','Kipuntos','Lawaan',
+    'Lawit','Libertad','Libon','Lunao','Lunotan','Malibud','Malinao','Maribucao',
+    'Mimbalagon','Mimbunga','Mimbuntong','Minsapinit','Murallon','Odiongan',
+    'Pangasihan','Pigsaluhan','Punong','Ricoro','Samay','San Jose','San Juan',
+    'San Luis','San Miguel','Sangalan','Santiago','Tagpako','Talisay','Talon',
+    'Tinabalan','Tinulongan'
+  ]
+
+  const allBarangays = [...poblacionBarangays, ...ruralBarangays]
+
+  for (const name of allBarangays) {
+    const existing = await get('SELECT id FROM barangays WHERE name = ?', [name])
+    if (!existing) {
+      await run(
+        `INSERT INTO barangays (name, captain, population, families, houses, risk_level, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [name, '', 0, 0, 0, 'Low', 'Active']
+      )
+    }
+  }
+  console.log(`Seeded ${allBarangays.length} barangays for Gingoog City`)
 }
 
 module.exports = { getDb, run, get, all, initDb }

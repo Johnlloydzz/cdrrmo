@@ -1,48 +1,109 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil, Trash2, Package, TrendingDown } from 'lucide-react'
-
-const INITIAL_INVENTORY = [
-  { id: 1, item: 'Rice (50kg sack)',    category: 'Food',     quantity: 250, unit: 'sacks',   threshold: 50,  lastUpdated: '2026-07-12' },
-  { id: 2, item: 'Bottled Water (1L)',  category: 'Water',    quantity: 1200, unit: 'bottles', threshold: 200, lastUpdated: '2026-07-12' },
-  { id: 3, item: 'Canned Goods',        category: 'Food',     quantity: 3500, unit: 'cans',   threshold: 500, lastUpdated: '2026-07-11' },
-  { id: 4, item: 'Blankets',            category: 'Non-Food', quantity: 180,  unit: 'pcs',    threshold: 50,  lastUpdated: '2026-07-10' },
-  { id: 5, item: 'Hygiene Kits',        category: 'Non-Food', quantity: 95,   unit: 'kits',   threshold: 30,  lastUpdated: '2026-07-09' },
-  { id: 6, item: 'Baby Food',           category: 'Food',     quantity: 40,   unit: 'boxes',  threshold: 20,  lastUpdated: '2026-07-08' },
-  { id: 7, item: 'Medicine Kits',       category: 'Medical',  quantity: 25,   unit: 'kits',   threshold: 10,  lastUpdated: '2026-07-08' },
-  { id: 8, item: 'Clothes (assorted)',  category: 'Non-Food', quantity: 500,  unit: 'pcs',    threshold: 100, lastUpdated: '2026-07-07' },
-]
-
-const INITIAL_DISTRIBUTIONS = [
-  { id: 1, family: 'Santos, Juan',   barangay: 'Kioskos',       center: 'Central Gym', items: 'Rice x2, Canned Goods x10', date: '2026-07-13', receiver: 'Juan Santos',    status: 'Completed' },
-  { id: 2, family: 'Reyes, Maria',   barangay: 'Kalambogan',    center: 'Kalambogan Hall', items: 'Blanket x1, Hygiene Kit x1', date: '2026-07-13', receiver: 'Maria Reyes', status: 'Completed' },
-  { id: 3, family: 'Dela Cruz, Ben', barangay: 'Magsaysay',     center: 'Magsaysay Court', items: 'Rice x1, Water x6', date: '2026-07-12', receiver: 'Ben Dela Cruz',      status: 'Pending' },
-]
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
 const CATEGORY_BADGE = { Food: 'badge-green', Water: 'badge-blue', 'Non-Food': 'badge-yellow', Medical: 'badge-red' }
 
 export default function ReliefManagement() {
   const [tab, setTab] = useState('inventory')
-  const [inventory, setInventory] = useState(INITIAL_INVENTORY)
-  const [distributions] = useState(INITIAL_DISTRIBUTIONS)
+  const [inventory, setInventory] = useState([])
+  const [distributions, setDistributions] = useState([])
+  const [households, setHouseholds] = useState([])
+  const [centers, setCenters] = useState([])
+  const [barangays, setBarangays] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({ item: '', category: 'Food', quantity: '', unit: '', threshold: '' })
 
-  const filteredInv = inventory.filter(i => i.item.toLowerCase().includes(search.toLowerCase()))
-  const filteredDist = distributions.filter(d => d.family.toLowerCase().includes(search.toLowerCase()) || d.barangay.toLowerCase().includes(search.toLowerCase()))
+  const [showInvModal, setShowInvModal] = useState(false)
+  const [editingInv, setEditingInv] = useState(null)
+  const [invForm, setInvForm] = useState({ item_name: '', category: 'Food', quantity: '', unit: '', threshold: '' })
 
-  const openAdd = () => { setEditing(null); setForm({ item: '', category: 'Food', quantity: '', unit: '', threshold: '' }); setShowModal(true) }
-  const openEdit = (item) => { setEditing(item.id); setForm({ ...item, quantity: String(item.quantity), threshold: String(item.threshold) }); setShowModal(true) }
-  const handleDelete = (id) => { if (window.confirm('Remove item?')) setInventory(p => p.filter(i => i.id !== id)) }
-  const handleSave = () => {
-    if (!form.item.trim()) return
-    if (editing) {
-      setInventory(p => p.map(i => i.id === editing ? { ...i, ...form, quantity: +form.quantity, threshold: +form.threshold, lastUpdated: new Date().toISOString().slice(0,10) } : i))
-    } else {
-      setInventory(p => [...p, { ...form, id: Date.now(), quantity: +form.quantity, threshold: +form.threshold, lastUpdated: new Date().toISOString().slice(0,10) }])
+  const [showDistModal, setShowDistModal] = useState(false)
+  const [distForm, setDistForm] = useState({ household_id: '', center_id: '', barangay_id: '', items: '', quantity: '', dist_date: '', receiver: '' })
+  const [saving, setSaving] = useState(false)
+
+  const loadAll = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [inv, dist, hh, ec, brgy] = await Promise.all([
+        apiGet('/relief/inventory'),
+        apiGet('/relief/distributions'),
+        apiGet('/households'),
+        apiGet('/evacuation-centers'),
+        apiGet('/barangays'),
+      ])
+      setInventory(inv)
+      setDistributions(dist)
+      setHouseholds(hh)
+      setCenters(ec)
+      setBarangays(brgy)
+    } catch (err) {
+      setError(err.message || 'Failed to load relief data.')
+    } finally {
+      setLoading(false)
     }
-    setShowModal(false)
+  }
+
+  useEffect(() => { loadAll() }, [])
+
+  const filteredInv = inventory.filter(i => i.item_name.toLowerCase().includes(search.toLowerCase()))
+  const filteredDist = distributions.filter(d =>
+    (d.receiver || '').toLowerCase().includes(search.toLowerCase()) ||
+    (d.barangay_name || '').toLowerCase().includes(search.toLowerCase())
+  )
+
+  // Inventory handlers
+  const openAddInv = () => { setEditingInv(null); setInvForm({ item_name: '', category: 'Food', quantity: '', unit: '', threshold: '' }); setShowInvModal(true) }
+  const openEditInv = (i) => { setEditingInv(i.id); setInvForm({ item_name: i.item_name, category: i.category, quantity: String(i.quantity), unit: i.unit || '', threshold: String(i.threshold) }); setShowInvModal(true) }
+
+  const handleDeleteInv = async (id) => {
+    if (!window.confirm('Remove this item?')) return
+    try {
+      await apiDelete(`/relief/inventory/${id}`)
+      setInventory(prev => prev.filter(i => i.id !== id))
+    } catch (err) { alert(err.message || 'Failed to delete item.') }
+  }
+
+  const handleSaveInv = async () => {
+    if (!invForm.item_name.trim()) return
+    setSaving(true)
+    try {
+      const payload = { ...invForm, quantity: +invForm.quantity || 0, threshold: +invForm.threshold || 0 }
+      if (editingInv) {
+        const updated = await apiPut(`/relief/inventory/${editingInv}`, payload)
+        setInventory(prev => prev.map(i => i.id === editingInv ? updated : i))
+      } else {
+        const created = await apiPost('/relief/inventory', payload)
+        setInventory(prev => [...prev, created])
+      }
+      setShowInvModal(false)
+    } catch (err) {
+      alert(err.message || 'Failed to save item.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Distribution handlers
+  const openAddDist = () => {
+    setDistForm({ household_id: '', center_id: '', barangay_id: '', items: '', quantity: '', dist_date: new Date().toISOString().slice(0, 10), receiver: '' })
+    setShowDistModal(true)
+  }
+
+  const handleSaveDist = async () => {
+    if (!distForm.receiver.trim() || !distForm.barangay_id) return
+    setSaving(true)
+    try {
+      const created = await apiPost('/relief/distributions', distForm)
+      setDistributions(prev => [created, ...prev])
+      setShowDistModal(false)
+    } catch (err) {
+      alert(err.message || 'Failed to save distribution.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -54,6 +115,10 @@ export default function ReliefManagement() {
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-blue-600">{distributions.length}</p><p className="text-xs text-gray-500 mt-1">Distributions</p></div>
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-green-600">{distributions.filter(d => d.status === 'Completed').length}</p><p className="text-xs text-gray-500 mt-1">Completed</p></div>
       </div>
+
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+      )}
 
       {/* Tabs */}
       <div className="card p-0 overflow-hidden">
@@ -70,13 +135,17 @@ export default function ReliefManagement() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input className="input pl-9" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          {tab === 'inventory' && (
-            <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Item</button>
+          {tab === 'inventory' ? (
+            <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAddInv}><Plus size={15} /> Add Item</button>
+          ) : (
+            <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAddDist}><Plus size={15} /> Add Distribution</button>
           )}
         </div>
 
         <div className="overflow-x-auto">
-          {tab === 'inventory' ? (
+          {loading ? (
+            <div className="table-cell text-center text-gray-400 py-8">Loading…</div>
+          ) : tab === 'inventory' ? (
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -88,43 +157,50 @@ export default function ReliefManagement() {
                   <tr key={i.id} className={`hover:bg-gray-50 ${i.quantity <= i.threshold ? 'bg-red-50' : ''}`}>
                     <td className="table-cell font-medium flex items-center gap-2">
                       <Package size={14} className="text-gray-400" />
-                      {i.item}
+                      {i.item_name}
                       {i.quantity <= i.threshold && <TrendingDown size={14} className="text-red-500" title="Low stock" />}
                     </td>
-                    <td className="table-cell"><span className={CATEGORY_BADGE[i.category]}>{i.category}</span></td>
-                    <td className="table-cell font-semibold">{i.quantity.toLocaleString()}</td>
+                    <td className="table-cell"><span className={CATEGORY_BADGE[i.category] || 'badge-green'}>{i.category}</span></td>
+                    <td className="table-cell font-semibold">{(i.quantity || 0).toLocaleString()}</td>
                     <td className="table-cell">{i.unit}</td>
                     <td className="table-cell text-gray-500">{i.threshold}</td>
-                    <td className="table-cell text-gray-500">{i.lastUpdated}</td>
+                    <td className="table-cell text-gray-500">{i.updated_at ? String(i.updated_at).slice(0, 10) : '—'}</td>
                     <td className="table-cell">
                       <div className="flex gap-2">
-                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(i)}><Pencil size={15} /></button>
-                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(i.id)}><Trash2 size={15} /></button>
+                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEditInv(i)}><Pencil size={15} /></button>
+                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDeleteInv(i.id)}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>
                 ))}
+                {filteredInv.length === 0 && (
+                  <tr><td colSpan={7} className="table-cell text-center text-gray-400 py-8">No inventory items found.</td></tr>
+                )}
               </tbody>
             </table>
           ) : (
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Family','Barangay','Center','Items','Date','Receiver','Status'].map(h => <th key={h} className="table-head">{h}</th>)}
+                  {['Barangay','Center','Items','Quantity','Date','Receiver','Distributed By','Status'].map(h => <th key={h} className="table-head">{h}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredDist.map(d => (
                   <tr key={d.id} className="hover:bg-gray-50">
-                    <td className="table-cell font-medium">{d.family}</td>
-                    <td className="table-cell">{d.barangay}</td>
-                    <td className="table-cell">{d.center}</td>
+                    <td className="table-cell">{d.barangay_name || '—'}</td>
+                    <td className="table-cell">{d.center_name || '—'}</td>
                     <td className="table-cell text-xs text-gray-600">{d.items}</td>
-                    <td className="table-cell">{d.date}</td>
+                    <td className="table-cell">{d.quantity}</td>
+                    <td className="table-cell">{d.dist_date}</td>
                     <td className="table-cell">{d.receiver}</td>
+                    <td className="table-cell text-sm text-gray-500">{d.distributed_by_name || '—'}</td>
                     <td className="table-cell"><span className={d.status === 'Completed' ? 'badge-green' : 'badge-yellow'}>{d.status}</span></td>
                   </tr>
                 ))}
+                {filteredDist.length === 0 && (
+                  <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-8">No distribution records found.</td></tr>
+                )}
               </tbody>
             </table>
           )}
@@ -132,27 +208,79 @@ export default function ReliefManagement() {
       </div>
 
       {/* Inventory Modal */}
-      {showModal && (
+      {showInvModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Item' : 'Add Inventory Item'}</h3>
+            <h3 className="text-lg font-semibold mb-5">{editingInv ? 'Edit Item' : 'Add Inventory Item'}</h3>
             <div className="space-y-4">
-              <div><label className="label">Item Name</label><input className="input" value={form.item} onChange={e => setForm({...form,item:e.target.value})} /></div>
+              <div><label className="label">Item Name</label><input className="input" value={invForm.item_name} onChange={e => setInvForm({...invForm, item_name: e.target.value})} /></div>
               <div>
                 <label className="label">Category</label>
-                <select className="input" value={form.category} onChange={e => setForm({...form,category:e.target.value})}>
+                <select className="input" value={invForm.category} onChange={e => setInvForm({...invForm, category: e.target.value})}>
                   {['Food','Water','Non-Food','Medical'].map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="label">Quantity</label><input className="input" type="number" value={form.quantity} onChange={e => setForm({...form,quantity:e.target.value})} /></div>
-                <div><label className="label">Unit</label><input className="input" value={form.unit} onChange={e => setForm({...form,unit:e.target.value})} placeholder="e.g. sacks" /></div>
+                <div><label className="label">Quantity</label><input className="input" type="number" value={invForm.quantity} onChange={e => setInvForm({...invForm, quantity: e.target.value})} /></div>
+                <div><label className="label">Unit</label><input className="input" value={invForm.unit} onChange={e => setInvForm({...invForm, unit: e.target.value})} placeholder="e.g. sacks" /></div>
               </div>
-              <div><label className="label">Low Stock Threshold</label><input className="input" type="number" value={form.threshold} onChange={e => setForm({...form,threshold:e.target.value})} /></div>
+              <div><label className="label">Low Stock Threshold</label><input className="input" type="number" value={invForm.threshold} onChange={e => setInvForm({...invForm, threshold: e.target.value})} /></div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleSave}>{editing ? 'Save Changes' : 'Add Item'}</button>
+              <button className="btn-secondary" onClick={() => setShowInvModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveInv} disabled={saving}>{saving ? 'Saving…' : (editingInv ? 'Save Changes' : 'Add Item')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Distribution Modal */}
+      {showDistModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <h3 className="text-lg font-semibold mb-5">Add Distribution</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Barangay</label>
+                <select className="input" value={distForm.barangay_id} onChange={e => setDistForm({...distForm, barangay_id: e.target.value})}>
+                  <option value="">Select barangay</option>
+                  {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Evacuation Center</label>
+                <select className="input" value={distForm.center_id} onChange={e => setDistForm({...distForm, center_id: e.target.value})}>
+                  <option value="">Select center</option>
+                  {centers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="label">Household</label>
+                <select className="input" value={distForm.household_id} onChange={e => setDistForm({...distForm, household_id: e.target.value})}>
+                  <option value="">Select household</option>
+                  {households.map(h => <option key={h.id} value={h.id}>{h.head_family} ({h.household_id})</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="label">Items</label>
+                <input className="input" value={distForm.items} onChange={e => setDistForm({...distForm, items: e.target.value})} placeholder="e.g. Rice x2, Canned Goods x10" />
+              </div>
+              <div>
+                <label className="label">Quantity</label>
+                <input className="input" value={distForm.quantity} onChange={e => setDistForm({...distForm, quantity: e.target.value})} placeholder="e.g. 12" />
+              </div>
+              <div>
+                <label className="label">Date</label>
+                <input className="input" type="date" value={distForm.dist_date} onChange={e => setDistForm({...distForm, dist_date: e.target.value})} />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Receiver Name</label>
+                <input className="input" value={distForm.receiver} onChange={e => setDistForm({...distForm, receiver: e.target.value})} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button className="btn-secondary" onClick={() => setShowDistModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn-primary" onClick={handleSaveDist} disabled={saving}>{saving ? 'Saving…' : 'Add Distribution'}</button>
             </div>
           </div>
         </div>
