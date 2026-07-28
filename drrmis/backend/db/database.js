@@ -52,6 +52,7 @@ async function initDb() {
   await runMigrations()
   await seedDefaultAdmin()
   await seedBarangays()
+  await seedBoundaries()
   console.log('Database initialized.')
 }
 
@@ -168,6 +169,36 @@ async function seedBarangays() {
     }
   }
   console.log(`Seeded ${allBarangays.length} barangays for Gingoog City`)
+}
+
+// Auto-restores official PSA/PSGC boundary polygons for any barangay that doesn't
+// have one yet. Runs on every server startup — this is what keeps the boundary data
+// alive even if the SQLite file gets reset (e.g. free-tier Render redeploys wipe
+// ephemeral disk). Source data is bundled in the repo, not the database, so it
+// always survives a redeploy.
+async function seedBoundaries() {
+  let boundaries
+  try {
+    boundaries = require('./gingoog-barangay-boundaries.json')
+  } catch {
+    console.log('No bundled boundary data file found — skipping boundary auto-seed.')
+    return
+  }
+
+  const barangays = await all('SELECT id, name, boundary_geojson FROM barangays')
+  let restored = 0
+
+  for (const b of barangays) {
+    if (b.boundary_geojson) continue // already has one, leave it alone
+    const geometry = boundaries[b.name]
+    if (!geometry) continue
+    await run('UPDATE barangays SET boundary_geojson = ? WHERE id = ?', [JSON.stringify(geometry), b.id])
+    restored++
+  }
+
+  if (restored > 0) {
+    console.log(`Boundary auto-seed: restored boundary_geojson for ${restored} barangay(s).`)
+  }
 }
 
 module.exports = { getDb, run, get, all, initDb }
