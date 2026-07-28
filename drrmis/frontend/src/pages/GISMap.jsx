@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2 } from 'lucide-react'
@@ -10,6 +10,15 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+// Custom pin icon for barangay markers (distinct from evacuation/incident pins)
+const barangayIcon = new L.DivIcon({
+  className: 'barangay-pin',
+  html: `<div style="background:#1d4ed8;width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 14],
+  popupAnchor: [0, -14],
 })
 
 // Gingoog City center coordinates
@@ -31,15 +40,50 @@ const LAYERS = [
 
 const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Evacuation Centers','Incident Locations','Household Locations']
 
+// Approximate centroid (average of vertices) for a Polygon or MultiPolygon.
+// Used to place a barangay pin and as a fly-to fallback when no boundary is loaded yet.
+function getCentroid(geojson) {
+  if (!geojson) return null
+  try {
+    let rings = []
+    if (geojson.type === 'Polygon') {
+      rings = [geojson.coordinates[0]]
+    } else if (geojson.type === 'MultiPolygon') {
+      rings = geojson.coordinates.map(poly => poly[0])
+    } else {
+      return null
+    }
+    let sumLat = 0, sumLng = 0, count = 0
+    rings.forEach(ring => {
+      ring.forEach(([lng, lat]) => {
+        sumLat += lat
+        sumLng += lng
+        count++
+      })
+    })
+    if (count === 0) return null
+    return [sumLat / count, sumLng / count]
+  } catch {
+    return null
+  }
+}
+
 // Helper component: pans/zooms the map to fit the selected barangay's boundary
-function FlyToBoundary({ geojsonLayer }) {
+// (fallbackCenter is optional — used to fly to a centroid point when there's no boundary polygon)
+function FlyToBoundary({ geojsonLayer, fallbackCenter }) {
   const map = useMap()
   useEffect(() => {
     if (geojsonLayer) {
       const bounds = geojsonLayer.getBounds()
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] })
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [30, 30] })
+        return
+      }
     }
-  }, [geojsonLayer, map])
+    if (fallbackCenter) {
+      map.flyTo(fallbackCenter, 15, { duration: 0.8 })
+    }
+  }, [geojsonLayer, fallbackCenter, map])
   return null
 }
 
@@ -59,9 +103,28 @@ export default function GISMap() {
 
   const layer = LAYERS.find(l => l.id === activeLayer)
 
-  const filteredBarangays = barangays.filter(b =>
+  // Pre-compute centroid for every barangay that has boundary data (for pins + fly-to fallback)
+  const barangaysWithCentroid = useMemo(() => {
+    return barangays.map(b => {
+      if (!b.boundary_geojson) return { ...b, centroid: null }
+      try {
+        return { ...b, centroid: getCentroid(JSON.parse(b.boundary_geojson)) }
+      } catch {
+        return { ...b, centroid: null }
+      }
+    })
+  }, [barangays])
+
+  const filteredBarangays = barangaysWithCentroid.filter(b =>
     b.name.toLowerCase().includes(search.toLowerCase())
   )
+
+  // Auto-select + fly to the barangay once the search narrows down to a single match
+  useEffect(() => {
+    if (search.trim().length > 0 && filteredBarangays.length === 1) {
+      setSelectedBarangay(filteredBarangays[0])
+    }
+  }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedGeojson = (() => {
     if (!selectedBarangay?.boundary_geojson) return null
@@ -71,6 +134,30 @@ export default function GISMap() {
       return null
     }
   })()
+
+  // When a selected barangay has no boundary (and so no centroid), look up its
+  // approximate location via OpenStreetMap Nominatim so we can still fly the map there.
+  const [geocodedCenter, setGeocodedCenter] = useState(null)
+  const [geocoding, setGeocoding] = useState(false)
+
+  useEffect(() => {
+    setGeocodedCenter(null)
+    if (!selectedBarangay || selectedBarangay.centroid) return
+
+    let cancelled = false
+    setGeocoding(true)
+    const query = encodeURIComponent(`${selectedBarangay.name}, Gingoog City, Misamis Oriental, Philippines`)
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${query}`)
+      .then(res => res.json())
+      .then(results => {
+        if (cancelled || !results?.[0]) return
+        setGeocodedCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setGeocoding(false) })
+
+    return () => { cancelled = true }
+  }, [selectedBarangay])
 
   return (
     <div className="flex gap-4 h-[calc(100vh-140px)] min-h-96">
@@ -121,6 +208,12 @@ export default function GISMap() {
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
             {!selectedBarangay.boundary_geojson && (
               <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
+            )}
+            {!selectedBarangay.centroid && geocoding && (
+              <p className="text-xs text-gray-400 mt-1">Locating on map…</p>
+            )}
+            {!selectedBarangay.centroid && !geocoding && !geocodedCenter && (
+              <p className="text-xs text-gray-400 mt-1">Location not found on the map.</p>
             )}
           </div>
         )}
@@ -197,9 +290,42 @@ export default function GISMap() {
                   )}
                 </Popup>
               </GeoJSON>
-              <FlyToBoundary geojsonLayer={geojsonLayerRef} />
+              <FlyToBoundary geojsonLayer={geojsonLayerRef} fallbackCenter={selectedBarangay?.centroid || geocodedCenter} />
             </>
           )}
+          {!selectedGeojson && selectedBarangay && (selectedBarangay.centroid || geocodedCenter) && (
+            <FlyToBoundary geojsonLayer={null} fallbackCenter={selectedBarangay.centroid || geocodedCenter} />
+          )}
+
+          {/* Fallback pin for the selected barangay when it has no boundary yet, using the geocoded location */}
+          {selectedBarangay && !selectedBarangay.centroid && geocodedCenter && (
+            <Marker position={geocodedCenter} icon={barangayIcon}>
+              <Popup>
+                <strong>{selectedBarangay.name}</strong>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>Approximate location (no boundary drawn yet)</div>
+              </Popup>
+            </Marker>
+          )}
+
+          {/* Barangay name pins — always visible, click to select + view photo */}
+          {barangaysWithCentroid.filter(b => b.centroid).map(b => (
+            <Marker
+              key={`brgy-${b.id}`}
+              position={b.centroid}
+              icon={barangayIcon}
+              eventHandlers={{ click: () => setSelectedBarangay(b) }}
+            >
+              <Popup>
+                <strong>{b.name}</strong>
+                {b.image_url && (
+                  <div>
+                    <img src={b.image_url} alt={b.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
+                  </div>
+                )}
+                {!b.image_url && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>No photo uploaded yet.</div>}
+              </Popup>
+            </Marker>
+          ))}
 
           {/* Flood zone circle */}
           {activeOverlays.includes('Flood Zones') && MARKERS.filter(m => m.type === 'Hazard').map(m => (
