@@ -22,7 +22,7 @@ export default function BarangayManagement() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active', boundary_geojson: '', image_url: '' })
+  const [form, setForm] = useState({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active', boundary_geojson: '', image_url: '', contact_number: '' })
 
   const loadBarangays = async () => {
     setLoading(true)
@@ -48,7 +48,7 @@ export default function BarangayManagement() {
 
   const openAdd = () => {
     setEditing(null)
-    setForm({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active', boundary_geojson: '', image_url: '' })
+    setForm({ name: '', captain: '', secretary: '', population: '', families: '', houses: '', risk_level: 'Low', status: 'Active', boundary_geojson: '', image_url: '', contact_number: '' })
     setShowModal(true)
   }
 
@@ -65,6 +65,7 @@ export default function BarangayManagement() {
       status: b.status || 'Active',
       boundary_geojson: b.boundary_geojson || '',
       image_url: b.image_url || '',
+      contact_number: b.contact_number || '',
     })
     setShowModal(true)
   }
@@ -98,6 +99,7 @@ export default function BarangayManagement() {
         houses: +form.houses || 0,
         boundary_geojson: form.boundary_geojson.trim() || null,
         image_url: form.image_url.trim() || null,
+        contact_number: form.contact_number.trim() || null,
       }
       if (editing) {
         const updated = await apiPut(`/barangays/${editing}`, payload)
@@ -212,11 +214,32 @@ export default function BarangayManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Barangay Name</label>
-                <input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Barangay 1 (Pob.)" />
+                <input
+                  className={`input ${editing ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+                  value={form.name}
+                  onChange={e => setForm({...form, name: e.target.value})}
+                  placeholder="e.g. Barangay 1 (Pob.)"
+                  disabled={!!editing}
+                  readOnly={!!editing}
+                />
+                {editing && (
+                  <p className="text-xs text-gray-400 mt-1">Official barangay name — matched to PSA records and cannot be renamed here.</p>
+                )}
               </div>
-              <div className="col-span-2">
+              <div>
                 <label className="label">Barangay Captain</label>
                 <input className="input" value={form.captain} onChange={e => setForm({...form, captain: e.target.value})} />
+              </div>
+              <div>
+                <label className="label">Emergency Contact Number</label>
+                <input
+                  className="input"
+                  type="tel"
+                  value={form.contact_number}
+                  onChange={e => setForm({...form, contact_number: e.target.value})}
+                  placeholder="e.g. 0917 123 4567"
+                />
+                <p className="text-xs text-gray-400 mt-1">Shown on the GIS Map for quick contact during emergencies.</p>
               </div>
               {[['population','Population'],['families','Families'],['houses','Houses']].map(([k,l]) => (
                 <div key={k}>
@@ -235,21 +258,6 @@ export default function BarangayManagement() {
                 <select className="input" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
                   <option>Active</option><option>Inactive</option>
                 </select>
-              </div>
-              <div className="col-span-2">
-                <label className="label">Barangay Image URL</label>
-                <input className="input" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} placeholder="https://…" />
-              </div>
-              <div className="col-span-2">
-                <label className="label">Boundary GeoJSON (Polygon/MultiPolygon)</label>
-                <textarea
-                  className="input font-mono text-xs"
-                  rows={5}
-                  value={form.boundary_geojson}
-                  onChange={e => setForm({...form, boundary_geojson: e.target.value})}
-                  placeholder='{"type":"Polygon","coordinates":[[[125.10,8.81],[125.11,8.81],[125.11,8.82],[125.10,8.82],[125.10,8.81]]]}'
-                />
-                <p className="text-xs text-gray-400 mt-1">Used by GIS Map to draw and highlight this barangay's boundary when selected.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
