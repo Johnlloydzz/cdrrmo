@@ -398,11 +398,7 @@ export default function GISMap() {
                   className="w-full h-40 object-cover"
                   onError={e => e.target.style.display = 'none'}
                 />
-              ) : (
-                <div className="w-full h-16 bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                  No photo uploaded yet
-                </div>
-              )}
+              ) :null}
               <button
                 onClick={() => setSelectedBarangay(null)}
                 className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full w-7 h-7 flex items-center justify-center shadow text-gray-600 text-sm"
