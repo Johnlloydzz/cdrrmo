@@ -389,30 +389,24 @@ export default function GISMap() {
 
         {/* Right-side barangay info panel — styled like a Google Maps place card */}
         {selectedBarangay && (
-          <div className="absolute top-3 right-3 z-[400] w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="relative">
-              {selectedBarangay.image_url ? (
-                <img
-                  src={selectedBarangay.image_url}
-                  alt={selectedBarangay.name}
-                  className="w-full h-40 object-cover"
-                  onError={e => e.target.style.display = 'none'}
-                />
-              ) : (
-                <div className="w-full h-16 bg-gray-100 flex items-center justify-center text-xs text-gray-400">
-                  No photo uploaded yet
-                </div>
-              )}
-              <button
-                onClick={() => setSelectedBarangay(null)}
-                className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full w-7 h-7 flex items-center justify-center shadow text-gray-600 text-sm"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
+          <div className="absolute top-3 right-3 z-[400] w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden relative">
+            <button
+              onClick={() => setSelectedBarangay(null)}
+              className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white rounded-full w-7 h-7 flex items-center justify-center shadow text-gray-600 text-sm"
+              title="Close"
+            >
+              ✕
+            </button>
+            {selectedBarangay.image_url && (
+              <img
+                src={selectedBarangay.image_url}
+                alt={selectedBarangay.name}
+                className="w-full h-40 object-cover"
+                onError={e => e.target.style.display = 'none'}
+              />
+            )}
 
-            <div className="p-4">
+            <div className={`p-4 ${!selectedBarangay.image_url ? 'pt-8' : ''}`}>
               <h3 className="font-semibold text-base text-gray-900">{selectedBarangay.name}</h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Risk level: <span className="font-medium">{selectedBarangay.risk_level}</span>
