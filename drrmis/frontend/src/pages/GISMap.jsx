@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { Layers, Search, MapPin, Navigation, Building2 } from 'lucide-react'
+import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
 
 // Fix Leaflet default icons in Vite
@@ -94,6 +94,7 @@ export default function GISMap() {
   const [barangays, setBarangays] = useState([])
   const [selectedBarangay, setSelectedBarangay] = useState(null)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
+  const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => {
     apiGet('/barangays').then(setBarangays).catch(() => {})
@@ -206,6 +207,16 @@ export default function GISMap() {
             <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain || '—'}</p>
             <p className="text-xs text-gray-500">Population: {(selectedBarangay.population || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
+            {selectedBarangay.contact_number ? (
+              <a
+                href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
+                className="mt-2 flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
+              >
+                📞 Call {selectedBarangay.contact_number}
+              </a>
+            ) : (
+              <p className="text-xs text-amber-600 mt-2">No emergency contact number on file.</p>
+            )}
             {!selectedBarangay.boundary_geojson && (
               <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
             )}
@@ -288,6 +299,16 @@ export default function GISMap() {
                   {selectedBarangay.image_url && (
                     <img src={selectedBarangay.image_url} alt={selectedBarangay.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
                   )}
+                  {selectedBarangay.contact_number ? (
+                    <a
+                      href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
+                      style={{ display: 'block', marginTop: '6px', background: '#dc2626', color: 'white', textAlign: 'center', padding: '5px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+                    >
+                      📞 Call {selectedBarangay.contact_number}
+                    </a>
+                  ) : (
+                    <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px' }}>No emergency contact on file.</div>
+                  )}
                 </Popup>
               </GeoJSON>
               <FlyToBoundary geojsonLayer={geojsonLayerRef} fallbackCenter={selectedBarangay?.centroid || geocodedCenter} />
@@ -323,6 +344,16 @@ export default function GISMap() {
                   </div>
                 )}
                 {!b.image_url && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>No photo uploaded yet.</div>}
+                {b.contact_number ? (
+                  <a
+                    href={`tel:${b.contact_number.replace(/\s+/g, '')}`}
+                    style={{ display: 'block', marginTop: '6px', background: '#dc2626', color: 'white', textAlign: 'center', padding: '5px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    📞 Call {b.contact_number}
+                  </a>
+                ) : (
+                  <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px' }}>No emergency contact on file.</div>
+                )}
               </Popup>
             </Marker>
           ))}
@@ -350,11 +381,105 @@ export default function GISMap() {
         </MapContainer>
 
         {/* Map toolbar overlay */}
-        <div className="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+        <div className="absolute bottom-3 right-3 z-[400] flex flex-col gap-2">
           <button className="bg-white shadow rounded-lg p-2 hover:bg-gray-50" title="My Location">
             <Navigation size={16} className="text-gray-600" />
           </button>
         </div>
+
+        {/* Right-side barangay info panel — styled like a Google Maps place card */}
+        {selectedBarangay && (
+          <div className="absolute top-3 right-3 z-[400] w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+            <div className="relative">
+              {selectedBarangay.image_url ? (
+                <img
+                  src={selectedBarangay.image_url}
+                  alt={selectedBarangay.name}
+                  className="w-full h-40 object-cover"
+                  onError={e => e.target.style.display = 'none'}
+                />
+              ) : (
+                <div className="w-full h-16 bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                  No photo uploaded yet
+                </div>
+              )}
+              <button
+                onClick={() => setSelectedBarangay(null)}
+                className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full w-7 h-7 flex items-center justify-center shadow text-gray-600 text-sm"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4">
+              <h3 className="font-semibold text-base text-gray-900">{selectedBarangay.name}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Risk level: <span className="font-medium">{selectedBarangay.risk_level}</span>
+                {' · '}Pop. {(selectedBarangay.population || 0).toLocaleString()}
+              </p>
+
+              {/* Google-style icon action row */}
+              <div className="flex items-center gap-2 mt-3">
+                <a
+                  href={selectedBarangay.contact_number ? `tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}` : undefined}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    selectedBarangay.contact_number
+                      ? 'bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer'
+                      : 'bg-gray-50 text-gray-300 pointer-events-none'
+                  }`}
+                  title={selectedBarangay.contact_number ? `Call ${selectedBarangay.contact_number}` : 'No contact number on file'}
+                >
+                  <Phone size={16} />
+                  Call
+                </a>
+
+                {(selectedBarangay.centroid || geocodedCenter) ? (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${(selectedBarangay.centroid || geocodedCenter)[0]},${(selectedBarangay.centroid || geocodedCenter)[1]}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                    title="Get directions"
+                  >
+                    <Route size={16} />
+                    Directions
+                  </a>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-300">
+                    <Route size={16} />
+                    Directions
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    const text = `${selectedBarangay.name} — Gingoog City${selectedBarangay.contact_number ? `\nContact: ${selectedBarangay.contact_number}` : ''}`
+                    navigator.clipboard?.writeText(text)
+                    setShareCopied(true)
+                    setTimeout(() => setShareCopied(false), 1500)
+                  }}
+                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
+                  title="Copy barangay info"
+                >
+                  <Share2 size={16} />
+                  {shareCopied ? 'Copied!' : 'Share'}
+                </button>
+              </div>
+
+              {/* Details */}
+              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+                <p className="text-xs text-gray-500">Captain: <span className="text-gray-700">{selectedBarangay.captain || '—'}</span></p>
+                <p className="text-xs text-gray-500">
+                  Emergency contact: <span className="text-gray-700">{selectedBarangay.contact_number || 'Not on file'}</span>
+                </p>
+                {!selectedBarangay.boundary_geojson && (
+                  <p className="text-xs text-amber-600 pt-1">No boundary data uploaded for this barangay yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

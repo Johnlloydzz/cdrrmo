@@ -11,6 +11,7 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showAccounts, setShowAccounts] = useState(false)
+  const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
 
   const handle = (e) =>
     setForm({ ...form, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
@@ -96,6 +97,12 @@ export default function Login({ onLogin }) {
                   </span>
                 </button>
               ))}
+            </div>
+          )}
+
+          {sessionExpired && !error && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+              <span className="text-amber-500">⏱</span> Your session expired. Please sign in again.
             </div>
           )}
 

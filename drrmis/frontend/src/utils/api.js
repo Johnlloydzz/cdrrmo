@@ -4,6 +4,14 @@ function getToken() {
   return localStorage.getItem('drrmis_token')
 }
 
+function handleSessionExpired() {
+  localStorage.removeItem('drrmis_token')
+  localStorage.removeItem('drrmis_user')
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login?expired=1'
+  }
+}
+
 async function request(endpoint, options = {}) {
   const token = getToken()
   const headers = {
@@ -13,6 +21,11 @@ async function request(endpoint, options = {}) {
   }
 
   const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers })
+
+  if (res.status === 401) {
+    handleSessionExpired()
+    throw new Error('Session expired. Please log in again.')
+  }
 
   let data
   try {
