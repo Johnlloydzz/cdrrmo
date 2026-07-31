@@ -293,24 +293,7 @@ export default function GISMap() {
                 data={selectedGeojson}
                 style={{ color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.15 }}
                 ref={setGeojsonLayerRef}
-              >
-                <Popup>
-                  <strong>{selectedBarangay.name}</strong><br />
-                  {selectedBarangay.image_url && (
-                    <img src={selectedBarangay.image_url} alt={selectedBarangay.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
-                  )}
-                  {selectedBarangay.contact_number ? (
-                    <a
-                      href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
-                      style={{ display: 'block', marginTop: '6px', background: '#dc2626', color: 'white', textAlign: 'center', padding: '5px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
-                    >
-                      📞 Call {selectedBarangay.contact_number}
-                    </a>
-                  ) : (
-                    <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px' }}>No emergency contact on file.</div>
-                  )}
-                </Popup>
-              </GeoJSON>
+              />
               <FlyToBoundary geojsonLayer={geojsonLayerRef} fallbackCenter={selectedBarangay?.centroid || geocodedCenter} />
             </>
           )}
@@ -320,42 +303,17 @@ export default function GISMap() {
 
           {/* Fallback pin for the selected barangay when it has no boundary yet, using the geocoded location */}
           {selectedBarangay && !selectedBarangay.centroid && geocodedCenter && (
-            <Marker position={geocodedCenter} icon={barangayIcon}>
-              <Popup>
-                <strong>{selectedBarangay.name}</strong>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>Approximate location (no boundary drawn yet)</div>
-              </Popup>
-            </Marker>
+            <Marker position={geocodedCenter} icon={barangayIcon} />
           )}
 
-          {/* Barangay name pins — always visible, click to select + view photo */}
+          {/* Barangay name pins — always visible, click to select (details show in the right-side panel) */}
           {barangaysWithCentroid.filter(b => b.centroid).map(b => (
             <Marker
               key={`brgy-${b.id}`}
               position={b.centroid}
               icon={barangayIcon}
               eventHandlers={{ click: () => setSelectedBarangay(b) }}
-            >
-              <Popup>
-                <strong>{b.name}</strong>
-                {b.image_url && (
-                  <div>
-                    <img src={b.image_url} alt={b.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
-                  </div>
-                )}
-                {!b.image_url && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>No photo uploaded yet.</div>}
-                {b.contact_number ? (
-                  <a
-                    href={`tel:${b.contact_number.replace(/\s+/g, '')}`}
-                    style={{ display: 'block', marginTop: '6px', background: '#dc2626', color: 'white', textAlign: 'center', padding: '5px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    📞 Call {b.contact_number}
-                  </a>
-                ) : (
-                  <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px' }}>No emergency contact on file.</div>
-                )}
-              </Popup>
-            </Marker>
+            />
           ))}
 
           {/* Flood zone circle */}
