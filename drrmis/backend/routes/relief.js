@@ -12,10 +12,10 @@ router.get('/inventory', async (req, res) => {
 
 router.post('/inventory', async (req, res) => {
   try {
-    const { item_name, category, quantity, unit, threshold } = req.body
+    const { item_name, category, quantity, unit, threshold, barangay_id } = req.body
     const r = await run(
-      'INSERT INTO relief_inventory (item_name, category, quantity, unit, threshold) VALUES (?, ?, ?, ?, ?)',
-      [item_name, category || 'Food', quantity || 0, unit, threshold || 0]
+      'INSERT INTO relief_inventory (item_name, category, quantity, unit, threshold, barangay_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [item_name, category || 'Food', quantity || 0, unit, threshold || 0, barangay_id || null]
     )
     res.status(201).json(await get('SELECT * FROM relief_inventory WHERE id = ?', [r.lastID]))
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -23,10 +23,10 @@ router.post('/inventory', async (req, res) => {
 
 router.put('/inventory/:id', async (req, res) => {
   try {
-    const { item_name, category, quantity, unit, threshold } = req.body
+    const { item_name, category, quantity, unit, threshold, barangay_id } = req.body
     await run(
-      `UPDATE relief_inventory SET item_name=?, category=?, quantity=?, unit=?, threshold=?, updated_at=datetime('now') WHERE id=?`,
-      [item_name, category, quantity, unit, threshold, req.params.id]
+      `UPDATE relief_inventory SET item_name=?, category=?, quantity=?, unit=?, threshold=?, barangay_id=?, updated_at=datetime('now') WHERE id=?`,
+      [item_name, category, quantity, unit, threshold, barangay_id || null, req.params.id]
     )
     res.json(await get('SELECT * FROM relief_inventory WHERE id = ?', [req.params.id]))
   } catch (err) { res.status(500).json({ error: err.message }) }

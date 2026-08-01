@@ -18,9 +18,9 @@ router.put('/', authorize('Super Administrator'), async (req, res) => {
     const entries = Object.entries(req.body)
     for (const [key, value] of entries) {
       await run(
-        `INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
-         ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
-        [key, value]
+        `INSERT INTO system_settings (key, value, updated_by, updated_at) VALUES (?, ?, ?, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_by=excluded.updated_by, updated_at=excluded.updated_at`,
+        [key, value, req.user.id]
       )
     }
     res.json({ message: 'Settings updated' })

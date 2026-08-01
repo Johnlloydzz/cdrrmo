@@ -191,6 +191,7 @@ module.exports = [
     quantity     INTEGER DEFAULT 0,
     unit         TEXT,
     threshold    INTEGER DEFAULT 0,
+    barangay_id  INTEGER REFERENCES barangays(id),
     updated_at   TEXT    DEFAULT (datetime('now'))
   )`,
 
@@ -259,6 +260,7 @@ module.exports = [
     wind_dir    TEXT,
     pressure    REAL,
     condition   TEXT,
+    barangay_id INTEGER REFERENCES barangays(id),
     logged_at   TEXT DEFAULT (datetime('now'))
   )`,
 
@@ -278,6 +280,7 @@ module.exports = [
   `CREATE TABLE IF NOT EXISTS system_settings (
     key         TEXT PRIMARY KEY,
     value       TEXT,
+    updated_by  INTEGER REFERENCES users(id),
     updated_at  TEXT DEFAULT (datetime('now'))
   )`,
 

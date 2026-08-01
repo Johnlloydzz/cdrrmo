@@ -111,6 +111,30 @@ async function runMigrations() {
     await run('ALTER TABLE alerts ADD COLUMN sent_by_user_id INTEGER REFERENCES users(id)')
     console.log('Migration: added sent_by_user_id to alerts')
   }
+
+  const reliefInvColumns = await all('PRAGMA table_info(relief_inventory)')
+  const reliefInvColumnNames = reliefInvColumns.map(c => c.name)
+
+  if (!reliefInvColumnNames.includes('barangay_id')) {
+    await run('ALTER TABLE relief_inventory ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
+    console.log('Migration: added barangay_id to relief_inventory')
+  }
+
+  const weatherColumns = await all('PRAGMA table_info(weather_logs)')
+  const weatherColumnNames = weatherColumns.map(c => c.name)
+
+  if (!weatherColumnNames.includes('barangay_id')) {
+    await run('ALTER TABLE weather_logs ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
+    console.log('Migration: added barangay_id to weather_logs')
+  }
+
+  const settingsColumns = await all('PRAGMA table_info(system_settings)')
+  const settingsColumnNames = settingsColumns.map(c => c.name)
+
+  if (!settingsColumnNames.includes('updated_by')) {
+    await run('ALTER TABLE system_settings ADD COLUMN updated_by INTEGER REFERENCES users(id)')
+    console.log('Migration: added updated_by to system_settings')
+  }
 }
 
 async function seedDefaultAdmin() {

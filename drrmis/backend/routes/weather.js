@@ -24,10 +24,10 @@ router.get('/history', async (req, res) => {
 
 router.post('/log', async (req, res) => {
   try {
-    const { temperature, humidity, rainfall, wind_speed, wind_dir, pressure, condition } = req.body
+    const { temperature, humidity, rainfall, wind_speed, wind_dir, pressure, condition, barangay_id } = req.body
     const r = await run(
-      'INSERT INTO weather_logs (temperature, humidity, rainfall, wind_speed, wind_dir, pressure, condition) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [temperature, humidity, rainfall, wind_speed, wind_dir, pressure, condition]
+      'INSERT INTO weather_logs (temperature, humidity, rainfall, wind_speed, wind_dir, pressure, condition, barangay_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [temperature, humidity, rainfall, wind_speed, wind_dir, pressure, condition, barangay_id || null]
     )
     res.status(201).json(await get('SELECT * FROM weather_logs WHERE id = ?', [r.lastID]))
   } catch (err) { res.status(500).json({ error: err.message }) }
