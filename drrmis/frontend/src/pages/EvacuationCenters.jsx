@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Plus, Pencil, Trash2, Download } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 
 const initialCenters = [
   { id: 1, name: 'Gingoog City Central Gym',   barangay: 'Barangay 1 (Pob.)', capacity: 500, occupants: 124, contact: 'City Sports Office',  medical: true,  generator: true,  kitchen: true,  water: true,  electricity: true, status: 'Open' },
@@ -62,7 +62,6 @@ export default function EvacuationCenters() {
           <input className="input pl-9" placeholder="Search center or barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary flex items-center gap-2 text-sm"><Download size={15} /> Export</button>
           <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Center</button>
         </div>
       </div>
