@@ -49,7 +49,7 @@ const MARKERS = [
   { id: 2, type: 'Evacuation', label: 'Kioskos Elem School', lat: 8.8190, lng: 125.1060, color: '#22c55e' },
   { id: 3, type: 'Incident',   label: 'INC-001 Flood (Active)', lat: 8.8175, lng: 125.1045, color: '#ef4444' },
   { id: 4, type: 'Incident',   label: 'INC-002 Landslide (Resolved)', lat: 8.8260, lng: 125.1150, color: '#f59e0b' },
-  { id: 5, type: 'Hazard',     label: 'Flood Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
+  { id: 5, type: 'Hazard',     label: 'Flood Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#ef4444', radius: 500 },
 ]
 
 const LAYERS = [
@@ -104,6 +104,17 @@ function FlyToBoundary({ geojsonLayer, fallbackCenter }) {
       map.flyTo(fallbackCenter, 15, { duration: 0.8 })
     }
   }, [geojsonLayer, fallbackCenter, map])
+  return null
+}
+
+// Zooms/pans the map to fit the whole CDRRMO-office-to-barangay route whenever
+// `trigger` changes (used by the "Directions" button in the info panel).
+function FocusRoute({ trigger, coords }) {
+  const map = useMap()
+  useEffect(() => {
+    if (trigger === 0 || !coords || coords.length < 2) return
+    map.fitBounds(L.latLngBounds(coords), { padding: [50, 50] })
+  }, [trigger]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
@@ -162,6 +173,10 @@ export default function GISMap() {
   const [geocoding, setGeocoding] = useState(false)
 
   useEffect(() => {
+    setShowRoute(false)
+  }, [selectedBarangay])
+
+  useEffect(() => {
     setGeocodedCenter(null)
     if (!selectedBarangay || selectedBarangay.centroid) return
 
@@ -186,6 +201,8 @@ export default function GISMap() {
   const [routeCoords, setRouteCoords] = useState(null)
   const [routeInfo, setRouteInfo] = useState(null) // { distanceKm, durationMin }
   const [routing, setRouting] = useState(false)
+  const [focusRoute, setFocusRoute] = useState(0)
+  const [showRoute, setShowRoute] = useState(false)
 
   const destination = selectedBarangay?.centroid || geocodedCenter
 
@@ -315,9 +332,9 @@ export default function GISMap() {
               { color: '#ef4444', label: 'Active Incident' },
               { color: '#f59e0b', label: 'Resolved Incident' },
               { color: '#22c55e', label: 'Evacuation Center' },
-              { color: '#3b82f6', label: 'Flood Zone' },
+              { color: '#ef4444', label: 'Flood Zone' },
               { color: '#8b5cf6', label: 'Landslide Zone' },
-              { color: '#dc2626', label: 'Selected Barangay Boundary' },
+              { color: '#0ea5e9', label: 'Selected Barangay Boundary' },
               { color: '#059669', label: 'CDRRMO Office / Driving Route' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
@@ -344,26 +361,9 @@ export default function GISMap() {
               <GeoJSON
                 key={selectedBarangay.id}
                 data={selectedGeojson}
-                style={{ color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.15 }}
+                style={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.15 }}
                 ref={setGeojsonLayerRef}
-              >
-                <Popup>
-                  <strong>{selectedBarangay.name}</strong><br />
-                  {selectedBarangay.image_url && (
-                    <img src={selectedBarangay.image_url} alt={selectedBarangay.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
-                  )}
-                  {selectedBarangay.contact_number ? (
-                    <a
-                      href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
-                      style={{ display: 'block', marginTop: '6px', background: '#dc2626', color: 'white', textAlign: 'center', padding: '5px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
-                    >
-                      📞 Call {selectedBarangay.contact_number}
-                    </a>
-                  ) : (
-                    <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px' }}>No emergency contact on file.</div>
-                  )}
-                </Popup>
-              </GeoJSON>
+              />
               <FlyToBoundary geojsonLayer={geojsonLayerRef} fallbackCenter={selectedBarangay?.centroid || geocodedCenter} />
             </>
           )}
@@ -373,12 +373,7 @@ export default function GISMap() {
 
           {/* Fallback pin for the selected barangay when it has no boundary yet, using the geocoded location */}
           {selectedBarangay && !selectedBarangay.centroid && geocodedCenter && (
-            <Marker position={geocodedCenter} icon={barangayIcon}>
-              <Popup>
-                <strong>{selectedBarangay.name}</strong>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>Approximate location (no boundary drawn yet)</div>
-              </Popup>
-            </Marker>
+            <Marker position={geocodedCenter} icon={barangayIcon} />
           )}
 
           {/* CDRRMO Office — always visible reference point */}
@@ -386,46 +381,29 @@ export default function GISMap() {
             <Popup><strong>CDRRMO Office</strong><br />Gingoog City</Popup>
           </Marker>
 
-          {/* Route from CDRRMO office to the selected barangay's location */}
-          {selectedBarangay && destination && (
-            <Polyline
-              positions={routeCoords || [CDRRMO_OFFICE, destination]}
-              pathOptions={
-                routeCoords
-                  ? { color: '#059669', weight: 4, opacity: 0.85 }
-                  : { color: '#059669', weight: 3, dashArray: '8, 8' }
-              }
-            />
+          {/* Route from CDRRMO office to the selected barangay's location — only after clicking Directions */}
+          {selectedBarangay && destination && showRoute && (
+            <>
+              <Polyline
+                positions={routeCoords || [CDRRMO_OFFICE, destination]}
+                pathOptions={
+                  routeCoords
+                    ? { color: '#059669', weight: 4, opacity: 0.85 }
+                    : { color: '#059669', weight: 3, dashArray: '8, 8' }
+                }
+              />
+              <FocusRoute trigger={focusRoute} coords={routeCoords || [CDRRMO_OFFICE, destination]} />
+            </>
           )}
 
-          {/* Barangay name pins — always visible, click to select + view photo */}
+          {/* Barangay name pins — always visible, click to select (details show in the right-side panel) */}
           {barangaysWithCentroid.filter(b => b.centroid).map(b => (
             <Marker
               key={`brgy-${b.id}`}
               position={b.centroid}
               icon={barangayIcon}
               eventHandlers={{ click: () => setSelectedBarangay(b) }}
-            >
-              <Popup>
-                <strong>{b.name}</strong>
-                {b.image_url && (
-                  <div>
-                    <img src={b.image_url} alt={b.name} style={{ width: '160px', borderRadius: '6px', marginTop: '4px' }} />
-                  </div>
-                )}
-                {!b.image_url && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>No photo uploaded yet.</div>}
-                {b.contact_number ? (
-                  <a
-                    href={`tel:${b.contact_number.replace(/\s+/g, '')}`}
-                    style={{ display: 'block', marginTop: '6px', background: '#dc2626', color: 'white', textAlign: 'center', padding: '5px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    📞 Call {b.contact_number}
-                  </a>
-                ) : (
-                  <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px' }}>No emergency contact on file.</div>
-                )}
-              </Popup>
-            </Marker>
+            />
           ))}
 
           {/* Flood zone circle */}
@@ -509,16 +487,15 @@ export default function GISMap() {
                 </a>
 
                 {(selectedBarangay.centroid || geocodedCenter) ? (
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${CDRRMO_OFFICE[0]},${CDRRMO_OFFICE[1]}&destination=${(selectedBarangay.centroid || geocodedCenter)[0]},${(selectedBarangay.centroid || geocodedCenter)[1]}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => { setShowRoute(true); setFocusRoute(f => f + 1) }}
                     className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                    title="Get directions"
+                    title="Show route on map"
                   >
                     <Route size={16} />
                     Directions
-                  </a>
+                  </button>
                 ) : (
                   <div className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-300">
                     <Route size={16} />
