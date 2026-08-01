@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -466,6 +467,29 @@ const weatherInfo = {
   landslideWarning: 'Moderate',
 }
 
+// Live weather for Gingoog City (same coordinates/source used on the Weather page)
+const GINGOOG_LAT = 8.8231
+const GINGOOG_LNG = 125.1109
+const LIVE_WEATHER_API = `https://api.open-meteo.com/v1/forecast?latitude=${GINGOOG_LAT}&longitude=${GINGOOG_LNG}` +
+  `&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&timezone=Asia%2FManila`
+
+function useLiveWeather() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(LIVE_WEATHER_API)
+      .then(res => res.json())
+      .then(json => { if (!cancelled) setData(json.current) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  return { data, loading }
+}
+
 // ── Barangay Admin Sub-Components ───────────────────────────────────────────────
 
 function BarangayDashboard({ navigate }) {
@@ -690,6 +714,7 @@ function BarangayDashboard({ navigate }) {
 // ── Field Responder Sub-Components ───────────────────────────────────────────────
 
 function FieldResponderDashboard({ navigate }) {
+  const { data: liveWeather, loading: weatherLoading } = useLiveWeather()
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -864,8 +889,8 @@ function FieldResponderDashboard({ navigate }) {
           <div className="card">
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Current', value: weatherInfo.current, icon: Thermometer, color: 'text-orange-500', bg: 'bg-orange-50' },
-                { label: 'Rainfall', value: weatherInfo.rainfall, icon: Droplets, color: 'text-blue-500', bg: 'bg-blue-50' },
+                { label: 'Current', value: weatherLoading ? '…' : `${Math.round(liveWeather?.temperature_2m ?? 0)}°C`, icon: Thermometer, color: 'text-orange-500', bg: 'bg-orange-50' },
+                { label: 'Rainfall', value: weatherLoading ? '…' : `${liveWeather?.precipitation ?? 0} mm`, icon: Droplets, color: 'text-blue-500', bg: 'bg-blue-50' },
               ].map((w) => (
                 <div key={w.label} className={`${w.bg} border border-gray-100 rounded-xl p-3 flex items-center gap-2`}>
                   <w.icon size={16} className={w.color} />
@@ -981,6 +1006,8 @@ function TeamStatusDot({ status }) {
 }
 
 function PersonnelDashboard({ navigate }) {
+  const { data: liveWeather, loading: weatherLoading } = useLiveWeather()
+
   return (
     <div className="space-y-6">
 
@@ -1008,10 +1035,10 @@ function PersonnelDashboard({ navigate }) {
             <h4 className="font-semibold text-gray-700 text-sm mb-4">Current Weather</h4>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Temperature', value: '28°C', icon: Thermometer, color: 'text-orange-500', bg: 'bg-orange-50' },
-                { label: 'Rainfall', value: '42 mm', icon: Droplets, color: 'text-blue-500', bg: 'bg-blue-50' },
-                { label: 'Wind Speed', value: '35 kph', icon: Wind, color: 'text-teal-500', bg: 'bg-teal-50' },
-                { label: 'Humidity', value: '88%', icon: Activity, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                { label: 'Temperature', value: weatherLoading ? '…' : `${Math.round(liveWeather?.temperature_2m ?? 0)}°C`, icon: Thermometer, color: 'text-orange-500', bg: 'bg-orange-50' },
+                { label: 'Rainfall', value: weatherLoading ? '…' : `${liveWeather?.precipitation ?? 0} mm`, icon: Droplets, color: 'text-blue-500', bg: 'bg-blue-50' },
+                { label: 'Wind Speed', value: weatherLoading ? '…' : `${Math.round(liveWeather?.wind_speed_10m ?? 0)} kph`, icon: Wind, color: 'text-teal-500', bg: 'bg-teal-50' },
+                { label: 'Humidity', value: weatherLoading ? '…' : `${Math.round(liveWeather?.relative_humidity_2m ?? 0)}%`, icon: Activity, color: 'text-indigo-600', bg: 'bg-indigo-50' },
               ].map((w) => (
                 <div key={w.label} className={`${w.bg} border border-gray-100 rounded-xl p-3 flex items-center gap-2`}>
                   <w.icon size={16} className={`${w.color} flex-shrink-0`} />
