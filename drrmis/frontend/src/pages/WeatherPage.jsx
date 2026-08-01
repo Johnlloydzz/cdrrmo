@@ -47,13 +47,13 @@ const weatherInfo = (code) => WEATHER_CODES[code] || { icon: '🌡️', label: '
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const WeatherCard = ({ icon: Icon, label, value, unit, color }) => (
-  <div className="card p-4 flex items-center gap-4">
+  <div className="card p-4 flex flex-col items-center text-center gap-2">
     <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
       <Icon size={20} className="text-white" />
     </div>
     <div>
-      <p className="text-xl font-bold text-gray-800">{value}<span className="text-sm font-normal text-gray-500 ml-1">{unit}</span></p>
-      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xl font-bold text-gray-800 whitespace-nowrap">{value}<span className="text-sm font-normal text-gray-500 ml-1">{unit}</span></p>
+      <p className="text-xs text-gray-500 whitespace-nowrap">{label}</p>
     </div>
   </div>
 )
