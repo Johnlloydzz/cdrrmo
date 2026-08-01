@@ -86,16 +86,9 @@ export const ROLE_ACCESS = {
    * submit hazard reports, update evacuation, view reports
    */
   'Barangay Admin': [
-    '/',            // dashboard
-    '/alerts',      // receive alerts
-    '/weather',     // weather
-    '/puroks',      // manage puroks
-    '/households',  // register households
-    '/residents',   // register residents
-    '/hazards',     // submit hazard reports
-    '/incidents',   // view own barangay incidents
-    '/evacuation',  // update evacuation
-    '/reports',     // view reports
+    '/hazards',    // Submit Hazard Report — Hazard Reporting Module
+    '/incidents',  // My Reports — status of their submitted reports (pending/verified/resolved)
+    '/settings',   // Profile/Settings — account info, logout
   ],
 
   /**
