@@ -202,7 +202,7 @@ const alertBanners = [
 // ── GIS Layer Items ─────────────────────────────────────────────────────────
 
 const gisLayers = [
-  { label: 'Flood Areas',         dot: 'bg-blue-500' },
+  { label: 'Flood Areas',         dot: 'bg-red-500' },
   { label: 'Landslide Areas',     dot: 'bg-amber-500' },
   { label: 'Fire Incidents',      dot: 'bg-red-500' },
   { label: 'Active Responders',   dot: 'bg-green-500' },
@@ -1099,8 +1099,8 @@ function PersonnelDashboard({ navigate }) {
               </div>
               {/* Simulated pins */}
               <div className="absolute top-[20%] left-[25%] flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-md animate-pulse" title="Flood Zone" />
-                <span className="text-[9px] text-blue-700 font-semibold mt-0.5 bg-white/70 px-1 rounded">Flood</span>
+                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-white shadow-md animate-pulse" title="Flood Zone" />
+                <span className="text-[9px] text-red-700 font-semibold mt-0.5 bg-white/70 px-1 rounded">Flood</span>
               </div>
               <div className="absolute top-[40%] left-[45%] flex flex-col items-center">
                 <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-md" title="Landslide Zone" />
@@ -1135,7 +1135,7 @@ function PersonnelDashboard({ navigate }) {
               <div className="space-y-2.5">
                 {[
                   { label: 'Active Hazard Locations', dot: 'bg-red-500' },
-                  { label: 'Flood Zones', dot: 'bg-blue-500' },
+                  { label: 'Flood Zones', dot: 'bg-red-500' },
                   { label: 'Landslide Zones', dot: 'bg-amber-500' },
                   { label: 'Incident Locations', dot: 'bg-red-600' },
                   { label: 'Field Responders', dot: 'bg-green-500' },
@@ -1474,8 +1474,8 @@ export default function Dashboard({ currentUser }) {
               </div>
               {/* Simulated pins */}
               <div className="absolute top-[25%] left-[30%] flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-md animate-pulse" title="Flood-Prone Area" />
-                <span className="text-[9px] text-blue-700 font-semibold mt-0.5 bg-white/70 px-1 rounded">Flood</span>
+                <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-white shadow-md animate-pulse" title="Flood-Prone Area" />
+                <span className="text-[9px] text-red-700 font-semibold mt-0.5 bg-white/70 px-1 rounded">Flood</span>
               </div>
               <div className="absolute top-[45%] left-[50%] flex flex-col items-center">
                 <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-md" title="Landslide-Prone Area" />
@@ -1507,7 +1507,7 @@ export default function Dashboard({ currentUser }) {
                 {[
                   { label: 'Barangay Boundaries', dot: 'bg-gray-400' },
                   { label: 'Active Hazard Locations', dot: 'bg-red-500' },
-                  { label: 'Flood-Prone Areas', dot: 'bg-blue-500' },
+                  { label: 'Flood-Prone Areas', dot: 'bg-red-500' },
                   { label: 'Landslide-Prone Areas', dot: 'bg-amber-500' },
                   { label: 'Evacuation Centers', dot: 'bg-purple-500' },
                   { label: 'Active Incidents', dot: 'bg-red-600' },
