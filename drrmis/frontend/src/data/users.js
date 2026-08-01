@@ -103,10 +103,10 @@ export const ROLE_ACCESS = {
    * Receive incidents, update status, GPS check-in, mark completed
    */
   'Field Responder': [
-    '/',          // dashboard
-    '/alerts',    // receive emergency alerts
-    '/map',       // GPS / map for navigation
-    '/incidents', // receive + update incident status
+    '/',          // Real-Time Dashboard Module — quick overview of active incidents
+    '/map',       // GIS-Based Mapping Module — hazard locations for response
+    '/incidents', // Incident Monitoring Module — status of relevant incidents
+    '/settings',  // Profile/Settings — account info, logout
   ],
 }
 
