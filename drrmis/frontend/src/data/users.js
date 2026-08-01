@@ -56,23 +56,18 @@ export const ROLE_ACCESS = {
 
   /**
    * CDRRMO Personnel
-   * Verify reports, monitor hazards, assign responders,
-   * manage evacuation, manage relief, view analytics
+   * Restricted to the five core modules defined in the capstone's Scope
+   * (1.5): Real-Time Dashboard, Hazard Reporting, Incident Monitoring,
+   * GIS-Based Mapping, and Report Generation.
    */
   'CDRRMO Personnel': [
-    '/',                   // dashboard — monitor
-    '/alerts',             // real-time alerts
-    '/weather',            // weather monitoring
-    '/map',                // GIS (view only)
-    '/barangays',          // needed to verify / assign by barangay
-    '/hazards',            // monitor hazards
-    '/incidents',          // verify reports, assign responders
-    '/evacuation-centers', // manage evacuation
-    '/evacuation',         // manage evacuation
-    '/relief',             // manage relief
-    '/resources',          // assign responders / vehicles
-    '/analytics',          // view analytics
-    '/reports',            // view reports
+    '/',          // Real-Time Dashboard Module
+    '/alerts',    // real-time alerts (supports the Dashboard module)
+    '/hazards',   // Hazard Reporting Module
+    '/incidents', // Incident Monitoring Module
+    '/map',       // GIS-Based Mapping Module
+    '/reports',   // Report Generation Module
+    '/settings',  // Profile/Settings — account settings, password, logout
   ],
 
   /**
