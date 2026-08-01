@@ -219,6 +219,7 @@ module.exports = [
     available   INTEGER DEFAULT 1,
     condition   TEXT    DEFAULT 'Good',
     location    TEXT,
+    barangay_id INTEGER REFERENCES barangays(id),
     status      TEXT    DEFAULT 'Available',
     created_at  TEXT    DEFAULT (datetime('now')),
     updated_at  TEXT    DEFAULT (datetime('now'))
@@ -231,19 +232,21 @@ module.exports = [
     role        TEXT,
     skills      TEXT,
     contact     TEXT,
+    barangay_id INTEGER REFERENCES barangays(id),
     available   INTEGER DEFAULT 1,
     created_at  TEXT    DEFAULT (datetime('now'))
   )`,
 
   // ── Alerts ────────────────────────────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS alerts (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    level       TEXT NOT NULL,
-    type        TEXT NOT NULL,
-    message     TEXT NOT NULL,
-    recipients  TEXT,
-    sent_by     TEXT,
-    sent_at     TEXT DEFAULT (datetime('now'))
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    level          TEXT NOT NULL,
+    type           TEXT NOT NULL,
+    message        TEXT NOT NULL,
+    recipients     TEXT,
+    sent_by        TEXT,
+    sent_by_user_id INTEGER REFERENCES users(id),
+    sent_at        TEXT DEFAULT (datetime('now'))
   )`,
 
   // ── Weather Logs ──────────────────────────────────────────────────────────

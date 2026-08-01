@@ -87,6 +87,30 @@ async function runMigrations() {
     await run('ALTER TABLE relief_distributions ADD COLUMN distributed_by INTEGER REFERENCES users(id)')
     console.log('Migration: added distributed_by to relief_distributions')
   }
+
+  const personnelColumns = await all('PRAGMA table_info(personnel)')
+  const personnelColumnNames = personnelColumns.map(c => c.name)
+
+  if (!personnelColumnNames.includes('barangay_id')) {
+    await run('ALTER TABLE personnel ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
+    console.log('Migration: added barangay_id to personnel')
+  }
+
+  const resourceColumns = await all('PRAGMA table_info(resources)')
+  const resourceColumnNames = resourceColumns.map(c => c.name)
+
+  if (!resourceColumnNames.includes('barangay_id')) {
+    await run('ALTER TABLE resources ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
+    console.log('Migration: added barangay_id to resources')
+  }
+
+  const alertColumns = await all('PRAGMA table_info(alerts)')
+  const alertColumnNames = alertColumns.map(c => c.name)
+
+  if (!alertColumnNames.includes('sent_by_user_id')) {
+    await run('ALTER TABLE alerts ADD COLUMN sent_by_user_id INTEGER REFERENCES users(id)')
+    console.log('Migration: added sent_by_user_id to alerts')
+  }
 }
 
 async function seedDefaultAdmin() {

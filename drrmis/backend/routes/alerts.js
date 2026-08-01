@@ -14,8 +14,8 @@ router.post('/', async (req, res) => {
     const { level, type, message, recipients } = req.body
     if (!level || !type || !message) return res.status(400).json({ error: 'level, type, and message are required' })
     const r = await run(
-      'INSERT INTO alerts (level, type, message, recipients, sent_by) VALUES (?, ?, ?, ?, ?)',
-      [level, type, message, recipients, req.user?.username || 'system']
+      'INSERT INTO alerts (level, type, message, recipients, sent_by, sent_by_user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [level, type, message, recipients, req.user?.username || 'system', req.user?.id || null]
     )
     res.status(201).json(await get('SELECT * FROM alerts WHERE id = ?', [r.lastID]))
   } catch (err) { res.status(500).json({ error: err.message }) }

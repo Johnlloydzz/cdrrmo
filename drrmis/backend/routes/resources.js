@@ -16,10 +16,10 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, type, category, identifier, quantity, available, condition, location, status } = req.body
+    const { name, type, category, identifier, quantity, available, condition, location, barangay_id, status } = req.body
     const r = await run(
-      'INSERT INTO resources (name, type, category, identifier, quantity, available, condition, location, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, type, category || 'Vehicle', identifier, quantity || 1, available || 1, condition || 'Good', location, status || 'Available']
+      'INSERT INTO resources (name, type, category, identifier, quantity, available, condition, location, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, type, category || 'Vehicle', identifier, quantity || 1, available || 1, condition || 'Good', location, barangay_id || null, status || 'Available']
     )
     res.status(201).json(await get('SELECT * FROM resources WHERE id = ?', [r.lastID]))
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -27,10 +27,10 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { name, quantity, available, condition, location, status } = req.body
+    const { name, quantity, available, condition, location, barangay_id, status } = req.body
     await run(
-      `UPDATE resources SET name=?, quantity=?, available=?, condition=?, location=?, status=?, updated_at=datetime('now') WHERE id=?`,
-      [name, quantity, available, condition, location, status, req.params.id]
+      `UPDATE resources SET name=?, quantity=?, available=?, condition=?, location=?, barangay_id=?, status=?, updated_at=datetime('now') WHERE id=?`,
+      [name, quantity, available, condition, location, barangay_id || null, status, req.params.id]
     )
     res.json(await get('SELECT * FROM resources WHERE id = ?', [req.params.id]))
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -51,10 +51,10 @@ router.get('/personnel', async (req, res) => {
 
 router.post('/personnel', async (req, res) => {
   try {
-    const { name, role, skills, contact, available } = req.body
+    const { name, role, skills, contact, barangay_id, available } = req.body
     const r = await run(
-      'INSERT INTO personnel (name, role, skills, contact, available) VALUES (?, ?, ?, ?, ?)',
-      [name, role, skills, contact, available ? 1 : 0]
+      'INSERT INTO personnel (name, role, skills, contact, barangay_id, available) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, role, skills, contact, barangay_id || null, available ? 1 : 0]
     )
     res.status(201).json(await get('SELECT * FROM personnel WHERE id = ?', [r.lastID]))
   } catch (err) { res.status(500).json({ error: err.message }) }
