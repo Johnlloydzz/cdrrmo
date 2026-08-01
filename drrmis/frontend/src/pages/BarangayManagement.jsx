@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Eye, Pencil, Trash2, Download, Archive as ArchiveIcon } from 'lucide-react'
+import { Search, Plus, Eye, Pencil, Trash2, Archive as ArchiveIcon } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { getStoredUser } from '../utils/storage'
 
@@ -133,7 +133,6 @@ export default function BarangayManagement() {
           </select>
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary flex items-center gap-2 text-sm"><Download size={15} /> Export</button>
           {canDelete && (
             <a href="/archive" className="btn-secondary flex items-center gap-2 text-sm">
               <ArchiveIcon size={15} /> Archive
