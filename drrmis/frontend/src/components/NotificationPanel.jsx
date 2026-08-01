@@ -93,8 +93,8 @@ export default function NotificationPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute top-full right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 flex flex-col"
-      style={{ maxHeight: '520px' }}
+      className="fixed sm:absolute top-16 sm:top-full inset-x-3 sm:inset-x-auto sm:right-0 sm:mt-2 sm:w-96 sm:max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 flex flex-col"
+      style={{ maxHeight: 'min(520px, calc(100vh - 90px))' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">

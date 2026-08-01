@@ -52,7 +52,7 @@ export default function ProfilePanel({ currentUser, open, onClose, onLogout }) {
   return (
     <div
       ref={panelRef}
-      className="absolute top-full right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
+      className="absolute top-full right-0 mt-2 w-80 max-w-[calc(100vw-1rem)] bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden"
     >
       {/* Header / avatar card */}
       <div className="bg-gradient-to-br from-primary-800 to-primary-600 px-5 py-5">
