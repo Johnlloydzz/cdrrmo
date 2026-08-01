@@ -230,9 +230,9 @@ export default function GISMap() {
   }, [destination])
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-140px)] min-h-96">
+    <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-140px)] lg:min-h-96">
       {/* Left panel */}
-      <div className="w-72 flex-shrink-0 space-y-3 overflow-y-auto">
+      <div className="w-full lg:w-72 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto order-2 lg:order-1">
         {/* Search */}
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
@@ -347,7 +347,7 @@ export default function GISMap() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative">
+      <div className="flex-1 h-[70vh] lg:h-auto rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
         <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
           <TileLayer
             key={activeLayer}
@@ -437,7 +437,7 @@ export default function GISMap() {
 
         {/* Right-side barangay info panel — styled like a Google Maps place card */}
         {selectedBarangay && (
-          <div className="absolute top-3 right-3 z-[400] w-80 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+          <div className="absolute top-3 right-3 left-3 sm:left-auto z-[400] w-auto sm:w-80 max-w-full bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
             <div className="relative">
               {selectedBarangay.image_url ? (
                 <img
