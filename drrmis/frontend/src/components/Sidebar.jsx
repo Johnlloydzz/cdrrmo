@@ -104,8 +104,8 @@ export default function Sidebar({ onLogout, currentUser, mobileOpen, onClose }) 
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-700">
-          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
-            <Shield size={20} className="text-primary-700" />
+          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-full h-full object-contain p-0.5" />
           </div>
           <div className="overflow-hidden">
             <p className="text-white font-bold text-sm leading-tight">DRRMIS</p>
