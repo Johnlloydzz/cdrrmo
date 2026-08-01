@@ -347,7 +347,7 @@ export default function GISMap() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 h-[70vh] lg:h-auto rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
+      <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
         <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
           <TileLayer
             key={activeLayer}
