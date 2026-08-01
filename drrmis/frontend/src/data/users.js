@@ -49,10 +49,20 @@ export const DEMO_USERS = [
 
 export const ROLE_ACCESS = {
   /**
-   * Super Administrator — full system access
-   * Manage all barangays, users, hazards, GIS, reports, dashboard, generate reports, configure system
+   * Super Administrator (System Administrator)
+   * Restricted to the paper's defined Scope: the five core modules plus
+   * user management and audit logging, matching the panel-facing navigation.
    */
-  'Super Administrator': '*',
+  'Super Administrator': [
+    '/',           // Real-Time Dashboard Module
+    '/hazards',    // Hazard Reporting Module
+    '/incidents',  // Incident Monitoring Module
+    '/map',        // GIS-Based Mapping Module
+    '/reports',    // Report Generation Module
+    '/users',      // User Management
+    '/audit-logs', // Activity Log
+    '/settings',   // Profile Settings
+  ],
 
   /**
    * CDRRMO Personnel
