@@ -208,9 +208,9 @@ export default function BarangayManagement() {
       {/* Modal — only rendered for roles allowed to add/edit */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Barangay' : 'Add Barangay'}</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
+            <h3 className="text-base font-semibold mb-4">{editing ? 'Edit Barangay' : 'Add Barangay'}</h3>
+            <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="label">Barangay Name</label>
                 <input
@@ -259,7 +259,7 @@ export default function BarangayManagement() {
                 </select>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 mt-5">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>
                 {saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add Barangay')}
