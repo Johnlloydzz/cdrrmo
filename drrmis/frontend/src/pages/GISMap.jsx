@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
@@ -23,6 +23,26 @@ const barangayIcon = new L.DivIcon({
 
 // Gingoog City center coordinates
 const CENTER = [8.8231, 125.1109]
+
+// CDRRMO Gingoog City office — confirmed exact coordinates.
+const CDRRMO_OFFICE = [8.828643971706757, 125.09931555101235]
+
+const cdrrmoIcon = new L.DivIcon({
+  className: 'cdrrmo-office-pin',
+  html: `<div style="background:#059669;width:18px;height:18px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center"></div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 18],
+  popupAnchor: [0, -18],
+})
+
+// Straight-line distance in km between two [lat, lng] points (haversine formula)
+function distanceKm([lat1, lng1], [lat2, lng2]) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 const MARKERS = [
   { id: 1, type: 'Evacuation', label: 'Central Gym', lat: 8.8245, lng: 125.1120, color: '#22c55e' },
@@ -160,6 +180,38 @@ export default function GISMap() {
     return () => { cancelled = true }
   }, [selectedBarangay])
 
+  // Real road-following route from the CDRRMO office to the selected barangay's
+  // location, fetched from OSRM (free, no API key). Falls back to a straight line
+  // if the routing service is unreachable or finds no drivable path.
+  const [routeCoords, setRouteCoords] = useState(null)
+  const [routeInfo, setRouteInfo] = useState(null) // { distanceKm, durationMin }
+  const [routing, setRouting] = useState(false)
+
+  const destination = selectedBarangay?.centroid || geocodedCenter
+
+  useEffect(() => {
+    setRouteCoords(null)
+    setRouteInfo(null)
+    if (!destination) return
+
+    let cancelled = false
+    setRouting(true)
+    const url = `https://router.project-osrm.org/route/v1/driving/${CDRRMO_OFFICE[1]},${CDRRMO_OFFICE[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson`
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        const route = data?.routes?.[0]
+        if (!route) return
+        setRouteCoords(route.geometry.coordinates.map(([lng, lat]) => [lat, lng]))
+        setRouteInfo({ distanceKm: route.distance / 1000, durationMin: route.duration / 60 })
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRouting(false) })
+
+    return () => { cancelled = true }
+  }, [destination])
+
   return (
     <div className="flex gap-4 h-[calc(100vh-140px)] min-h-96">
       {/* Left panel */}
@@ -266,6 +318,7 @@ export default function GISMap() {
               { color: '#3b82f6', label: 'Flood Zone' },
               { color: '#8b5cf6', label: 'Landslide Zone' },
               { color: '#dc2626', label: 'Selected Barangay Boundary' },
+              { color: '#059669', label: 'CDRRMO Office / Driving Route' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: l.color }} />
@@ -326,6 +379,23 @@ export default function GISMap() {
                 <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>Approximate location (no boundary drawn yet)</div>
               </Popup>
             </Marker>
+          )}
+
+          {/* CDRRMO Office — always visible reference point */}
+          <Marker position={CDRRMO_OFFICE} icon={cdrrmoIcon}>
+            <Popup><strong>CDRRMO Office</strong><br />Gingoog City</Popup>
+          </Marker>
+
+          {/* Route from CDRRMO office to the selected barangay's location */}
+          {selectedBarangay && destination && (
+            <Polyline
+              positions={routeCoords || [CDRRMO_OFFICE, destination]}
+              pathOptions={
+                routeCoords
+                  ? { color: '#059669', weight: 4, opacity: 0.85 }
+                  : { color: '#059669', weight: 3, dashArray: '8, 8' }
+              }
+            />
           )}
 
           {/* Barangay name pins — always visible, click to select + view photo */}
@@ -414,6 +484,14 @@ export default function GISMap() {
                 Risk level: <span className="font-medium">{selectedBarangay.risk_level}</span>
                 {' · '}Pop. {(selectedBarangay.population || 0).toLocaleString()}
               </p>
+              {(selectedBarangay.centroid || geocodedCenter) && (
+                <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                  <span className="w-2 h-0.5 bg-emerald-600 inline-block" />
+                  {routing && !routeInfo && 'Calculating route…'}
+                  {routeInfo && `${routeInfo.distanceKm.toFixed(1)} km · ~${Math.round(routeInfo.durationMin)} min drive from CDRRMO Office`}
+                  {!routing && !routeInfo && `~${distanceKm(CDRRMO_OFFICE, selectedBarangay.centroid || geocodedCenter).toFixed(1)} km from CDRRMO Office (straight line — no road route found)`}
+                </p>
+              )}
 
               {/* Google-style icon action row */}
               <div className="flex items-center gap-2 mt-3">
@@ -432,7 +510,7 @@ export default function GISMap() {
 
                 {(selectedBarangay.centroid || geocodedCenter) ? (
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${(selectedBarangay.centroid || geocodedCenter)[0]},${(selectedBarangay.centroid || geocodedCenter)[1]}`}
+                    href={`https://www.google.com/maps/dir/?api=1&origin=${CDRRMO_OFFICE[0]},${CDRRMO_OFFICE[1]}&destination=${(selectedBarangay.centroid || geocodedCenter)[0]},${(selectedBarangay.centroid || geocodedCenter)[1]}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
