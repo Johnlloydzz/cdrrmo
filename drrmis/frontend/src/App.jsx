@@ -87,7 +87,7 @@ function App() {
           <Route path="residents"  element={<G><ResidentManagement /></G>} />
 
           {/* Disaster Response */}
-          <Route path="hazards"            element={<G><HazardManagement /></G>} />
+          <Route path="hazards"            element={<G><HazardManagement currentUser={currentUser} /></G>} />
           <Route path="incidents"          element={<G><IncidentManagement currentUser={currentUser} /></G>} />
           <Route path="evacuation-centers" element={<G><EvacuationCenters /></G>} />
           <Route path="evacuation"         element={<G><EvacuationManagement /></G>} />

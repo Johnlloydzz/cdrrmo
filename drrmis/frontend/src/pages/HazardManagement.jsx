@@ -13,7 +13,8 @@ const initial = [
   { id: 4, hid: 'HAZ-004', type: 'Flood',      severity: 'Moderate', barangay: 'Kalambogan', purok: 'Purok 3',   reporter: 'Brgy. Admin', date: '2026-07-10', status: 'Active',     desc: 'Low-lying roads flooded.' },
 ]
 
-export default function HazardManagement() {
+export default function HazardManagement({ currentUser }) {
+  const canReport = currentUser?.role === 'Barangay Admin'
   const [hazards, setHazards] = useState(initial)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -57,7 +58,9 @@ export default function HazardManagement() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input className="input pl-9" placeholder="Search hazard, barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Report Hazard</button>
+        {canReport && (
+          <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Report Hazard</button>
+        )}
       </div>
 
       <div className="card p-0 overflow-hidden">
