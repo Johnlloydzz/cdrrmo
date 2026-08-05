@@ -7,10 +7,14 @@ router.use(authenticate)
 router.get('/', async (req, res) => {
   try {
     const { household_id, search } = req.query
-    let sql = 'SELECT * FROM residents WHERE 1=1'
+    let sql = `SELECT r.*, h.household_id as hh_code, b.name as barangay_name
+               FROM residents r
+               LEFT JOIN households h ON r.household_id = h.id
+               LEFT JOIN barangays b ON h.barangay_id = b.id
+               WHERE 1=1`
     const params = []
-    if (household_id) { sql += ' AND household_id = ?'; params.push(household_id) }
-    if (search) { sql += ' AND name LIKE ?'; params.push(`%${search}%`) }
+    if (household_id) { sql += ' AND r.household_id = ?'; params.push(household_id) }
+    if (search) { sql += ' AND r.name LIKE ?'; params.push(`%${search}%`) }
     res.json(await all(sql, params))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

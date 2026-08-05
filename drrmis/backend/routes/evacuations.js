@@ -6,10 +6,11 @@ router.use(authenticate)
 
 router.get('/', async (req, res) => {
   try {
-    const rows = await all(`SELECT er.*, b.name as barangay_name, ec.name as center_name
+    const rows = await all(`SELECT er.*, b.name as barangay_name, ec.name as center_name, h.head_family
       FROM evacuation_records er
       LEFT JOIN barangays b ON er.barangay_id = b.id
       LEFT JOIN evacuation_centers ec ON er.center_id = ec.id
+      LEFT JOIN households h ON er.household_id = h.id
       ORDER BY er.created_at DESC`)
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
