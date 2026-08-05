@@ -49,10 +49,11 @@ const MARKERS = [
   { id: 2, type: 'Evacuation', label: 'Kioskos Elem School', lat: 8.8190, lng: 125.1060, color: '#22c55e' },
   { id: 3, type: 'Incident',   label: 'INC-001 Flood (Active)', lat: 8.8175, lng: 125.1045, color: '#ef4444' },
   { id: 4, type: 'Incident',   label: 'INC-002 Landslide (Resolved)', lat: 8.8260, lng: 125.1150, color: '#f59e0b' },
-  { id: 5, type: 'Hazard',     label: 'Flood Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#ef4444', radius: 500 },
+  { id: 5, type: 'Hazard',     label: 'Flood Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
 ]
 
 const LAYERS = [
+  { id: 'modern',    label: 'Modern',        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; OpenStreetMap contributors' },
   { id: 'street',    label: 'Street View',   url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
   { id: 'satellite', label: 'Satellite',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
@@ -119,16 +120,18 @@ function FocusRoute({ trigger, coords }) {
 }
 
 export default function GISMap() {
-  const [activeLayer, setActiveLayer] = useState('street')
+  const [activeLayer, setActiveLayer] = useState('modern')
   const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Evacuation Centers','Incident Locations'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
+  const [barangaysLoading, setBarangaysLoading] = useState(true)
   const [selectedBarangay, setSelectedBarangay] = useState(null)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
   const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => {
-    apiGet('/barangays').then(setBarangays).catch(() => {})
+    setBarangaysLoading(true)
+    apiGet('/barangays').then(setBarangays).catch(() => {}).finally(() => setBarangaysLoading(false))
   }, [])
 
   const toggleOverlay = (o) => setActiveOverlays(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o])
@@ -243,7 +246,13 @@ export default function GISMap() {
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
           <div className="space-y-0.5 max-h-56 overflow-y-auto">
-            {filteredBarangays.map(b => (
+            {barangaysLoading && (
+              <p className="text-xs text-gray-400 py-2 flex items-center gap-2">
+                <span className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin inline-block" />
+                Connecting to server… (may take up to a minute on first load)
+              </p>
+            )}
+            {!barangaysLoading && filteredBarangays.map(b => (
               <button
                 key={b.id}
                 onClick={() => setSelectedBarangay(b)}
@@ -255,7 +264,7 @@ export default function GISMap() {
                 {!b.boundary_geojson && <span className="text-xs text-gray-400 ml-1">(no boundary)</span>}
               </button>
             ))}
-            {filteredBarangays.length === 0 && (
+            {!barangaysLoading && filteredBarangays.length === 0 && (
               <p className="text-xs text-gray-400 py-2">No barangays found.</p>
             )}
           </div>
@@ -332,9 +341,9 @@ export default function GISMap() {
               { color: '#ef4444', label: 'Active Incident' },
               { color: '#f59e0b', label: 'Resolved Incident' },
               { color: '#22c55e', label: 'Evacuation Center' },
-              { color: '#ef4444', label: 'Flood Zone' },
+              { color: '#3b82f6', label: 'Flood Zone' },
               { color: '#8b5cf6', label: 'Landslide Zone' },
-              { color: '#0ea5e9', label: 'Selected Barangay Boundary' },
+              { color: '#dc2626', label: 'Selected Barangay Boundary' },
               { color: '#059669', label: 'CDRRMO Office / Driving Route' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
@@ -352,7 +361,7 @@ export default function GISMap() {
           <TileLayer
             key={activeLayer}
             url={layer.url}
-            attribution='&copy; OpenStreetMap contributors'
+            attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
           />
 
           {/* Selected barangay boundary outline */}
@@ -361,7 +370,7 @@ export default function GISMap() {
               <GeoJSON
                 key={selectedBarangay.id}
                 data={selectedGeojson}
-                style={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.15 }}
+                style={{ color: '#dc2626', weight: 2, dashArray: '6, 4', fillColor: '#86efac', fillOpacity: 0.35 }}
                 ref={setGeojsonLayerRef}
               />
               <FlyToBoundary geojsonLayer={geojsonLayerRef} fallbackCenter={selectedBarangay?.centroid || geocodedCenter} />
