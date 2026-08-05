@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff, Users, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin } from 'lucide-react'
 import { DEMO_USERS, ROLE_COLORS } from '../../data/users'
@@ -19,6 +19,12 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false)
   const [showAccounts, setShowAccounts] = useState(false)
   const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
+
+  useEffect(() => {
+    if (sessionExpired) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [sessionExpired])
 
   const handle = (e) =>
     setForm({ ...form, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
