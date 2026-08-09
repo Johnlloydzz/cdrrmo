@@ -45,11 +45,7 @@ function distanceKm([lat1, lng1], [lat2, lng2]) {
 }
 
 const MARKERS = [
-  { id: 1, type: 'Evacuation', label: 'Central Gym', lat: 8.8245, lng: 125.1120, color: '#22c55e' },
-  { id: 2, type: 'Evacuation', label: 'Kioskos Elem School', lat: 8.8190, lng: 125.1060, color: '#22c55e' },
-  { id: 3, type: 'Incident',   label: 'INC-001 Flood (Active)', lat: 8.8175, lng: 125.1045, color: '#ef4444' },
-  { id: 4, type: 'Incident',   label: 'INC-002 Landslide (Resolved)', lat: 8.8260, lng: 125.1150, color: '#f59e0b' },
-  { id: 5, type: 'Hazard',     label: 'Flood Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
+  { id: 5, type: 'Hazard', label: 'Flood Susceptibility Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
 ]
 
 const LAYERS = [
@@ -59,7 +55,7 @@ const LAYERS = [
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
 ]
 
-const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Evacuation Centers','Incident Locations','Household Locations']
+const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Household Locations']
 
 // Approximate centroid (average of vertices) for a Polygon or MultiPolygon.
 // Used to place a barangay pin and as a fly-to fallback when no boundary is loaded yet.
@@ -121,9 +117,10 @@ function FocusRoute({ trigger, coords }) {
 
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('modern')
-  const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Evacuation Centers','Incident Locations'])
+  const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Household Locations'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
+  const [households, setHouseholds] = useState([])
   const [barangaysLoading, setBarangaysLoading] = useState(true)
   const [selectedBarangay, setSelectedBarangay] = useState(null)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
@@ -132,6 +129,7 @@ export default function GISMap() {
   useEffect(() => {
     setBarangaysLoading(true)
     apiGet('/barangays').then(setBarangays).catch(() => {}).finally(() => setBarangaysLoading(false))
+    apiGet('/households').then(setHouseholds).catch(() => {})
   }, [])
 
   const toggleOverlay = (o) => setActiveOverlays(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o])
@@ -338,9 +336,8 @@ export default function GISMap() {
           <h3 className="font-semibold text-sm mb-3">Legend</h3>
           <div className="space-y-2">
             {[
-              { color: '#ef4444', label: 'Active Incident' },
-              { color: '#f59e0b', label: 'Resolved Incident' },
-              { color: '#22c55e', label: 'Evacuation Center' },
+              { color: '#dc2626', label: 'Household — High Flood-Risk Zone (Geofenced)' },
+              { color: '#3b82f6', label: 'Household — Outside High-Risk Zone' },
               { color: '#3b82f6', label: 'Flood Zone' },
               { color: '#8b5cf6', label: 'Landslide Zone' },
               { color: '#dc2626', label: 'Selected Barangay Boundary' },
@@ -422,18 +419,23 @@ export default function GISMap() {
             </Circle>
           ))}
 
-          {/* Incident markers */}
-          {activeOverlays.includes('Incident Locations') && MARKERS.filter(m => m.type === 'Incident').map(m => (
-            <Marker key={m.id} position={[m.lat, m.lng]}>
-              <Popup><strong>{m.label}</strong></Popup>
-            </Marker>
-          ))}
-
-          {/* Evacuation center markers */}
-          {activeOverlays.includes('Evacuation Centers') && MARKERS.filter(m => m.type === 'Evacuation').map(m => (
-            <Marker key={m.id} position={[m.lat, m.lng]}>
-              <Popup><strong>{m.label}</strong><br />Evacuation Center</Popup>
-            </Marker>
+          {/* Household locations — colored by geofencing risk status (red = within high flood-risk purok) */}
+          {activeOverlays.includes('Household Locations') && households.filter(h => h.latitude && h.longitude).map(h => (
+            <Circle
+              key={`hh-${h.id}`}
+              center={[h.latitude, h.longitude]}
+              radius={15}
+              pathOptions={{
+                color: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6',
+                fillColor: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6',
+                fillOpacity: 0.7,
+              }}
+            >
+              <Popup>
+                <strong>{h.household_id}</strong> — {h.head_family}<br />
+                {h.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
+              </Popup>
+            </Circle>
           ))}
         </MapContainer>
 

@@ -3,7 +3,7 @@ import { Search, Plus, Pencil, Trash2, UserCog } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
 const STATUS_BADGE = { Active: 'badge-green', Inactive: 'badge-gray', Suspended: 'badge-red' }
-const ROLES = ['Super Administrator', 'CDRRMO Personnel', 'Barangay Admin', 'Field Responder']
+const ROLES = ['CDRRMO Personnel', 'Barangay Official']
 const emptyForm = { name: '', username: '', email: '', password: '', role: 'CDRRMO Personnel', barangay: 'All', status: 'Active' }
 
 export default function UserManagement() {
