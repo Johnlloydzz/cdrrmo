@@ -10,6 +10,7 @@ import Unauthorized      from './pages/Unauthorized'
 import { getStoredUser, setStoredUser, clearStoredUser } from './utils/storage'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
+const RiskAssessmentDashboard = lazy(() => import('./pages/RiskAssessmentDashboard'))
 const BarangayManagement = lazy(() => import('./pages/BarangayManagement'))
 const PurokManagement = lazy(() => import('./pages/PurokManagement'))
 const HouseholdManagement = lazy(() => import('./pages/HouseholdManagement'))
@@ -72,7 +73,7 @@ function App() {
           }
         >
           {/* Dashboard — all roles */}
-          <Route index element={<Dashboard currentUser={currentUser} />} />
+          <Route index element={<RiskAssessmentDashboard currentUser={currentUser} />} />
 
           {/* Unauthorized landing */}
           <Route path="unauthorized" element={<Unauthorized />} />

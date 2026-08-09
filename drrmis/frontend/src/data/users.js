@@ -1,19 +1,11 @@
 // Demo user accounts — frontend-only (no backend)
 // In production these would come from the database via API.
+// PDRA (Pre-Disaster Risk Assessment) — restricted to two user roles
+// per Section 1.5 (Scope): CDRRMO Personnel and Barangay Officials.
 
 export const DEMO_USERS = [
   {
     id: 1,
-    name: 'System Administrator',
-    username: 'sysadmin',
-    password: 'Admin@1234',
-    role: 'Super Administrator',
-    barangay: 'All',
-    email: 'admin@gingoog.gov.ph',
-    avatar: 'SA',
-  },
-  {
-    id: 2,
     name: 'Carlos Mendoza',
     username: 'cdrrmo01',
     password: 'Cdrrmo@1234',
@@ -23,109 +15,67 @@ export const DEMO_USERS = [
     avatar: 'CM',
   },
   {
-    id: 3,
+    id: 2,
     name: 'Ana Villanueva',
     username: 'brgy.kioskos',
     password: 'Brgy@1234',
-    role: 'Barangay Admin',
+    role: 'Barangay Official',
     barangay: 'Kioskos',
     email: 'ana@kioskos.gov.ph',
     avatar: 'AV',
   },
-  {
-    id: 4,
-    name: 'Mark Responder',
-    username: 'responder01',
-    password: 'Resp@1234',
-    role: 'Field Responder',
-    barangay: 'All',
-    email: 'mark@cdrrmo.gov.ph',
-    avatar: 'MR',
-  },
 ]
 
 // ─── Role-based page access ───────────────────────────────────────────────────
-// Matches exactly the capabilities listed in the system document.
+// Matches exactly the 5 modules in Section 1.5 (Scope): Household and
+// Population Management, Web-Based Hazard Mapping, Geofencing,
+// Risk Assessment Dashboard, and User Management (CDRRMO only).
 
 export const ROLE_ACCESS = {
   /**
-   * Super Administrator (System Administrator)
-   * Restricted to the paper's defined Scope: the five core modules plus
-   * user management and audit logging, matching the panel-facing navigation.
-   */
-  'Super Administrator': [
-    '/',           // Real-Time Dashboard Module
-    '/hazards',    // Hazard Reporting Module
-    '/incidents',  // Incident Monitoring Module
-    '/map',        // GIS-Based Mapping Module
-    '/reports',    // Report Generation Module
-    '/users',      // User Management
-    '/audit-logs', // Activity Log
-    '/settings',   // Profile Settings
-  ],
-
-  /**
    * CDRRMO Personnel
-   * Restricted to the five core modules defined in the capstone's Scope
-   * (1.5): Real-Time Dashboard, Hazard Reporting, Incident Monitoring,
-   * GIS-Based Mapping, and Report Generation.
+   * Full access to all 5 PDRA modules — views risk assessment data,
+   * hazard maps, household records (read/verify), and manages user accounts.
    */
   'CDRRMO Personnel': [
-    '/',          // Real-Time Dashboard Module
-    '/alerts',    // real-time alerts (supports the Dashboard module)
-    '/hazards',   // Hazard Reporting Module
-    '/incidents', // Incident Monitoring Module
-    '/map',       // GIS-Based Mapping Module
-    '/reports',   // Report Generation Module
-    '/settings',  // Profile/Settings — account settings, password, logout
+    '/',                // Risk Assessment Dashboard Module (landing page)
+    '/map',             // Web-Based Hazard Mapping Module (+ Geofencing overlay)
+    '/barangays',       // Barangay reference data
+    '/households',      // Household and Population Management (view/verify)
+    '/residents',        // Household members
+    '/puroks',          // Purok-level organization
+    '/users',           // User Management — CDRRMO Personnel & Barangay Officials
+    '/settings',        // Profile/Settings
   ],
 
   /**
-   * Barangay Administrator
-   * Own barangay only: manage puroks, register households/residents,
-   * submit hazard reports, update evacuation, view reports
+   * Barangay Official
+   * Maintains household-level records for their own barangay — this is
+   * their core function per Section 1.1 and 1.4 (Significance).
    */
-  'Barangay Admin': [
-    '/hazards',    // Submit Hazard Report — Hazard Reporting Module
-    '/incidents',  // My Reports — status of their submitted reports (pending/verified/resolved)
-    '/settings',   // Profile/Settings — account info, logout
-  ],
-
-  /**
-   * Field Responder
-   * Receive incidents, update status, GPS check-in, mark completed
-   */
-  'Field Responder': [
-    '/',          // Real-Time Dashboard Module — quick overview of active incidents
-    '/map',       // GIS-Based Mapping Module — hazard locations for response
-    '/incidents', // Incident Monitoring Module — status of relevant incidents
-    '/settings',  // Profile/Settings — account info, logout
+  'Barangay Official': [
+    '/',             // Risk Assessment Dashboard (landing page, own barangay view)
+    '/barangays',    // Barangay reference data (own barangay)
+    '/households',   // Household and Population Management — their core task
+    '/residents',    // Household members (birthdates for age-bracket tracking)
+    '/puroks',       // Purok-level organization within their barangay
+    '/settings',     // Profile/Settings
   ],
 }
 
 // ─── Per-role action permissions (used inside pages) ─────────────────────────
 export const ROLE_PERMISSIONS = {
-  'Super Administrator': {
-    canCreate: true, canEdit: true, canDelete: true,
-    canApprove: true, canExport: true, canManageUsers: true, canConfigSystem: true,
-  },
   'CDRRMO Personnel': {
-    canCreate: true, canEdit: true, canDelete: false,
-    canApprove: true, canExport: true, canManageUsers: false, canConfigSystem: false,
+    canCreate: false, canEdit: false, canDelete: false,
+    canApprove: true, canExport: true, canManageUsers: true, canConfigSystem: false,
   },
-  'Barangay Admin': {
+  'Barangay Official': {
     canCreate: true, canEdit: true, canDelete: false,
-    canApprove: false, canExport: false, canManageUsers: false, canConfigSystem: false,
-  },
-  'Field Responder': {
-    canCreate: false, canEdit: true, canDelete: false,
     canApprove: false, canExport: false, canManageUsers: false, canConfigSystem: false,
   },
 }
 
 export const ROLE_COLORS = {
-  'Super Administrator': { bg: 'bg-red-500',    badge: 'bg-red-100 text-red-700 border-red-200' },
-  'CDRRMO Personnel':   { bg: 'bg-blue-500',   badge: 'bg-blue-100 text-blue-700 border-blue-200' },
-  'Barangay Admin':     { bg: 'bg-green-500',  badge: 'bg-green-100 text-green-700 border-green-200' },
-  'Field Responder':    { bg: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700 border-orange-200' },
+  'CDRRMO Personnel': { bg: 'bg-blue-500',  badge: 'bg-blue-100 text-blue-700 border-blue-200' },
+  'Barangay Official': { bg: 'bg-green-500', badge: 'bg-green-100 text-green-700 border-green-200' },
 }

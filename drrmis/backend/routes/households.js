@@ -6,8 +6,8 @@ router.use(authenticate)
 
 router.get('/', async (req, res) => {
   try {
-    const { barangay_id, purok_id, search } = req.query
-    let sql = `SELECT h.*, b.name as barangay_name, p.name as purok_name
+    const { barangay_id, purok_id, search, at_risk } = req.query
+    let sql = `SELECT h.*, b.name as barangay_name, p.name as purok_name, p.flood_risk as purok_flood_risk
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
                LEFT JOIN puroks p ON h.purok_id = p.id
@@ -16,7 +16,11 @@ router.get('/', async (req, res) => {
     if (barangay_id) { sql += ' AND h.barangay_id = ?'; params.push(barangay_id) }
     if (purok_id)    { sql += ' AND h.purok_id = ?'; params.push(purok_id) }
     if (search)      { sql += ' AND (h.head_family LIKE ? OR h.household_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
-    res.json(await all(sql, params))
+    if (at_risk === '1') { sql += " AND p.flood_risk = 'High'" }
+    const rows = await all(sql, params)
+    // Geofencing: flag households in high flood-risk puroks (based on CDRA-aligned purok classification)
+    const withRisk = rows.map(h => ({ ...h, in_flood_risk_zone: h.purok_flood_risk === 'High' }))
+    res.json(withRisk)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

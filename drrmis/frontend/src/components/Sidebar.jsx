@@ -12,14 +12,12 @@ const navGroups = [
   {
     label: 'Main',
     items: [
-      { to: '/',        icon: LayoutDashboard, label: 'Dashboard',       exact: true },
-      { to: '/map',     icon: Map,             label: 'GIS Map' },
-      { to: '/alerts',  icon: Bell,            label: 'Real-Time Alerts' },
-      { to: '/weather', icon: CloudRain,       label: 'Weather' },
+      { to: '/',    icon: LayoutDashboard, label: 'Risk Assessment Dashboard', exact: true },
+      { to: '/map', icon: Map,             label: 'Hazard Map & Geofencing' },
     ],
   },
   {
-    label: 'Community',
+    label: 'Household & Population',
     items: [
       { to: '/barangays',  icon: Building2, label: 'Barangays' },
       { to: '/puroks',     icon: TreePine,  label: 'Puroks' },
@@ -28,25 +26,10 @@ const navGroups = [
     ],
   },
   {
-    label: 'Disaster Response',
-    items: [
-      { to: '/hazards',           icon: Shield,        label: 'Hazards' },
-      { to: '/incidents',         icon: AlertTriangle, label: 'Incidents' },
-      { to: '/evacuation-centers',icon: MapPin,        label: 'Evacuation Centers' },
-      { to: '/evacuation',        icon: Tent,          label: 'Evacuation Records' },
-      { to: '/relief',            icon: Package,       label: 'Relief Management' },
-      { to: '/resources',         icon: Truck,         label: 'Resources' },
-    ],
-  },
-  {
     label: 'Administration',
     items: [
-      { to: '/users',      icon: UserCog,     label: 'User Management' },
-      { to: '/reports',    icon: FileText,    label: 'Reports' },
-      { to: '/analytics',  icon: BarChart2,   label: 'Analytics' },
-      { to: '/audit-logs', icon: ClipboardList, label: 'Audit Logs' },
-      { to: '/archive',    icon: Archive,     label: 'Archive' },
-      { to: '/settings',   icon: Settings,    label: 'Settings' },
+      { to: '/users',    icon: UserCog,  label: 'User Management' },
+      { to: '/settings', icon: Settings, label: 'Settings' },
     ],
   },
 ]
