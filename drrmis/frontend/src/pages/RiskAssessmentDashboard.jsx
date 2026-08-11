@@ -7,11 +7,13 @@ const RISK_BADGE = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-gree
 export default function RiskAssessmentDashboard({ currentUser }) {
   const [summary, setSummary] = useState([])
   const [loading, setLoading] = useState(true)
+  const [wakingUp, setWakingUp] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     setLoading(true)
-    apiGet('/risk-assessment/summary')
+    setWakingUp(false)
+    apiGet('/risk-assessment/summary', { onColdStart: () => setWakingUp(true) })
       .then(setSummary)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
@@ -29,7 +31,17 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     atRiskPopulation: acc.atRiskPopulation + (s.at_risk_population || 0),
   }), { households: 0, atRiskHouseholds: 0, population: 0, atRiskPopulation: 0 })
 
-  if (loading) return <div className="card p-10 text-center text-gray-400">Loading risk assessment data…</div>
+  if (loading) return (
+    <div className="card p-10 text-center text-gray-400">
+      {wakingUp ? (
+        <>
+          <div className="w-6 h-6 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="font-medium text-gray-500">Waking up the server…</p>
+          <p className="text-xs mt-1">This can take up to a minute after a period of inactivity. Thanks for your patience.</p>
+        </>
+      ) : 'Loading risk assessment data…'}
+    </div>
+  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (

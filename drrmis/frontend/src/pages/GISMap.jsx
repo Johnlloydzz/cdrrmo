@@ -122,13 +122,14 @@ export default function GISMap() {
   const [barangays, setBarangays] = useState([])
   const [households, setHouseholds] = useState([])
   const [barangaysLoading, setBarangaysLoading] = useState(true)
+  const [wakingUp, setWakingUp] = useState(false)
   const [selectedBarangay, setSelectedBarangay] = useState(null)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
   const [shareCopied, setShareCopied] = useState(false)
 
   useEffect(() => {
     setBarangaysLoading(true)
-    apiGet('/barangays').then(setBarangays).catch(() => {}).finally(() => setBarangaysLoading(false))
+    apiGet('/barangays', { onColdStart: () => setWakingUp(true) }).then(setBarangays).catch(() => {}).finally(() => setBarangaysLoading(false))
     apiGet('/households').then(setHouseholds).catch(() => {})
   }, [])
 
@@ -247,7 +248,7 @@ export default function GISMap() {
             {barangaysLoading && (
               <p className="text-xs text-gray-400 py-2 flex items-center gap-2">
                 <span className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin inline-block" />
-                Connecting to server… (may take up to a minute on first load)
+                {wakingUp ? 'Waking up the server… (up to a minute)' : 'Connecting to server…'}
               </p>
             )}
             {!barangaysLoading && filteredBarangays.map(b => (
