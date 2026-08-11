@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Save, Database, Mail, Map, Bell } from 'lucide-react'
 
 export default function Settings() {
-  const [system, setSystem] = useState({ name: 'DRRMIS - Gingoog City CDRRMO', address: 'Gingoog City, Misamis Oriental', contact: '(088) 861-0000', email: 'cdrrmo@gingoog.gov.ph' })
+  const [system, setSystem] = useState({ name: 'PDRA - Gingoog City CDRRMO', address: 'Gingoog City, Misamis Oriental', contact: '(088) 861-0000', email: 'cdrrmo@gingoog.gov.ph' })
   const [sms, setSms] = useState({ provider: 'Semaphore', apiKey: '••••••••••••••••', sender: 'CDRRMO' })
   const [emailSet, setEmailSet] = useState({ host: 'smtp.gmail.com', port: '587', user: 'cdrrmo@gingoog.gov.ph', password: '••••••••' })
   const [saved, setSaved] = useState(false)

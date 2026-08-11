@@ -43,7 +43,7 @@ export default function ForgotPassword() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg mb-4">
             <Shield size={32} className="text-primary-700" />
           </div>
-          <h1 className="text-2xl font-bold text-white">DRRMIS</h1>
+          <h1 className="text-2xl font-bold text-white">PDRA</h1>
           <p className="text-blue-200 text-sm mt-1">Gingoog City CDRRMO</p>
         </div>
 

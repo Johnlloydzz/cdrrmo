@@ -91,7 +91,7 @@ export default function Sidebar({ onLogout, currentUser, mobileOpen, onClose }) 
             <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-full h-full object-contain p-0.5" />
           </div>
           <div className="overflow-hidden">
-            <p className="text-white font-bold text-sm leading-tight">DRRMIS</p>
+            <p className="text-white font-bold text-sm leading-tight">PDRA</p>
             <p className="text-blue-200 text-xs truncate">Gingoog City CDRRMO</p>
           </div>
         </div>

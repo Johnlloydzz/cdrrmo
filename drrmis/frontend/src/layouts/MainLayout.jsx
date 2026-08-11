@@ -35,7 +35,7 @@ export default function MainLayout({ onLogout, currentUser }) {
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
 
   const location = useLocation()
-  const title = pageTitles[location.pathname] || 'DRRMIS'
+  const title = pageTitles[location.pathname] || 'PDRA'
   const unread = notifications.filter(n => !n.read).length
 
   const toggleNotif  = () => { setNotifOpen(o => !o);   setProfileOpen(false) }
