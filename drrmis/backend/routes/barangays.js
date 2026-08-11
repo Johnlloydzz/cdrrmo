@@ -41,9 +41,21 @@ router.post('/', async (req, res) => {
 })
 
 // PUT /api/barangays/:id
+// Partial update — only overwrites fields actually sent in the request body,
+// so editing e.g. just the CDRA classification doesn't wipe out boundary_geojson
+// (or any other field) that the edit form didn't include.
 router.put('/:id', async (req, res) => {
   try {
-    const { name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson } = req.body
+    const current = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
+    if (!current) return res.status(404).json({ error: 'Not found' })
+
+    const name                     = req.body.name ?? current.name
+    const population                = req.body.population ?? current.population
+    const risk_level                = req.body.risk_level ?? current.risk_level
+    const flood_susceptibility      = req.body.flood_susceptibility ?? current.flood_susceptibility
+    const landslide_susceptibility  = req.body.landslide_susceptibility ?? current.landslide_susceptibility
+    const boundary_geojson          = req.body.boundary_geojson ?? current.boundary_geojson
+
     await run(
       `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, updated_at=datetime('now') WHERE id=?`,
       [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, req.params.id]
