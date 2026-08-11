@@ -5,7 +5,8 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
 const emptyForm = { barangay_id: '', name: '', flood_risk: 'Low', flood_threshold_m: '1.0', landslide_risk: 'Low' }
 
-export default function PurokManagement() {
+export default function PurokManagement({ currentUser }) {
+  const canAdd = currentUser?.role === 'Barangay Official'
   const [puroks, setPuroks] = useState([])
   const [barangays, setBarangays] = useState([])
   const [loading, setLoading] = useState(true)
@@ -55,7 +56,9 @@ export default function PurokManagement() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input className="input pl-9" placeholder="Search purok or barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Purok</button>
+        {canAdd && (
+          <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Purok</button>
+        )}
       </div>
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
