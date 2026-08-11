@@ -4,6 +4,21 @@ const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
 
+// Computes an age bracket label from a birthdate string (YYYY-MM-DD)
+function computeAgeBracket(birthdate) {
+  if (!birthdate) return null
+  const dob = new Date(birthdate)
+  if (isNaN(dob)) return null
+  const ageMs = Date.now() - dob.getTime()
+  const age = Math.floor(ageMs / (1000 * 60 * 60 * 24 * 365.25))
+  if (age < 1) return 'Infant (0)'
+  if (age <= 12) return 'Child (1-12)'
+  if (age <= 17) return 'Teen (13-17)'
+  if (age <= 59) return 'Adult (18-59)'
+  return 'Senior (60+)'
+}
+
+// GET /api/residents
 router.get('/', async (req, res) => {
   try {
     const { household_id, search } = req.query
@@ -19,55 +34,44 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-router.get('/analytics', async (req, res) => {
-  try {
-    const total     = await get('SELECT COUNT(*) as c FROM residents')
-    const male      = await get("SELECT COUNT(*) as c FROM residents WHERE gender = 'Male'")
-    const female    = await get("SELECT COUNT(*) as c FROM residents WHERE gender = 'Female'")
-    const senior    = await get('SELECT COUNT(*) as c FROM residents WHERE is_senior = 1')
-    const pwd       = await get('SELECT COUNT(*) as c FROM residents WHERE is_pwd = 1')
-    const pregnant  = await get('SELECT COUNT(*) as c FROM residents WHERE is_pregnant = 1')
-    const children  = await get('SELECT COUNT(*) as c FROM residents WHERE age < 18')
-    res.json({ total: total.c, male: male.c, female: female.c, senior: senior.c, pwd: pwd.c, pregnant: pregnant.c, children: children.c })
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
-router.get('/:id', async (req, res) => {
-  try {
-    const row = await get('SELECT * FROM residents WHERE id = ?', [req.params.id])
-    if (!row) return res.status(404).json({ error: 'Not found' })
-    res.json(row)
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
+// POST /api/residents
 router.post('/', async (req, res) => {
   try {
+    const { household_id, name, birthdate, relation_to_head } = req.body
+    if (!household_id || !name || !birthdate) {
+      return res.status(400).json({ error: 'household_id, name, and birthdate are required' })
+    }
     const count = await get('SELECT COUNT(*) as c FROM residents')
-    const rid = `RES-${String((count.c || 0) + 1).padStart(4, '0')}`
-    const { household_id, name, birthdate, age, gender, civil_status, occupation, education, religion, contact, blood_type, medical_condition, is_pwd, is_senior, is_pregnant, is_solo_parent, is_vaccinated, emergency_contact, ec_relationship } = req.body
-    const r = await run(
-      `INSERT INTO residents (resident_id, household_id, name, birthdate, age, gender, civil_status, occupation, education, religion, contact, blood_type, medical_condition, is_pwd, is_senior, is_pregnant, is_solo_parent, is_vaccinated, emergency_contact, ec_relationship)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [rid, household_id, name, birthdate, age, gender, civil_status, occupation, education, religion, contact, blood_type, medical_condition, is_pwd ? 1 : 0, is_senior ? 1 : 0, is_pregnant ? 1 : 0, is_solo_parent ? 1 : 0, is_vaccinated ? 1 : 0, emergency_contact, ec_relationship]
+    const resident_id = `RES-${String((count?.c || 0) + 1).padStart(5, '0')}`
+    const age_bracket = computeAgeBracket(birthdate)
+    const result = await run(
+      `INSERT INTO residents (resident_id, household_id, name, birthdate, age_bracket, relation_to_head) VALUES (?, ?, ?, ?, ?, ?)`,
+      [resident_id, household_id, name, birthdate, age_bracket, relation_to_head || null]
     )
-    res.status(201).json(await get('SELECT * FROM residents WHERE id = ?', [r.lastID]))
+    const newRow = await get('SELECT * FROM residents WHERE id = ?', [result.lastID])
+    res.status(201).json(newRow)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// PUT /api/residents/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, age, gender, civil_status, occupation, contact, blood_type, medical_condition, is_pwd, is_senior, is_pregnant } = req.body
+    const { name, birthdate, relation_to_head } = req.body
+    const age_bracket = computeAgeBracket(birthdate)
     await run(
-      'UPDATE residents SET name=?, age=?, gender=?, civil_status=?, occupation=?, contact=?, blood_type=?, medical_condition=?, is_pwd=?, is_senior=?, is_pregnant=? WHERE id=?',
-      [name, age, gender, civil_status, occupation, contact, blood_type, medical_condition, is_pwd ? 1 : 0, is_senior ? 1 : 0, is_pregnant ? 1 : 0, req.params.id]
+      `UPDATE residents SET name=?, birthdate=?, age_bracket=?, relation_to_head=? WHERE id=?`,
+      [name, birthdate, age_bracket, relation_to_head, req.params.id]
     )
-    res.json(await get('SELECT * FROM residents WHERE id = ?', [req.params.id]))
+    const updated = await get('SELECT * FROM residents WHERE id = ?', [req.params.id])
+    res.json(updated)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// DELETE /api/residents/:id
 router.delete('/:id', async (req, res) => {
   try {
-    await run('DELETE FROM residents WHERE id = ?', [req.params.id])
+    const result = await run('DELETE FROM residents WHERE id = ?', [req.params.id])
+    if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
     res.json({ message: 'Deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

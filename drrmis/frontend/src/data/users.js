@@ -17,11 +17,11 @@ export const DEMO_USERS = [
   {
     id: 2,
     name: 'Ana Villanueva',
-    username: 'brgy.kioskos',
+    username: 'brgy.sanjuan',
     password: 'Brgy@1234',
     role: 'Barangay Official',
-    barangay: 'Kioskos',
-    email: 'ana@kioskos.gov.ph',
+    barangay: 'San Juan',
+    email: 'ana@sanjuan.gov.ph',
     avatar: 'AV',
   },
 ]

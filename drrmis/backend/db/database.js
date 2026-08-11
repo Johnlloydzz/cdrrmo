@@ -49,127 +49,32 @@ async function initDb() {
   for (const stmt of schema) {
     await run(stmt)
   }
-  await runMigrations()
-  await seedDefaultAdmin()
   await seedBarangays()
+  await seedDefaultAdmin()
   await seedBoundaries()
   console.log('Database initialized.')
 }
 
-async function runMigrations() {
-  const barangayColumns = await all('PRAGMA table_info(barangays)')
-  const barangayColumnNames = barangayColumns.map(c => c.name)
-
-  if (!barangayColumnNames.includes('is_archived')) {
-    await run('ALTER TABLE barangays ADD COLUMN is_archived INTEGER DEFAULT 0')
-    console.log('Migration: added is_archived to barangays')
-  }
-
-  if (!barangayColumnNames.includes('archived_at')) {
-    await run('ALTER TABLE barangays ADD COLUMN archived_at TEXT')
-    console.log('Migration: added archived_at to barangays')
-  }
-
-  if (!barangayColumnNames.includes('boundary_geojson')) {
-    await run('ALTER TABLE barangays ADD COLUMN boundary_geojson TEXT')
-    console.log('Migration: added boundary_geojson to barangays')
-  }
-
-  if (!barangayColumnNames.includes('image_url')) {
-    await run('ALTER TABLE barangays ADD COLUMN image_url TEXT')
-    console.log('Migration: added image_url to barangays')
-  }
-
-  const reliefColumns = await all('PRAGMA table_info(relief_distributions)')
-  const reliefColumnNames = reliefColumns.map(c => c.name)
-
-  if (!reliefColumnNames.includes('distributed_by')) {
-    await run('ALTER TABLE relief_distributions ADD COLUMN distributed_by INTEGER REFERENCES users(id)')
-    console.log('Migration: added distributed_by to relief_distributions')
-  }
-
-  const personnelColumns = await all('PRAGMA table_info(personnel)')
-  const personnelColumnNames = personnelColumns.map(c => c.name)
-
-  if (!personnelColumnNames.includes('barangay_id')) {
-    await run('ALTER TABLE personnel ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
-    console.log('Migration: added barangay_id to personnel')
-  }
-
-  const resourceColumns = await all('PRAGMA table_info(resources)')
-  const resourceColumnNames = resourceColumns.map(c => c.name)
-
-  if (!resourceColumnNames.includes('barangay_id')) {
-    await run('ALTER TABLE resources ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
-    console.log('Migration: added barangay_id to resources')
-  }
-
-  const alertColumns = await all('PRAGMA table_info(alerts)')
-  const alertColumnNames = alertColumns.map(c => c.name)
-
-  if (!alertColumnNames.includes('sent_by_user_id')) {
-    await run('ALTER TABLE alerts ADD COLUMN sent_by_user_id INTEGER REFERENCES users(id)')
-    console.log('Migration: added sent_by_user_id to alerts')
-  }
-
-  const reliefInvColumns = await all('PRAGMA table_info(relief_inventory)')
-  const reliefInvColumnNames = reliefInvColumns.map(c => c.name)
-
-  if (!reliefInvColumnNames.includes('barangay_id')) {
-    await run('ALTER TABLE relief_inventory ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
-    console.log('Migration: added barangay_id to relief_inventory')
-  }
-
-  const weatherColumns = await all('PRAGMA table_info(weather_logs)')
-  const weatherColumnNames = weatherColumns.map(c => c.name)
-
-  if (!weatherColumnNames.includes('barangay_id')) {
-    await run('ALTER TABLE weather_logs ADD COLUMN barangay_id INTEGER REFERENCES barangays(id)')
-    console.log('Migration: added barangay_id to weather_logs')
-  }
-
-  const settingsColumns = await all('PRAGMA table_info(system_settings)')
-  const settingsColumnNames = settingsColumns.map(c => c.name)
-
-  if (!settingsColumnNames.includes('updated_by')) {
-    await run('ALTER TABLE system_settings ADD COLUMN updated_by INTEGER REFERENCES users(id)')
-    console.log('Migration: added updated_by to system_settings')
-  }
-}
-
+// ── Demo accounts — 2 roles only: CDRRMO Personnel, Barangay Official ────────
 async function seedDefaultAdmin() {
+  const brgy = await get('SELECT id FROM barangays WHERE name = ?', ['San Juan'])
+
   const demoUsers = [
-    {
-      name: 'System Administrator',
-      username: 'sysadmin',
-      email: 'admin@gingoog.gov.ph',
-      password: 'Admin@1234',
-      role: 'Super Administrator',
-      barangay: 'All',
-    },
     {
       name: 'Carlos Mendoza',
       username: 'cdrrmo01',
       email: 'carlos@cdrrmo.gov.ph',
       password: 'Cdrrmo@1234',
       role: 'CDRRMO Personnel',
-      barangay: 'All',
+      barangay_id: null,
     },
     {
       name: 'Ana Villanueva',
-      username: 'brgy.kioskos',
-      email: 'ana@kioskos.gov.ph',
+      username: 'brgy.sanjuan',
+      email: 'ana@sanjuan.gov.ph',
       password: 'Brgy@1234',
-      role: 'Barangay Admin',
-      barangay: 'Kioskos',
-    },
-    {
-      name: 'Mark Responder',
-      username: 'responder01',
-      email: 'mark@cdrrmo.gov.ph',
-      password: 'Resp@1234',
-      role: 'Field Responder',
-      barangay: 'All',
+      role: 'Barangay Official',
+      barangay_id: brgy ? brgy.id : null,
     },
   ]
 
@@ -178,15 +83,16 @@ async function seedDefaultAdmin() {
     if (!existing) {
       const hash = await bcrypt.hash(user.password, 12)
       await run(
-        `INSERT INTO users (name, username, email, password_hash, role, barangay, status)
+        `INSERT INTO users (name, username, email, password_hash, role, barangay_id, status)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [user.name, user.username, user.email, hash, user.role, user.barangay, 'Active']
+        [user.name, user.username, user.email, hash, user.role, user.barangay_id, 'Active']
       )
       console.log(`Demo user created: ${user.username} / ${user.password}`)
     }
   }
 }
 
+// ── Seed all 79 barangays of Gingoog City ────────────────────────────────────
 async function seedBarangays() {
   const poblacionBarangays = [
     '1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17',
@@ -210,9 +116,8 @@ async function seedBarangays() {
     const existing = await get('SELECT id FROM barangays WHERE name = ?', [name])
     if (!existing) {
       await run(
-        `INSERT INTO barangays (name, captain, population, families, houses, risk_level, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [name, '', 0, 0, 0, 'Low', 'Active']
+        `INSERT INTO barangays (name, population, risk_level) VALUES (?, ?, ?)`,
+        [name, 0, 'Low']
       )
     }
   }

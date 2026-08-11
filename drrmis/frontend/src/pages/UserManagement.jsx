@@ -4,10 +4,11 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
 const STATUS_BADGE = { Active: 'badge-green', Inactive: 'badge-gray', Suspended: 'badge-red' }
 const ROLES = ['CDRRMO Personnel', 'Barangay Official']
-const emptyForm = { name: '', username: '', email: '', password: '', role: 'CDRRMO Personnel', barangay: 'All', status: 'Active' }
+const emptyForm = { name: '', username: '', email: '', password: '', role: 'CDRRMO Personnel', barangay_id: '', status: 'Active' }
 
 export default function UserManagement() {
   const [users, setUsers] = useState([])
+  const [barangays, setBarangays] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -18,7 +19,7 @@ export default function UserManagement() {
   const [form, setForm] = useState(emptyForm)
 
   const load = () => { setLoading(true); apiGet('/users').then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false)) }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); apiGet('/barangays').then(setBarangays).catch(() => {}) }, [])
 
   const filtered = users.filter(u =>
     ((u.name || '').toLowerCase().includes(search.toLowerCase()) || (u.username || '').toLowerCase().includes(search.toLowerCase())) &&
@@ -26,19 +27,22 @@ export default function UserManagement() {
   )
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
-  const openEdit = (u) => { setEditing(u.id); setForm({ ...u, password: '' }); setShowModal(true) }
+  const openEdit = (u) => { setEditing(u.id); setForm({ ...u, barangay_id: u.barangay_id || '', password: '' }); setShowModal(true) }
   const handleDelete = async (id) => { if (!window.confirm('Delete this user account?')) return; try { await apiDelete(`/users/${id}`); load() } catch (err) { alert(err.message) } }
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.username.trim() || !form.email.trim() || (!editing && !form.password.trim())) {
       alert('Name, username, email, and password are required.'); return
     }
+    if (form.role === 'Barangay Official' && !form.barangay_id) {
+      alert('Barangay Officials must be assigned to a barangay.'); return
+    }
     setSaving(true)
     try {
       if (editing) {
-        await apiPut(`/users/${editing}`, { name: form.name, email: form.email, role: form.role, barangay: form.barangay, status: form.status })
+        await apiPut(`/users/${editing}`, { name: form.name, email: form.email, role: form.role, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null, status: form.status })
       } else {
-        await apiPost('/users', form)
+        await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
       }
       setShowModal(false)
       load()
@@ -77,7 +81,7 @@ export default function UserManagement() {
                   <td className="table-cell font-mono text-gray-600">{u.username}</td>
                   <td className="table-cell">{u.email}</td>
                   <td className="table-cell">{u.role}</td>
-                  <td className="table-cell">{u.barangay}</td>
+                  <td className="table-cell">{u.barangay_name || '—'}</td>
                   <td className="table-cell"><span className={STATUS_BADGE[u.status] || 'badge-gray'}>{u.status}</span></td>
                   <td className="table-cell text-xs text-gray-500">{u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</td>
                   <td className="table-cell">
@@ -105,7 +109,13 @@ export default function UserManagement() {
               <div className="col-span-2"><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
               {!editing && (<div className="col-span-2"><label className="label">Password</label><input className="input" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} /></div>)}
               <div><label className="label">Role</label><select className="input" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>{ROLES.map(r => <option key={r}>{r}</option>)}</select></div>
-              <div><label className="label">Barangay</label><input className="input" value={form.barangay} onChange={e => setForm({...form, barangay: e.target.value})} placeholder="All, or specific barangay" /></div>
+              <div>
+                <label className="label">Barangay {form.role === 'Barangay Official' && <span className="text-red-500">*</span>}</label>
+                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value})} disabled={form.role !== 'Barangay Official'}>
+                  <option value="">{form.role === 'CDRRMO Personnel' ? 'N/A (city-wide access)' : 'Select barangay…'}</option>
+                  {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
               <div className="col-span-2"><label className="label">Status</label><select className="input" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>{['Active','Inactive','Suspended'].map(s => <option key={s}>{s}</option>)}</select></div>
             </div>
             <div className="flex justify-end gap-3 mt-6">

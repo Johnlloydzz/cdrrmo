@@ -45,7 +45,7 @@ function distanceKm([lat1, lng1], [lat2, lng2]) {
 }
 
 const MARKERS = [
-  { id: 5, type: 'Hazard', label: 'Flood Susceptibility Zone - Kioskos', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
+  { id: 5, type: 'Hazard', label: 'Flood Susceptibility Zone - San Juan', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
 ]
 
 const LAYERS = [

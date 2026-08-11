@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
-const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
-const emptyForm = { barangay_id: '', purok_id: '', house_number: '', head_family: '', contact: '', house_type: 'Concrete', roof_type: 'GI Sheet', wall_type: '', risk_level: 'Low', latitude: '', longitude: '' }
+const emptyForm = { barangay_id: '', purok_id: '', head_family: '', contact: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement() {
   const [households, setHouseholds] = useState([])
   const [barangays, setBarangays] = useState([])
+  const [puroks, setPuroks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -16,23 +16,51 @@ export default function HouseholdManagement() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
 
-  const load = () => { setLoading(true); apiGet('/households').then(setHouseholds).catch(err => setError(err.message)).finally(() => setLoading(false)) }
-  useEffect(() => { load(); apiGet('/barangays').then(setBarangays).catch(() => {}) }, [])
+  const load = () => {
+    setLoading(true)
+    apiGet('/households').then(setHouseholds).catch(err => setError(err.message)).finally(() => setLoading(false))
+  }
 
-  const filtered = households.filter(h => (h.head_family || '').toLowerCase().includes(search.toLowerCase()) || (h.barangay_name || '').toLowerCase().includes(search.toLowerCase()) || (h.household_id || '').toLowerCase().includes(search.toLowerCase()))
+  useEffect(() => {
+    load()
+    apiGet('/barangays').then(setBarangays).catch(() => {})
+    apiGet('/puroks').then(setPuroks).catch(() => {})
+  }, [])
+
+  const filtered = households.filter(h =>
+    (h.head_family || '').toLowerCase().includes(search.toLowerCase()) ||
+    (h.barangay_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (h.household_id || '').toLowerCase().includes(search.toLowerCase())
+  )
+
+  const puroksForBarangay = (barangayId) => puroks.filter(p => String(p.barangay_id) === String(barangayId))
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
   const openEdit = (h) => {
     setEditing(h.id)
-    setForm({ barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', house_number: h.house_number || '', head_family: h.head_family || '', contact: h.contact || '', house_type: h.house_type || 'Concrete', roof_type: h.roof_type || 'GI Sheet', wall_type: h.wall_type || '', risk_level: h.risk_level || 'Low', latitude: h.latitude || '', longitude: h.longitude || '' })
+    setForm({
+      barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_family: h.head_family || '',
+      contact: h.contact || '', latitude: h.latitude || '', longitude: h.longitude || '',
+    })
     setShowModal(true)
   }
-  const handleDelete = async (id) => { if (!window.confirm('Delete this household record?')) return; try { await apiDelete(`/households/${id}`); load() } catch (err) { alert(err.message) } }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this household record?')) return
+    try { await apiDelete(`/households/${id}`); load() } catch (err) { alert(err.message) }
+  }
+
   const handleSave = async () => {
-    if (!form.head_family.trim() || !form.barangay_id) { alert('Head of family and barangay are required.'); return }
+    if (!form.head_family.trim() || !form.barangay_id || !form.purok_id) {
+      alert('Head of family, barangay, and purok are required.'); return
+    }
     setSaving(true)
-    try { if (editing) { await apiPut(`/households/${editing}`, form) } else { await apiPost('/households', form) } setShowModal(false); load() }
-    catch (err) { alert(err.message) } finally { setSaving(false) }
+    try {
+      if (editing) { await apiPut(`/households/${editing}`, form) }
+      else { await apiPost('/households', form) }
+      setShowModal(false)
+      load()
+    } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
   if (loading) return <div className="card p-10 text-center text-gray-400">Loading households…</div>
@@ -47,30 +75,33 @@ export default function HouseholdManagement() {
         </div>
         <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Register Household</button>
       </div>
+
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['HH ID','Barangay','Head of Family','Contact','House Type','Roof Type','Risk','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>{['HH ID','Barangay','Purok','Head of Family','Contact','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{h.household_id}</td>
                   <td className="table-cell">{h.barangay_name || '—'}</td>
+                  <td className="table-cell">
+                    {h.purok_name || '—'}
+                    {h.in_flood_risk_zone && <span className="badge-red text-xs ml-2">High Risk</span>}
+                  </td>
                   <td className="table-cell font-medium">{h.head_family}</td>
                   <td className="table-cell">{h.contact}</td>
-                  <td className="table-cell">{h.house_type}</td>
-                  <td className="table-cell">{h.roof_type}</td>
-                  <td className="table-cell"><span className={RISK[h.risk_level] || 'badge-gray'}>{h.risk_level}</span></td>
                   <td className="table-cell">
                     <div className="flex gap-2">
-                      <button className="p-1.5 rounded hover:bg-blue-50 text-blue-600"><Eye size={15} /></button>
                       <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(h)}><Pencil size={15} /></button>
                       <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(h.id)}><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -82,18 +113,22 @@ export default function HouseholdManagement() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Household' : 'Register Household'}</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
+              <div>
                 <label className="label">Barangay</label>
-                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value})} disabled={!!editing}>
-                  <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, purok_id: ''})} disabled={!!editing}>
+                  <option value="">Select barangay…</option>
+                  {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
-              <div><label className="label">House Number</label><input className="input" value={form.house_number} onChange={e => setForm({...form, house_number: e.target.value})} /></div>
-              <div><label className="label">Head of Family</label><input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} /></div>
+              <div>
+                <label className="label">Purok</label>
+                <select className="input" value={form.purok_id} onChange={e => setForm({...form, purok_id: e.target.value})} disabled={!form.barangay_id}>
+                  <option value="">Select purok…</option>
+                  {puroksForBarangay(form.barangay_id).map(p => <option key={p.id} value={p.id}>{p.name} ({p.flood_risk} risk)</option>)}
+                </select>
+              </div>
+              <div className="col-span-2"><label className="label">Head of Family</label><input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} /></div>
               <div><label className="label">Contact</label><input className="input" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} /></div>
-              <div><label className="label">House Type</label><select className="input" value={form.house_type} onChange={e => setForm({...form, house_type: e.target.value})}>{['Concrete','Wooden','Mixed','Makeshift'].map(t => <option key={t}>{t}</option>)}</select></div>
-              <div><label className="label">Roof Type</label><select className="input" value={form.roof_type} onChange={e => setForm({...form, roof_type: e.target.value})}>{['GI Sheet','Concrete','Nipa','Tarpaulin'].map(t => <option key={t}>{t}</option>)}</select></div>
-              <div><label className="label">Risk Level</label><select className="input" value={form.risk_level} onChange={e => setForm({...form, risk_level: e.target.value})}>{['Low','Medium','High'].map(r => <option key={r}>{r}</option>)}</select></div>
               <div><label className="label">Latitude</label><input className="input" value={form.latitude} onChange={e => setForm({...form, latitude: e.target.value})} /></div>
               <div><label className="label">Longitude</label><input className="input" value={form.longitude} onChange={e => setForm({...form, longitude: e.target.value})} /></div>
             </div>

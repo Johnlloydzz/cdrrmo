@@ -9,27 +9,17 @@ import ChangePassword    from './pages/auth/ChangePassword'
 import Unauthorized      from './pages/Unauthorized'
 import { getStoredUser, setStoredUser, clearStoredUser } from './utils/storage'
 
-const Dashboard = lazy(() => import('./pages/Dashboard'))
+// PDRA — 5 modules only (Chapter 1, Section 1.5):
+// Risk Assessment Dashboard, Web-Based Hazard Mapping (+ Geofencing),
+// Household and Population Management, User Management
 const RiskAssessmentDashboard = lazy(() => import('./pages/RiskAssessmentDashboard'))
-const BarangayManagement = lazy(() => import('./pages/BarangayManagement'))
-const PurokManagement = lazy(() => import('./pages/PurokManagement'))
-const HouseholdManagement = lazy(() => import('./pages/HouseholdManagement'))
-const ResidentManagement = lazy(() => import('./pages/ResidentManagement'))
-const HazardManagement = lazy(() => import('./pages/HazardManagement'))
-const IncidentManagement = lazy(() => import('./pages/IncidentManagement'))
-const EvacuationCenters = lazy(() => import('./pages/EvacuationCenters'))
-const EvacuationManagement = lazy(() => import('./pages/EvacuationManagement'))
-const ReliefManagement = lazy(() => import('./pages/ReliefManagement'))
-const ResourceManagement = lazy(() => import('./pages/ResourceManagement'))
-const WeatherPage = lazy(() => import('./pages/WeatherPage'))
-const GISMap = lazy(() => import('./pages/GISMap'))
-const UserManagement = lazy(() => import('./pages/UserManagement'))
-const Reports = lazy(() => import('./pages/Reports'))
-const Analytics = lazy(() => import('./pages/Analytics'))
-const AuditLogs = lazy(() => import('./pages/AuditLogs'))
-const Settings = lazy(() => import('./pages/Settings'))
-const Alerts = lazy(() => import('./pages/Alerts'))
-const Archive = lazy(() => import('./pages/Archive'))
+const BarangayManagement      = lazy(() => import('./pages/BarangayManagement'))
+const PurokManagement         = lazy(() => import('./pages/PurokManagement'))
+const HouseholdManagement     = lazy(() => import('./pages/HouseholdManagement'))
+const ResidentManagement      = lazy(() => import('./pages/ResidentManagement'))
+const GISMap                  = lazy(() => import('./pages/GISMap'))
+const UserManagement          = lazy(() => import('./pages/UserManagement'))
+const Settings                = lazy(() => import('./pages/Settings'))
 
 // Wraps a page element with RoleGuard so direct URL access is also blocked
 function Protected({ currentUser, children }) {
@@ -72,7 +62,7 @@ function App() {
               : <Navigate to="/login" replace />
           }
         >
-          {/* Dashboard — all roles */}
+          {/* Risk Assessment Dashboard Module — landing page, all roles */}
           <Route index element={<RiskAssessmentDashboard currentUser={currentUser} />} />
 
           {/* Unauthorized landing */}
@@ -81,32 +71,18 @@ function App() {
           {/* Change password — all authenticated users */}
           <Route path="change-password" element={<ChangePassword />} />
 
-          {/* Community */}
+          {/* Household and Population Management Module */}
           <Route path="barangays"  element={<G><BarangayManagement /></G>} />
           <Route path="puroks"     element={<G><PurokManagement /></G>} />
           <Route path="households" element={<G><HouseholdManagement /></G>} />
           <Route path="residents"  element={<G><ResidentManagement /></G>} />
 
-          {/* Disaster Response */}
-          <Route path="hazards"            element={<G><HazardManagement currentUser={currentUser} /></G>} />
-          <Route path="incidents"          element={<G><IncidentManagement currentUser={currentUser} /></G>} />
-          <Route path="evacuation-centers" element={<G><EvacuationCenters /></G>} />
-          <Route path="evacuation"         element={<G><EvacuationManagement /></G>} />
-          <Route path="relief"             element={<G><ReliefManagement /></G>} />
-          <Route path="resources"          element={<G><ResourceManagement /></G>} />
+          {/* Web-Based Hazard Mapping + Geofencing Module */}
+          <Route path="map" element={<G><GISMap /></G>} />
 
-          {/* Main */}
-          <Route path="weather" element={<G><WeatherPage /></G>} />
-          <Route path="map"     element={<G><GISMap /></G>} />
-          <Route path="alerts"  element={<G><Alerts /></G>} />
-
-          {/* Administration */}
-          <Route path="users"      element={<G><UserManagement currentUser={currentUser} /></G>} />
-          <Route path="reports"    element={<G><Reports /></G>} />
-          <Route path="analytics"  element={<G><Analytics /></G>} />
-          <Route path="audit-logs" element={<G><AuditLogs /></G>} />
-          <Route path="archive"    element={<G><Archive /></G>} />
-          <Route path="settings"   element={<G><Settings /></G>} />
+          {/* User Management Module — CDRRMO Personnel only */}
+          <Route path="users"    element={<G><UserManagement currentUser={currentUser} /></G>} />
+          <Route path="settings" element={<G><Settings /></G>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

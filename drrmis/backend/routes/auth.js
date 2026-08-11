@@ -14,7 +14,10 @@ router.post('/login', async (req, res) => {
     if (!username || !password)
       return res.status(400).json({ error: 'Username and password are required.' })
 
-    const user = await get('SELECT * FROM users WHERE username = ? AND status = ?', [username, 'Active'])
+    const user = await get(
+      `SELECT u.*, b.name as barangay_name FROM users u LEFT JOIN barangays b ON u.barangay_id = b.id WHERE u.username = ? AND u.status = ?`,
+      [username, 'Active']
+    )
     if (!user) return res.status(401).json({ error: 'Invalid credentials.' })
 
     const valid = await bcrypt.compare(password, user.password_hash)
@@ -30,7 +33,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, username: user.username, role: user.role, barangay: user.barangay }
+      user: { id: user.id, name: user.name, username: user.username, role: user.role, barangay_id: user.barangay_id, barangay: user.barangay_name || 'All' }
     })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -61,7 +64,11 @@ router.post('/change-password', authenticate, async (req, res) => {
 // GET /api/auth/me
 router.get('/me', authenticate, async (req, res) => {
   try {
-    const user = await get('SELECT id, name, username, email, role, barangay, last_login FROM users WHERE id = ?', [req.user.id])
+    const user = await get(
+      `SELECT u.id, u.name, u.username, u.email, u.role, u.barangay_id, b.name as barangay, u.last_login
+       FROM users u LEFT JOIN barangays b ON u.barangay_id = b.id WHERE u.id = ?`,
+      [req.user.id]
+    )
     res.json(user)
   } catch (err) {
     res.status(500).json({ error: err.message })
