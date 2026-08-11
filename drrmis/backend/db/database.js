@@ -93,32 +93,70 @@ async function seedDefaultAdmin() {
 }
 
 // ── Seed all 79 barangays of Gingoog City ────────────────────────────────────
-// Flood/landslide susceptibility for a sample of barangays is seeded from the
-// City of Gingoog CLUP Landslide and Flood Susceptibility Map (visual read).
-// This is a starting point only — CDRRMO should verify/correct every barangay's
-// classification against the official CDRA map before relying on it operationally.
+// Flood/landslide susceptibility read carefully, barangay-by-barangay, from the
+// City of Gingoog CLUP Landslide and Flood Susceptibility Map (CY 2020-2029)
+// and the CDRA Population Flooding Exposure Map for urban (Poblacion) barangays.
+// This is a manual visual read of the official map — CDRRMO should verify each
+// entry against the source GIS data before relying on it operationally.
 const CDRA_SAMPLE = {
-  'Bantaawan':    { flood: 'Low',  landslide: 'High' },
-  'Pigsaluhan':   { flood: 'Low',  landslide: 'High' },
-  'Mimbuntong':   { flood: 'Low',  landslide: 'High' },
-  'Bakid-Bakid':  { flood: 'Low',  landslide: 'High' },
-  'Murallon':     { flood: 'Low',  landslide: 'High' },
-  'Tinulongan':   { flood: 'Low',  landslide: 'High' },
-  'Kipuntos':     { flood: 'Low',  landslide: 'High' },
-  'Kalagonoy':    { flood: 'Low',  landslide: 'Moderate' },
+  // ── Rural barangays ──────────────────────────────────────────────────────
+  'Agay-Ayan':    { flood: 'High', landslide: 'High' },
   'Alagatan':     { flood: 'Low',  landslide: 'Low' },
-  'Lunotan':      { flood: 'Low',  landslide: 'High' },
+  'Anakan':       { flood: 'High', landslide: 'Moderate' },
+  'Bagubad':      { flood: 'Low',  landslide: 'High' },
+  'Bakidbakid':   { flood: 'Low',  landslide: 'Moderate' },
+  'Bal-Ason':     { flood: 'Low',  landslide: 'High' },
+  'Bantaawan':    { flood: 'Low',  landslide: 'High' },
+  'Binakalan':    { flood: 'Low',  landslide: 'Moderate' },
+  'Dinawehan':    { flood: 'Low',  landslide: 'High' },
+  'Eureka':       { flood: 'Low',  landslide: 'Low' },
   'Hindangon':    { flood: 'Low',  landslide: 'High' },
-  'San Juan':     { flood: 'High', landslide: 'Low' },
-  'Santiago':     { flood: 'High', landslide: 'Moderate' },
-  'Bagubad':      { flood: 'High', landslide: 'Moderate' },
-  'Agay-Ayan':    { flood: 'High', landslide: 'Low' },
-  'Eureka':       { flood: 'Low',  landslide: 'Moderate' },
+  'Kalagonoy':    { flood: 'Low',  landslide: 'Moderate' },
   'Kalipay':      { flood: 'Low',  landslide: 'Moderate' },
-  'Malibud':      { flood: 'Low',  landslide: 'Moderate' },
-  'Daan-Lungsod': { flood: 'High', landslide: 'Low' },
-  'Odiongan':     { flood: 'High', landslide: 'Low' },
+  'Kamanikan':    { flood: 'Low',  landslide: 'Moderate' },
+  'Kianlagan':    { flood: 'Low',  landslide: 'High' },
+  'Kibuging':     { flood: 'High', landslide: 'High' },
+  'Kipuntos':     { flood: 'Low',  landslide: 'Moderate' },
+  'Lawaan':       { flood: 'Low',  landslide: 'High' },
+  'Lawit':        { flood: 'Low',  landslide: 'Low' },
+  'Libertad':     { flood: 'Low',  landslide: 'High' },
+  'Libon':        { flood: 'Low',  landslide: 'Moderate' },
+  'Lunao':        { flood: 'High', landslide: 'High' },
+  'Lunotan':      { flood: 'Low',  landslide: 'High' },
+  'Malibud':      { flood: 'Low',  landslide: 'Low' },
+  'Malinao':      { flood: 'Low',  landslide: 'Moderate' },
+  'Maribucao':    { flood: 'Low',  landslide: 'Moderate' },
+  'Mimbalagon':   { flood: 'Low',  landslide: 'Moderate' },
+  'Mimbunga':     { flood: 'Low',  landslide: 'Moderate' },
+  'Mimbuntong':   { flood: 'Low',  landslide: 'High' },
+  'Minsapinit':   { flood: 'Low',  landslide: 'Low' },
+  'Murallon':     { flood: 'Low',  landslide: 'Moderate' },
+  'Odiongan':     { flood: 'High', landslide: 'High' },
+  'Pangasihan':   { flood: 'High', landslide: 'High' },
+  'Pigsaluhan':   { flood: 'Low',  landslide: 'High' },
+  'Punong':       { flood: 'Low',  landslide: 'Moderate' },
+  'Ricoro':       { flood: 'Low',  landslide: 'Moderate' },
+  'Samay':        { flood: 'Low',  landslide: 'Low' },
+  'San Jose':     { flood: 'Low',  landslide: 'Moderate' },
+  'San Juan':     { flood: 'High', landslide: 'Moderate' },
+  'San Luis':     { flood: 'Low',  landslide: 'Low' },
+  'San Miguel':   { flood: 'Low',  landslide: 'Moderate' },
+  'Sangalan':     { flood: 'Low',  landslide: 'High' },
+  'Santiago':     { flood: 'High', landslide: 'Moderate' },
+  'Tagpako':      { flood: 'Low',  landslide: 'Moderate' },
+  'Talisay':      { flood: 'Low',  landslide: 'High' },
+  'Talon':        { flood: 'Low',  landslide: 'Moderate' },
+  'Tinabalan':    { flood: 'Low',  landslide: 'High' },
+  'Tinulongan':   { flood: 'Low',  landslide: 'Moderate' },
+  // ── Poblacion (urban) barangays — per the CDRA Population Flooding
+  // Exposure Map, this whole cluster sits mostly within the High-flood
+  // (purple) zone with pockets of Low (tan); landslide risk is low since
+  // it's flat urban/coastal terrain. Precise per-block classification from
+  // the map's inset numbering was not legible enough to assign individually
+  // — CDRRMO should confirm/refine per Poblacion barangay.
 }
+
+const POBLACION_DEFAULT = { flood: 'High', landslide: 'Low' }
 
 async function seedBarangays() {
   const poblacionBarangays = [
@@ -142,7 +180,8 @@ async function seedBarangays() {
   for (const name of allBarangays) {
     const existing = await get('SELECT id FROM barangays WHERE name = ?', [name])
     if (!existing) {
-      const sample = CDRA_SAMPLE[name]
+      const isPoblacion = name.includes('(Pob.)')
+      const sample = CDRA_SAMPLE[name] || (isPoblacion ? POBLACION_DEFAULT : null)
       await run(
         `INSERT INTO barangays (name, population, risk_level, flood_susceptibility, landslide_susceptibility) VALUES (?, ?, ?, ?, ?)`,
         [name, 0, 'Low', sample?.flood || 'Low', sample?.landslide || 'Low']
