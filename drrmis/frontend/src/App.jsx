@@ -74,7 +74,7 @@ function App() {
           {/* Household and Population Management Module */}
           <Route path="barangays"  element={<G><BarangayManagement /></G>} />
           <Route path="puroks"     element={<G><PurokManagement currentUser={currentUser} /></G>} />
-          <Route path="households" element={<G><HouseholdManagement /></G>} />
+          <Route path="households" element={<G><HouseholdManagement currentUser={currentUser} /></G>} />
           <Route path="residents"  element={<G><ResidentManagement currentUser={currentUser} /></G>} />
 
           {/* Web-Based Hazard Mapping + Geofencing Module */}
