@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2, Building2 } from 'lucide-react'
-import { apiGet, apiPost, apiPut } from '../utils/api'
+import { Search, Pencil, Building2 } from 'lucide-react'
+import { apiGet, apiPut } from '../utils/api'
 
-const RISK_BADGE = { High: 'badge-red', Moderate: 'badge-orange', Low: 'badge-green' }
+// Badge colors matched to the official MGB Landslide and Flood Susceptibility Map legend.
+// Landslide: brown (Very High) → red (High) → green (Moderate) → yellow (Low)
+// Flood:     navy (Very High) → violet (High) → purple (Moderate) → blue (Low)
+const LANDSLIDE_BADGE = { 'Very High': 'badge-brown', High: 'badge-red', Moderate: 'badge-green', Low: 'badge-yellow' }
+const FLOOD_BADGE = { 'Very High': 'badge-navy', High: 'badge-violet', Moderate: 'badge-purple', Low: 'badge-blue' }
 const emptyForm = { name: '', population: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low' }
 
 export default function BarangayManagement() {
@@ -20,7 +24,6 @@ export default function BarangayManagement() {
 
   const filtered = barangays.filter(b => (b.name || '').toLowerCase().includes(search.toLowerCase()))
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
   const openEdit = (b) => {
     setEditing(b.id)
     setForm({
@@ -32,11 +35,10 @@ export default function BarangayManagement() {
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) { alert('Barangay name is required.'); return }
     setSaving(true)
     try {
       const payload = { ...form, population: +form.population || 0 }
-      if (editing) { await apiPut(`/barangays/${editing}`, payload) } else { await apiPost('/barangays', payload) }
+      await apiPut(`/barangays/${editing}`, payload)
       setShowModal(false); load()
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
@@ -46,12 +48,11 @@ export default function BarangayManagement() {
 
   return (
     <div className="space-y-4">
-      <div className="card p-4 flex flex-wrap gap-3 items-center justify-between">
-        <div className="relative flex-1 min-w-48">
+      <div className="card p-4">
+        <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input className="input pl-9" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Barangay</button>
       </div>
 
       <div className="card p-0 overflow-hidden">
@@ -65,8 +66,8 @@ export default function BarangayManagement() {
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium"><span className="flex items-center gap-1.5"><Building2 size={13} className="text-primary-500" />{b.name}</span></td>
                   <td className="table-cell">{(b.population || 0).toLocaleString()}</td>
-                  <td className="table-cell"><span className={RISK_BADGE[b.flood_susceptibility] || 'badge-gray'}>{b.flood_susceptibility}</span></td>
-                  <td className="table-cell"><span className={RISK_BADGE[b.landslide_susceptibility] || 'badge-gray'}>{b.landslide_susceptibility}</span></td>
+                  <td className="table-cell"><span className={FLOOD_BADGE[b.flood_susceptibility] || 'badge-gray'}>{b.flood_susceptibility}</span></td>
+                  <td className="table-cell"><span className={LANDSLIDE_BADGE[b.landslide_susceptibility] || 'badge-gray'}>{b.landslide_susceptibility}</span></td>
                   <td className="table-cell text-xs text-gray-400">{b.boundary_geojson ? '✓ Loaded' : 'None'}</td>
                   <td className="table-cell"><button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(b)}><Pencil size={15} /></button></td>
                 </tr>
@@ -81,27 +82,27 @@ export default function BarangayManagement() {
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Barangay' : 'Add Barangay'}</h3>
+            <h3 className="text-lg font-semibold mb-5">Edit Barangay</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2"><label className="label">Barangay Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} disabled={!!editing} /></div>
+              <div className="col-span-2"><label className="label">Barangay Name</label><input className="input bg-gray-50 text-gray-500" value={form.name} disabled /></div>
               <div className="col-span-2"><label className="label">Population</label><input className="input" type="number" value={form.population} onChange={e => setForm({...form, population: e.target.value})} /></div>
               <div>
                 <label className="label">Flood Susceptibility (CDRA)</label>
                 <select className="input" value={form.flood_susceptibility} onChange={e => setForm({...form, flood_susceptibility: e.target.value})}>
-                  <option>Low</option><option>High</option>
+                  <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
                 </select>
               </div>
               <div>
                 <label className="label">Landslide Susceptibility (CDRA)</label>
                 <select className="input" value={form.landslide_susceptibility} onChange={e => setForm({...form, landslide_susceptibility: e.target.value})}>
-                  <option>Low</option><option>Moderate</option><option>High</option>
+                  <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
                 </select>
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-3">Classification is manually encoded from the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) maps.</p>
             <div className="flex justify-end gap-3 mt-6">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
-              <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save' : 'Add Barangay')}</button>
+              <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </div>
           </div>
         </div>
