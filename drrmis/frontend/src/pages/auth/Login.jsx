@@ -76,12 +76,12 @@ export default function Login({ onLogin }) {
           <img src="/cdrrmo-logo.png" alt="Gingoog City CDRRMO" className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg mb-6" />
 
           <h1 className="text-white text-xl md:text-2xl font-bold leading-snug max-w-sm">
-            Web-Based And Mobile-Responsive Hazard Tracking For Gingoog City
+            PDRA — Pre-Disaster Risk Assessment for Gingoog City
           </h1>
 
           <p className="text-blue-200 text-sm mt-6 max-w-xs leading-relaxed">
-            <span className="font-semibold text-white">Monitoring Hazards. Protecting Lives.</span><br />
-            A centralized platform for real-time hazard monitoring, reporting, and emergency management in Gingoog City.
+            <span className="font-semibold text-white">Assessing Risk. Protecting Lives.</span><br />
+            A centralized platform for identifying at-risk households and assessing disaster risk before it happens in Gingoog City.
           </p>
 
           <div className="flex items-center gap-4 mt-8">
