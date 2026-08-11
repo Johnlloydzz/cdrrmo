@@ -4,7 +4,8 @@ import { apiGet, apiPost, apiPut } from '../utils/api'
 
 const emptyForm = { household_id: '', name: '', birthdate: '', relation_to_head: '' }
 
-export default function ResidentManagement() {
+export default function ResidentManagement({ currentUser }) {
+  const canAdd = currentUser?.role === 'Barangay Official'
   const [residents, setResidents] = useState([])
   const [households, setHouseholds] = useState([])
   const [loading, setLoading] = useState(true)
@@ -73,7 +74,9 @@ export default function ResidentManagement() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input className="input pl-9" placeholder="Search resident or barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Register Resident</button>
+        {canAdd && (
+          <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Register Resident</button>
+        )}
       </div>
 
       <div className="card p-0 overflow-hidden">
