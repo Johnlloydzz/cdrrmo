@@ -93,6 +93,33 @@ async function seedDefaultAdmin() {
 }
 
 // ── Seed all 79 barangays of Gingoog City ────────────────────────────────────
+// Flood/landslide susceptibility for a sample of barangays is seeded from the
+// City of Gingoog CLUP Landslide and Flood Susceptibility Map (visual read).
+// This is a starting point only — CDRRMO should verify/correct every barangay's
+// classification against the official CDRA map before relying on it operationally.
+const CDRA_SAMPLE = {
+  'Bantaawan':    { flood: 'Low',  landslide: 'High' },
+  'Pigsaluhan':   { flood: 'Low',  landslide: 'High' },
+  'Mimbuntong':   { flood: 'Low',  landslide: 'High' },
+  'Bakid-Bakid':  { flood: 'Low',  landslide: 'High' },
+  'Murallon':     { flood: 'Low',  landslide: 'High' },
+  'Tinulongan':   { flood: 'Low',  landslide: 'High' },
+  'Kipuntos':     { flood: 'Low',  landslide: 'High' },
+  'Kalagonoy':    { flood: 'Low',  landslide: 'Moderate' },
+  'Alagatan':     { flood: 'Low',  landslide: 'Low' },
+  'Lunotan':      { flood: 'Low',  landslide: 'High' },
+  'Hindangon':    { flood: 'Low',  landslide: 'High' },
+  'San Juan':     { flood: 'High', landslide: 'Low' },
+  'Santiago':     { flood: 'High', landslide: 'Moderate' },
+  'Bagubad':      { flood: 'High', landslide: 'Moderate' },
+  'Agay-Ayan':    { flood: 'High', landslide: 'Low' },
+  'Eureka':       { flood: 'Low',  landslide: 'Moderate' },
+  'Kalipay':      { flood: 'Low',  landslide: 'Moderate' },
+  'Malibud':      { flood: 'Low',  landslide: 'Moderate' },
+  'Daan-Lungsod': { flood: 'High', landslide: 'Low' },
+  'Odiongan':     { flood: 'High', landslide: 'Low' },
+}
+
 async function seedBarangays() {
   const poblacionBarangays = [
     '1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17',
@@ -115,9 +142,10 @@ async function seedBarangays() {
   for (const name of allBarangays) {
     const existing = await get('SELECT id FROM barangays WHERE name = ?', [name])
     if (!existing) {
+      const sample = CDRA_SAMPLE[name]
       await run(
-        `INSERT INTO barangays (name, population, risk_level) VALUES (?, ?, ?)`,
-        [name, 0, 'Low']
+        `INSERT INTO barangays (name, population, risk_level, flood_susceptibility, landslide_susceptibility) VALUES (?, ?, ?, ?, ?)`,
+        [name, 0, 'Low', sample?.flood || 'Low', sample?.landslide || 'Low']
       )
     }
   }

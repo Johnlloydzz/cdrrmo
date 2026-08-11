@@ -57,6 +57,11 @@ const LAYERS = [
 
 const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Household Locations']
 
+// Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors,
+// matching the City of Gingoog CLUP Landslide and Flood Susceptibility Map.
+const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
+const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
+
 // Approximate centroid (average of vertices) for a Polygon or MultiPolygon.
 // Used to place a barangay pin and as a fly-to fallback when no boundary is loaded yet.
 function getCentroid(geojson) {
@@ -117,6 +122,7 @@ function FocusRoute({ trigger, coords }) {
 
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('modern')
+  const [hazardLayer, setHazardLayer] = useState('landslide') // 'landslide' | 'flood' | 'none'
   const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Household Locations'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
@@ -306,6 +312,23 @@ export default function GISMap() {
           </div>
         )}
 
+        {/* CDRA Hazard Susceptibility Layer — matches the official CDRA maps */}
+        <div className="card p-4">
+          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><MapPin size={15} /> Hazard Susceptibility (CDRA)</h3>
+          <div className="space-y-1">
+            {[
+              { id: 'landslide', label: 'Landslide Susceptibility' },
+              { id: 'flood',     label: 'Flood Susceptibility' },
+              { id: 'none',      label: 'None' },
+            ].map(o => (
+              <label key={o.id} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
+                <input type="radio" name="hazardLayer" value={o.id} checked={hazardLayer === o.id} onChange={() => setHazardLayer(o.id)} className="text-primary-600" />
+                <span className="text-sm">{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         {/* Base layers */}
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Layers size={15} /> Base Layer</h3>
@@ -336,12 +359,30 @@ export default function GISMap() {
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3">Legend</h3>
           <div className="space-y-2">
+            {hazardLayer === 'landslide' && [
+              { color: LANDSLIDE_COLOR.High, label: 'High Susceptibility to Landslide' },
+              { color: LANDSLIDE_COLOR.Moderate, label: 'Moderate Susceptibility to Landslide' },
+              { color: LANDSLIDE_COLOR.Low, label: 'Low Susceptibility to Landslide' },
+            ].map(l => (
+              <div key={l.label} className="flex items-center gap-2 text-xs">
+                <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
+                {l.label}
+              </div>
+            ))}
+            {hazardLayer === 'flood' && [
+              { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
+              { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
+            ].map(l => (
+              <div key={l.label} className="flex items-center gap-2 text-xs">
+                <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
+                {l.label}
+              </div>
+            ))}
+            <div className="border-t border-gray-100 my-2" />
             {[
               { color: '#dc2626', label: 'Household — High Flood-Risk Zone (Geofenced)' },
               { color: '#3b82f6', label: 'Household — Outside High-Risk Zone' },
-              { color: '#3b82f6', label: 'Flood Zone' },
-              { color: '#8b5cf6', label: 'Landslide Zone' },
-              { color: '#dc2626', label: 'Selected Barangay Boundary' },
+              { color: '#0ea5e9', label: 'Selected Barangay Boundary' },
               { color: '#059669', label: 'CDRRMO Office / Driving Route' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
@@ -362,13 +403,30 @@ export default function GISMap() {
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
           />
 
+          {/* CDRA Hazard Susceptibility choropleth — all barangays, colored to match the official CDRA maps */}
+          {hazardLayer !== 'none' && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+            const color = hazardLayer === 'landslide'
+              ? (LANDSLIDE_COLOR[b.landslide_susceptibility] || LANDSLIDE_COLOR.Low)
+              : (FLOOD_COLOR[b.flood_susceptibility] || FLOOD_COLOR.Low)
+            return (
+              <GeoJSON
+                key={`hz-${hazardLayer}-${b.id}`}
+                data={geo}
+                style={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
+                eventHandlers={{ click: () => setSelectedBarangay(b) }}
+              />
+            )
+          })}
+
           {/* Selected barangay boundary outline */}
           {selectedGeojson && (
             <>
               <GeoJSON
                 key={selectedBarangay.id}
                 data={selectedGeojson}
-                style={{ color: '#dc2626', weight: 2, dashArray: '6, 4', fillColor: '#86efac', fillOpacity: 0.35 }}
+                style={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.1 }}
                 ref={setGeojsonLayerRef}
               />
               <FlyToBoundary geojsonLayer={geojsonLayerRef} fallbackCenter={selectedBarangay?.centroid || geocodedCenter} />

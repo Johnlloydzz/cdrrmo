@@ -22,13 +22,15 @@ const tables = [
 
   // ── Barangays ─────────────────────────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS barangays (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT    NOT NULL UNIQUE,
-    risk_level  TEXT    DEFAULT 'Low',
-    population  INTEGER DEFAULT 0,
-    boundary_geojson TEXT,
-    created_at  TEXT    DEFAULT (datetime('now')),
-    updated_at  TEXT    DEFAULT (datetime('now'))
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                   TEXT    NOT NULL UNIQUE,
+    risk_level             TEXT    DEFAULT 'Low',
+    flood_susceptibility     TEXT  DEFAULT 'Low',    -- High / Low  (CDRA)
+    landslide_susceptibility TEXT  DEFAULT 'Low',    -- High / Moderate / Low  (CDRA)
+    population             INTEGER DEFAULT 0,
+    boundary_geojson       TEXT,
+    created_at             TEXT    DEFAULT (datetime('now')),
+    updated_at             TEXT    DEFAULT (datetime('now'))
   )`,
 
   // ── Puroks (Geofencing: flood_risk + flood_threshold_m from CDRA data) ────

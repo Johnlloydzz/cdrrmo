@@ -29,11 +29,11 @@ router.get('/:id', async (req, res) => {
 // POST /api/barangays
 router.post('/', async (req, res) => {
   try {
-    const { name, population, risk_level, boundary_geojson } = req.body
+    const { name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson } = req.body
     if (!name) return res.status(400).json({ error: 'Name is required' })
     const result = await run(
-      `INSERT INTO barangays (name, population, risk_level, boundary_geojson) VALUES (?, ?, ?, ?)`,
-      [name, population || 0, risk_level || 'Low', boundary_geojson || null]
+      `INSERT INTO barangays (name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson) VALUES (?, ?, ?, ?, ?, ?)`,
+      [name, population || 0, risk_level || 'Low', flood_susceptibility || 'Low', landslide_susceptibility || 'Low', boundary_geojson || null]
     )
     const newRow = await get('SELECT * FROM barangays WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -43,10 +43,10 @@ router.post('/', async (req, res) => {
 // PUT /api/barangays/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, population, risk_level, boundary_geojson } = req.body
+    const { name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson } = req.body
     await run(
-      `UPDATE barangays SET name=?, population=?, risk_level=?, boundary_geojson=?, updated_at=datetime('now') WHERE id=?`,
-      [name, population, risk_level, boundary_geojson, req.params.id]
+      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, updated_at=datetime('now') WHERE id=?`,
+      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
     res.json(updated)
