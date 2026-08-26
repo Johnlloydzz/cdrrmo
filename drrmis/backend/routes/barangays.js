@@ -22,11 +22,11 @@ router.get('/', async (req, res) => {
 
     // Attach each barangay's actual purok names (not just the count) in one
     // extra query, grouped in JS to avoid an N+1 query per barangay.
-    const allPuroks = await all('SELECT id, barangay_id, name, flood_risk, landslide_risk, latitude, longitude FROM puroks ORDER BY name')
+    const allPuroks = await all('SELECT id, barangay_id, name, flood_risk, flood_threshold_m, landslide_risk, latitude, longitude FROM puroks ORDER BY name')
     const puroksByBarangay = {}
     for (const p of allPuroks) {
       if (!puroksByBarangay[p.barangay_id]) puroksByBarangay[p.barangay_id] = []
-      puroksByBarangay[p.barangay_id].push({ id: p.id, name: p.name, flood_risk: p.flood_risk, landslide_risk: p.landslide_risk, latitude: p.latitude, longitude: p.longitude })
+      puroksByBarangay[p.barangay_id].push({ id: p.id, name: p.name, flood_risk: p.flood_risk, flood_threshold_m: p.flood_threshold_m, landslide_risk: p.landslide_risk, latitude: p.latitude, longitude: p.longitude })
     }
     for (const b of barangays) { b.puroks = puroksByBarangay[b.id] || [] }
 

@@ -106,7 +106,16 @@ export default function PurokManagement({ currentUser }) {
                   list="purok-suggestions"
                   placeholder={form.barangay_id ? 'Select or type a purok name…' : 'Select a barangay first'}
                   value={form.name}
-                  onChange={e => setForm({...form, name: e.target.value})}
+                  onChange={e => {
+                    const name = e.target.value
+                    const match = (barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || [])
+                      .find(p => p.name.toLowerCase() === name.toLowerCase())
+                    if (match) {
+                      setForm({...form, name, flood_risk: match.flood_risk || 'Low', flood_threshold_m: String(match.flood_threshold_m ?? '1.0'), landslide_risk: match.landslide_risk || 'Low'})
+                    } else {
+                      setForm({...form, name})
+                    }
+                  }}
                 />
                 <datalist id="purok-suggestions">
                   {(barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || []).map(p => (
