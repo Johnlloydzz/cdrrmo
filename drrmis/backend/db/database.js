@@ -75,6 +75,34 @@ async function selfHealColumns() {
   }
 }
 
+// Purok names corrected after cross-checking the source PDF (Gingoog City
+// Statistical Yearbook 2022, Table II.36) — a handful were mis-transcribed
+// in the initial seed. Renaming (not delete+insert) so any household already
+// linked to these puroks keeps its link. Safe to run on every startup: only
+// renames a row if it still has the old (wrong) spelling.
+const PUROK_NAME_CORRECTIONS = [
+  { barangay: 'Bagubad',  wrong: 'Bofal',    correct: 'Batal' },
+  { barangay: 'Mimbunga', wrong: 'Elizolde', correct: 'Elizalde' },
+  { barangay: 'Odiongan', wrong: 'Tabique',  correct: 'Tabigue' },
+  { barangay: 'Libertad', wrong: 'Tigbaw',   correct: 'Tigbao' },
+  { barangay: 'Kibuging', wrong: 'Ki-iwang', correct: 'Kiiwang' },
+]
+
+async function selfHealPurokNames() {
+  for (const c of PUROK_NAME_CORRECTIONS) {
+    try {
+      const barangay = await get('SELECT id FROM barangays WHERE name = ?', [c.barangay])
+      if (!barangay) continue
+      const purok = await get('SELECT id FROM puroks WHERE barangay_id = ? AND name = ?', [barangay.id, c.wrong])
+      if (!purok) continue
+      await run('UPDATE puroks SET name = ? WHERE id = ?', [c.correct, purok.id])
+      console.log(`Self-heal: renamed purok "${c.wrong}" -> "${c.correct}" (${c.barangay})`)
+    } catch (err) {
+      console.log(`Self-heal: could not rename purok for ${c.barangay}: ${err.message}`)
+    }
+  }
+}
+
 async function initDb() {
   const schema = require('./schema')
   for (const stmt of schema) {
@@ -84,6 +112,7 @@ async function initDb() {
   await seedBarangays()
   await seedDefaultAdmin()
   await seedBoundaries()
+  await selfHealPurokNames()
   console.log('Database initialized.')
 }
 
