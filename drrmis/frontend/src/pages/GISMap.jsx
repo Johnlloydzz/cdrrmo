@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
@@ -163,6 +163,24 @@ export default function GISMap() {
   const filteredBarangays = barangaysWithCentroid.filter(b =>
     b.name.toLowerCase().includes(search.toLowerCase())
   )
+
+  // Approximate purok label position: since puroks have no boundary polygon
+  // of their own (only barangays do), we average the lat/lng of that purok's
+  // registered households as a stand-in for "where this purok is" on the map.
+  // A purok with no geolocated households yet has no label to show.
+  const purokLabelPositions = useMemo(() => {
+    const byPurok = {}
+    for (const h of households) {
+      if (!h.purok_id || !h.latitude || !h.longitude) continue
+      if (!byPurok[h.purok_id]) byPurok[h.purok_id] = { sumLat: 0, sumLng: 0, count: 0, name: h.purok_name }
+      byPurok[h.purok_id].sumLat += Number(h.latitude)
+      byPurok[h.purok_id].sumLng += Number(h.longitude)
+      byPurok[h.purok_id].count += 1
+    }
+    return Object.entries(byPurok).map(([purokId, v]) => ({
+      purokId, name: v.name, lat: v.sumLat / v.count, lng: v.sumLng / v.count,
+    }))
+  }, [households])
 
   // Auto-select + fly to the barangay once the search narrows down to a single match
   useEffect(() => {
@@ -514,6 +532,20 @@ export default function GISMap() {
             <Circle key={m.id} center={[m.lat, m.lng]} radius={m.radius} pathOptions={{ color: m.color, fillColor: m.color, fillOpacity: 0.2 }}>
               <Popup><strong>{m.label}</strong><br />Hazard Zone</Popup>
             </Circle>
+          ))}
+
+          {/* Purok name labels — positioned at the average location of that purok's
+              registered households, since puroks have no boundary polygon of their own */}
+          {activeOverlays.includes('Purok Boundaries') && purokLabelPositions.map(p => (
+            <Marker
+              key={`purok-label-${p.purokId}`}
+              position={[p.lat, p.lng]}
+              icon={L.divIcon({
+                className: '',
+                html: `<div style="font-size:11px;font-weight:700;color:#57534e;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${p.name.toUpperCase()}</div>`,
+                iconSize: [0, 0],
+              })}
+            />
           ))}
 
           {/* Household locations — colored by geofencing risk status (red = within high flood-risk purok) */}
