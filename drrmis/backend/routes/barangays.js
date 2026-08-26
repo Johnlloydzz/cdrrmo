@@ -8,11 +8,16 @@ router.use(authenticate)
 router.get('/', async (req, res) => {
   try {
     const { search, risk } = req.query
-    let sql = 'SELECT * FROM barangays WHERE 1=1'
+    let sql = `
+      SELECT b.*,
+        (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS purok_count,
+        (SELECT COUNT(*) FROM households h WHERE h.barangay_id = b.id) AS household_count,
+        (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.barangay_id = b.id) AS resident_count
+      FROM barangays b WHERE 1=1`
     const params = []
-    if (search) { sql += ' AND name LIKE ?'; params.push(`%${search}%`) }
-    if (risk && risk !== 'All') { sql += ' AND risk_level = ?'; params.push(risk) }
-    sql += ' ORDER BY name'
+    if (search) { sql += ' AND b.name LIKE ?'; params.push(`%${search}%`) }
+    if (risk && risk !== 'All') { sql += ' AND b.risk_level = ?'; params.push(risk) }
+    sql += ' ORDER BY b.name'
     res.json(await all(sql, params))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -20,7 +25,12 @@ router.get('/', async (req, res) => {
 // GET /api/barangays/:id
 router.get('/:id', async (req, res) => {
   try {
-    const b = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
+    const b = await get(`
+      SELECT b.*,
+        (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS purok_count,
+        (SELECT COUNT(*) FROM households h WHERE h.barangay_id = b.id) AS household_count,
+        (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.barangay_id = b.id) AS resident_count
+      FROM barangays b WHERE b.id = ?`, [req.params.id])
     if (!b) return res.status(404).json({ error: 'Not found' })
     res.json(b)
   } catch (err) { res.status(500).json({ error: err.message }) }

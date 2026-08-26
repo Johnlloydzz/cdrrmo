@@ -290,6 +290,20 @@ export default function GISMap() {
             <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain || '—'}</p>
             <p className="text-xs text-gray-500">Population: {(selectedBarangay.population || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
+            <div className="grid grid-cols-3 gap-2 mt-2 mb-1">
+              <div className="bg-primary-50 rounded-lg py-2 text-center">
+                <p className="text-lg font-bold text-primary-700">{selectedBarangay.purok_count ?? 0}</p>
+                <p className="text-[10px] text-gray-500 uppercase">Puroks</p>
+              </div>
+              <div className="bg-primary-50 rounded-lg py-2 text-center">
+                <p className="text-lg font-bold text-primary-700">{selectedBarangay.household_count ?? 0}</p>
+                <p className="text-[10px] text-gray-500 uppercase">Households</p>
+              </div>
+              <div className="bg-primary-50 rounded-lg py-2 text-center">
+                <p className="text-lg font-bold text-primary-700">{selectedBarangay.resident_count ?? 0}</p>
+                <p className="text-[10px] text-gray-500 uppercase">Residents</p>
+              </div>
+            </div>
             {selectedBarangay.contact_number ? (
               <a
                 href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
