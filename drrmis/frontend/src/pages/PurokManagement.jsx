@@ -64,7 +64,7 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok Name','Barangay','Flood Risk','Flood Threshold (m)','Landslide Risk','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok','Barangay','Flood Risk','Flood Threshold (m)','Landslide Risk','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
@@ -94,12 +94,26 @@ export default function PurokManagement({ currentUser }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Barangay</label>
-                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value})} disabled={!!editing}>
+                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, name: ''})} disabled={!!editing}>
                   <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
                 {barangaysError && <p className="text-xs text-red-600 mt-1">Could not load barangay list: {barangaysError}</p>}
               </div>
-              <div className="col-span-2"><label className="label">Purok Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+              <div className="col-span-2">
+                <label className="label">Purok</label>
+                <input
+                  className="input"
+                  list="purok-suggestions"
+                  placeholder={form.barangay_id ? 'Select or type a purok name…' : 'Select a barangay first'}
+                  value={form.name}
+                  onChange={e => setForm({...form, name: e.target.value})}
+                />
+                <datalist id="purok-suggestions">
+                  {(barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || []).map(p => (
+                    <option key={p.id} value={p.name} />
+                  ))}
+                </datalist>
+              </div>
               <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
               <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
               <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
