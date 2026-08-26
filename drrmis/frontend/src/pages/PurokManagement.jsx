@@ -16,6 +16,7 @@ export default function PurokManagement({ currentUser }) {
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [addingNew, setAddingNew] = useState(false)
   const [form, setForm] = useState(emptyForm)
 
   const load = () => {
@@ -30,15 +31,21 @@ export default function PurokManagement({ currentUser }) {
 
   const filtered = puroks.filter(p => (p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.barangay_name || '').toLowerCase().includes(search.toLowerCase()))
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setForm(emptyForm); setAddingNew(false); setShowModal(true) }
   const openEdit = (p) => {
     setEditing(p.id)
     setForm({ barangay_id: p.barangay_id || '', name: p.name || '', flood_risk: p.flood_risk || 'Low', flood_threshold_m: String(p.flood_threshold_m ?? '1.0'), landslide_risk: p.landslide_risk || 'Low' })
+    setAddingNew(true) // editing always shows a free text name field for the existing purok
     setShowModal(true)
   }
   const handleDelete = async (id) => { if (!window.confirm('Delete this purok?')) return; try { await apiDelete(`/puroks/${id}`); load() } catch (err) { alert(err.message) } }
   const handleSave = async () => {
     if (!form.name.trim() || !form.barangay_id) { alert('Purok name and barangay are required.'); return }
+    if (!editing) {
+      const isDuplicate = (barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || [])
+        .some(p => p.name.toLowerCase() === form.name.trim().toLowerCase())
+      if (isDuplicate && !window.confirm(`"${form.name}" already exists in this barangay. Add it again as a duplicate entry?`)) return
+    }
     setSaving(true)
     try {
       const payload = { ...form, flood_threshold_m: parseFloat(form.flood_threshold_m) || 1.0 }
@@ -94,34 +101,42 @@ export default function PurokManagement({ currentUser }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Barangay</label>
-                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, name: ''})} disabled={!!editing}>
+                <select className="input" value={form.barangay_id} onChange={e => { setForm({...form, barangay_id: e.target.value, name: ''}); setAddingNew(false) }} disabled={!!editing}>
                   <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
                 {barangaysError && <p className="text-xs text-red-600 mt-1">Could not load barangay list: {barangaysError}</p>}
               </div>
               <div className="col-span-2">
                 <label className="label">Purok</label>
-                <input
-                  className="input"
-                  list="purok-suggestions"
-                  placeholder={form.barangay_id ? 'Select or type a purok name…' : 'Select a barangay first'}
-                  value={form.name}
-                  onChange={e => {
-                    const name = e.target.value
-                    const match = (barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || [])
-                      .find(p => p.name.toLowerCase() === name.toLowerCase())
-                    if (match) {
-                      setForm({...form, name, flood_risk: match.flood_risk || 'Low', flood_threshold_m: String(match.flood_threshold_m ?? '1.0'), landslide_risk: match.landslide_risk || 'Low'})
-                    } else {
-                      setForm({...form, name})
-                    }
-                  }}
-                />
-                <datalist id="purok-suggestions">
-                  {(barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || []).map(p => (
-                    <option key={p.id} value={p.name} />
-                  ))}
-                </datalist>
+                {!addingNew ? (
+                  <select
+                    className="input"
+                    disabled={!form.barangay_id}
+                    value={form.name}
+                    onChange={e => {
+                      if (e.target.value === '__new__') { setForm({...form, name: ''}); setAddingNew(true); return }
+                      const match = (barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || [])
+                        .find(p => p.name === e.target.value)
+                      setForm({
+                        ...form, name: e.target.value,
+                        flood_risk: match?.flood_risk || 'Low',
+                        flood_threshold_m: String(match?.flood_threshold_m ?? '1.0'),
+                        landslide_risk: match?.landslide_risk || 'Low',
+                      })
+                    }}
+                  >
+                    <option value="">{form.barangay_id ? 'Select a purok…' : 'Select a barangay first'}</option>
+                    {(barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || []).map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                    {form.barangay_id && <option value="__new__">+ Add new purok…</option>}
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input className="input" autoFocus placeholder="Type new purok name…" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                    <button type="button" className="btn-secondary whitespace-nowrap" onClick={() => { setAddingNew(false); setForm({...form, name: ''}) }}>Back to list</button>
+                  </div>
+                )}
               </div>
               <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
               <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
