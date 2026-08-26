@@ -40,6 +40,8 @@ const EXPECTED_COLUMNS = {
     flood_risk: `TEXT DEFAULT 'Low'`,
     flood_threshold_m: `REAL DEFAULT 1.0`,
     landslide_risk: `TEXT DEFAULT 'Low'`,
+    latitude: `REAL`,
+    longitude: `REAL`,
     created_at: `TEXT`,
   },
   households: {

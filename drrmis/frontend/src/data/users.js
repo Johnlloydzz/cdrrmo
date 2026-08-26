@@ -54,8 +54,6 @@ export const ROLE_ACCESS = {
    * their core function per Section 1.1 and 1.4 (Significance).
    */
   'Barangay Official': [
-    '/',             // Risk Assessment Dashboard (landing page, own barangay view)
-    '/barangays',    // Barangay reference data (own barangay)
     '/households',   // Household and Population Management — their core task
     '/residents',    // Household members (birthdates for age-bracket tracking)
     '/puroks',       // Purok-level organization within their barangay

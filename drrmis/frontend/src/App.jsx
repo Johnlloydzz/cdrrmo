@@ -26,6 +26,13 @@ function Protected({ currentUser, children }) {
   return <RoleGuard currentUser={currentUser}>{children}</RoleGuard>
 }
 
+// Dashboard and Barangays are now CDRRMO Personnel only — Barangay Official's
+// default landing page after login is Households instead.
+function defaultRouteFor(user) {
+  if (!user) return '/login'
+  return user.role === 'CDRRMO Personnel' ? '/' : '/households'
+}
+
 function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser())
 
@@ -49,7 +56,7 @@ function App() {
         {/* Public */}
         <Route
           path="/login"
-          element={currentUser ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />}
+          element={currentUser ? <Navigate to={defaultRouteFor(currentUser)} replace /> : <Login onLogin={handleLogin} />}
         />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
@@ -62,8 +69,8 @@ function App() {
               : <Navigate to="/login" replace />
           }
         >
-          {/* Risk Assessment Dashboard Module — landing page, all roles */}
-          <Route index element={<RiskAssessmentDashboard currentUser={currentUser} />} />
+          {/* Risk Assessment Dashboard Module — CDRRMO Personnel only */}
+          <Route index element={<G><RiskAssessmentDashboard currentUser={currentUser} /></G>} />
 
           {/* Unauthorized landing */}
           <Route path="unauthorized" element={<Unauthorized />} />
@@ -85,7 +92,7 @@ function App() {
           <Route path="settings" element={<G><Settings /></G>} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={defaultRouteFor(currentUser)} replace />} />
       </Routes>
       </Suspense>
     </BrowserRouter>

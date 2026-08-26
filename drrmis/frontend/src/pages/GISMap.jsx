@@ -164,10 +164,11 @@ export default function GISMap() {
     b.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Approximate purok label position: since puroks have no boundary polygon
-  // of their own (only barangays do), we average the lat/lng of that purok's
-  // registered households as a stand-in for "where this purok is" on the map.
-  // A purok with no geolocated households yet has no label to show.
+  // Purok label position: prefer the purok's own geocoded location (from
+  // scripts/geocode-puroks.js) when available. If a purok wasn't found by
+  // the geocoder (many sitios are too hyper-local for OpenStreetMap), fall
+  // back to averaging the lat/lng of that purok's registered households —
+  // a purok with neither has no label to show yet.
   const purokLabelPositions = useMemo(() => {
     const byPurok = {}
     for (const h of households) {
@@ -177,10 +178,23 @@ export default function GISMap() {
       byPurok[h.purok_id].sumLng += Number(h.longitude)
       byPurok[h.purok_id].count += 1
     }
-    return Object.entries(byPurok).map(([purokId, v]) => ({
-      purokId, name: v.name, lat: v.sumLat / v.count, lng: v.sumLng / v.count,
-    }))
-  }, [households])
+    const centroids = new Map()
+    for (const [purokId, v] of Object.entries(byPurok)) {
+      centroids.set(Number(purokId), { name: v.name, lat: v.sumLat / v.count, lng: v.sumLng / v.count })
+    }
+
+    const positions = []
+    for (const b of barangays) {
+      for (const p of (b.puroks || [])) {
+        if (p.latitude && p.longitude) {
+          positions.push({ purokId: p.id, name: p.name, lat: p.latitude, lng: p.longitude })
+        } else if (centroids.has(p.id)) {
+          positions.push({ purokId: p.id, ...centroids.get(p.id) })
+        }
+      }
+    }
+    return positions
+  }, [households, barangays])
 
   // Auto-select + fly to the barangay once the search narrows down to a single match
   useEffect(() => {
