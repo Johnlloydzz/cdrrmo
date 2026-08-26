@@ -18,7 +18,19 @@ router.get('/', async (req, res) => {
     if (search) { sql += ' AND b.name LIKE ?'; params.push(`%${search}%`) }
     if (risk && risk !== 'All') { sql += ' AND b.risk_level = ?'; params.push(risk) }
     sql += ' ORDER BY b.name'
-    res.json(await all(sql, params))
+    const barangays = await all(sql, params)
+
+    // Attach each barangay's actual purok names (not just the count) in one
+    // extra query, grouped in JS to avoid an N+1 query per barangay.
+    const allPuroks = await all('SELECT id, barangay_id, name, flood_risk, landslide_risk FROM puroks ORDER BY name')
+    const puroksByBarangay = {}
+    for (const p of allPuroks) {
+      if (!puroksByBarangay[p.barangay_id]) puroksByBarangay[p.barangay_id] = []
+      puroksByBarangay[p.barangay_id].push({ id: p.id, name: p.name, flood_risk: p.flood_risk, landslide_risk: p.landslide_risk })
+    }
+    for (const b of barangays) { b.puroks = puroksByBarangay[b.id] || [] }
+
+    res.json(barangays)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -32,6 +44,7 @@ router.get('/:id', async (req, res) => {
         (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.barangay_id = b.id) AS resident_count
       FROM barangays b WHERE b.id = ?`, [req.params.id])
     if (!b) return res.status(404).json({ error: 'Not found' })
+    b.puroks = await all('SELECT id, name, flood_risk, landslide_risk FROM puroks WHERE barangay_id = ? ORDER BY name', [req.params.id])
     res.json(b)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

@@ -130,8 +130,13 @@ export default function GISMap() {
   const [barangaysLoading, setBarangaysLoading] = useState(true)
   const [wakingUp, setWakingUp] = useState(false)
   const [selectedBarangay, setSelectedBarangay] = useState(null)
+  const [showPurokList, setShowPurokList] = useState(false)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
   const [shareCopied, setShareCopied] = useState(false)
+
+  useEffect(() => {
+    setShowPurokList(false)
+  }, [selectedBarangay?.id])
 
   useEffect(() => {
     setBarangaysLoading(true)
@@ -291,10 +296,15 @@ export default function GISMap() {
             <p className="text-xs text-gray-500">Population: {(selectedBarangay.population || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
             <div className="grid grid-cols-3 gap-2 mt-2 mb-1">
-              <div className="bg-primary-50 rounded-lg py-2 text-center">
+              <button
+                type="button"
+                onClick={() => setShowPurokList(v => !v)}
+                disabled={!selectedBarangay.purok_count}
+                className="bg-primary-50 hover:bg-primary-100 rounded-lg py-2 text-center disabled:cursor-default disabled:hover:bg-primary-50"
+              >
                 <p className="text-lg font-bold text-primary-700">{selectedBarangay.purok_count ?? 0}</p>
-                <p className="text-[10px] text-gray-500 uppercase">Puroks</p>
-              </div>
+                <p className="text-[10px] text-gray-500 uppercase">Puroks {selectedBarangay.purok_count > 0 && (showPurokList ? '▲' : '▼')}</p>
+              </button>
               <div className="bg-primary-50 rounded-lg py-2 text-center">
                 <p className="text-lg font-bold text-primary-700">{selectedBarangay.household_count ?? 0}</p>
                 <p className="text-[10px] text-gray-500 uppercase">Households</p>
@@ -304,6 +314,20 @@ export default function GISMap() {
                 <p className="text-[10px] text-gray-500 uppercase">Residents</p>
               </div>
             </div>
+            {showPurokList && selectedBarangay.puroks?.length > 0 && (
+              <div className="mb-2 max-h-40 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
+                {selectedBarangay.puroks.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-2 py-1.5 text-xs">
+                    <span className="text-gray-700">{p.name}</span>
+                    <span className={
+                      p.flood_risk === 'High' ? 'text-red-600 font-medium' :
+                      p.flood_risk === 'Moderate' ? 'text-amber-600 font-medium' :
+                      'text-green-600 font-medium'
+                    }>{p.flood_risk}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {selectedBarangay.contact_number ? (
               <a
                 href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
