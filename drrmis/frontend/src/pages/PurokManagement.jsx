@@ -9,6 +9,7 @@ export default function PurokManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [puroks, setPuroks] = useState([])
   const [barangays, setBarangays] = useState([])
+  const [barangaysError, setBarangaysError] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -24,7 +25,7 @@ export default function PurokManagement({ currentUser }) {
 
   useEffect(() => {
     load()
-    apiGet('/barangays').then(setBarangays).catch(() => {})
+    apiGet('/barangays').then(setBarangays).catch(err => setBarangaysError(err.message))
   }, [])
 
   const filtered = puroks.filter(p => (p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.barangay_name || '').toLowerCase().includes(search.toLowerCase()))
@@ -91,13 +92,14 @@ export default function PurokManagement({ currentUser }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Purok' : 'Add Purok'}</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2"><label className="label">Purok Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
               <div className="col-span-2">
                 <label className="label">Barangay</label>
                 <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value})} disabled={!!editing}>
                   <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
+                {barangaysError && <p className="text-xs text-red-600 mt-1">Could not load barangay list: {barangaysError}</p>}
               </div>
+              <div className="col-span-2"><label className="label">Purok Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
               <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
               <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
               <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
