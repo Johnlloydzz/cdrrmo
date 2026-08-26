@@ -44,11 +44,43 @@ function all(sql, params = []) {
   })
 }
 
+// Columns added to the schema after some databases were already created.
+// CREATE TABLE IF NOT EXISTS does not retrofit columns onto an existing
+// table, so this runs on every startup to safely add whatever is missing —
+// non-destructive, never touches existing rows. This is what keeps a
+// production database (e.g. Render) in sync automatically on each deploy,
+// without needing manual shell access to run a one-off migration script.
+const EXPECTED_COLUMNS = {
+  users: { name: `TEXT`, email: `TEXT`, barangay_id: `INTEGER REFERENCES barangays(id)`, status: `TEXT DEFAULT 'Active'`, last_login: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
+  barangays: { risk_level: `TEXT DEFAULT 'Low'`, flood_susceptibility: `TEXT DEFAULT 'Low'`, landslide_susceptibility: `TEXT DEFAULT 'Low'`, population: `INTEGER DEFAULT 0`, boundary_geojson: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
+  puroks: { flood_risk: `TEXT DEFAULT 'Low'`, flood_threshold_m: `REAL DEFAULT 1.0`, landslide_risk: `TEXT DEFAULT 'Low'`, latitude: `REAL`, longitude: `REAL`, created_at: `TEXT` },
+  households: { household_id: `TEXT`, purok_id: `INTEGER REFERENCES puroks(id)`, latitude: `REAL`, longitude: `REAL`, contact: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
+  residents: { resident_id: `TEXT`, age_bracket: `TEXT`, relation_to_head: `TEXT`, created_at: `TEXT` },
+}
+
+async function selfHealColumns() {
+  for (const [table, columns] of Object.entries(EXPECTED_COLUMNS)) {
+    let existing
+    try { existing = (await all(`PRAGMA table_info(${table})`)).map(r => r.name) }
+    catch { continue }
+    for (const [colName, colDef] of Object.entries(columns)) {
+      if (existing.includes(colName)) continue
+      try {
+        await run(`ALTER TABLE ${table} ADD COLUMN ${colName} ${colDef}`)
+        console.log(`Self-heal: added missing column ${table}.${colName}`)
+      } catch (err) {
+        console.log(`Self-heal: could not add ${table}.${colName}: ${err.message}`)
+      }
+    }
+  }
+}
+
 async function initDb() {
   const schema = require('./schema')
   for (const stmt of schema) {
     await run(stmt)
   }
+  await selfHealColumns()
   await seedBarangays()
   await seedDefaultAdmin()
   await seedBoundaries()
