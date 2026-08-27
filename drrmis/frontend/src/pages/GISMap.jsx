@@ -170,6 +170,7 @@ export default function GISMap() {
   // back to averaging the lat/lng of that purok's registered households —
   // a purok with neither has no label to show yet.
   const purokLabelPositions = useMemo(() => {
+    if (!selectedBarangay) return []
     const byPurok = {}
     for (const h of households) {
       if (!h.purok_id || !h.latitude || !h.longitude) continue
@@ -184,17 +185,15 @@ export default function GISMap() {
     }
 
     const positions = []
-    for (const b of barangays) {
-      for (const p of (b.puroks || [])) {
-        if (p.latitude && p.longitude) {
-          positions.push({ purokId: p.id, name: p.name, lat: p.latitude, lng: p.longitude })
-        } else if (centroids.has(p.id)) {
-          positions.push({ purokId: p.id, ...centroids.get(p.id) })
-        }
+    for (const p of (selectedBarangay.puroks || [])) {
+      if (p.latitude && p.longitude) {
+        positions.push({ purokId: p.id, name: p.name, lat: p.latitude, lng: p.longitude })
+      } else if (centroids.has(p.id)) {
+        positions.push({ purokId: p.id, ...centroids.get(p.id) })
       }
     }
     return positions
-  }, [households, barangays])
+  }, [households, selectedBarangay])
 
   // Auto-select + fly to the barangay once the search narrows down to a single match
   useEffect(() => {
