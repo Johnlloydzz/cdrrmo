@@ -1,5 +1,7 @@
 // scripts/seed-puroks.js
 //
+require('dotenv').config()
+//
 // Populates the `puroks` table with real sitio/purok names per rural barangay,
 // sourced from the Gingoog City Statistical Yearbook 2022, Table II.36
 // "Sitios/Puroks by Barangay" (Source: CMO-OBA), pages 56-61.

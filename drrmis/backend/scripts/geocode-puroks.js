@@ -1,5 +1,7 @@
 // scripts/geocode-puroks.js
 //
+require('dotenv').config()
+//
 // One-time batch job: attempts to find an approximate latitude/longitude for
 // every purok that doesn't have one yet, using the same free Nominatim
 // (OpenStreetMap) geocoding service already used elsewhere in the app for

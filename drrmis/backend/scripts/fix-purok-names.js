@@ -1,5 +1,7 @@
 // scripts/fix-purok-names.js
 //
+require('dotenv').config()
+//
 // Corrects 5 purok names that were mis-transcribed in the initial seed,
 // found by re-checking the source text directly against the Gingoog City
 // Statistical Yearbook 2022, Table II.36 "Sitios/Puroks by Barangay".
