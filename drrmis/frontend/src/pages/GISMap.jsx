@@ -49,7 +49,6 @@ const MARKERS = [
 ]
 
 const LAYERS = [
-  { id: 'modern',    label: 'Modern',        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; OpenStreetMap contributors' },
   { id: 'street',    label: 'Street View',   url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
   { id: 'satellite', label: 'Satellite',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
@@ -121,7 +120,7 @@ function FocusRoute({ trigger, coords }) {
 }
 
 export default function GISMap() {
-  const [activeLayer, setActiveLayer] = useState('modern')
+  const [activeLayer, setActiveLayer] = useState('street')
   const [hazardLayer, setHazardLayer] = useState('landslide') // 'landslide' | 'flood' | 'none'
   const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Household Locations'])
   const [search, setSearch] = useState('')
