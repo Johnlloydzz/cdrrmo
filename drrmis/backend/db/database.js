@@ -1,47 +1,40 @@
-const sqlite3 = require('sqlite3').verbose()
-const path = require('path')
+const { createClient } = require('@libsql/client')
 const bcrypt = require('bcryptjs')
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'drrmis.db')
-
-let db
+// Hosted on Turso (libSQL) instead of a local file — Render's free tier has
+// an ephemeral filesystem, so a local SQLite file gets wiped on every
+// redeploy, restart, or 15-minute idle spin-down. Turso's free tier persists
+// data permanently, independent of the app's own filesystem.
+// Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN as environment variables
+// (in Render's dashboard, or a local .env file for development).
+let client
 
 function getDb() {
-  if (!db) {
-    db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) console.error('DB connection error:', err)
+  if (!client) {
+    if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) {
+      throw new Error('TURSO_DATABASE_URL and TURSO_AUTH_TOKEN environment variables are required.')
+    }
+    client = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
     })
-    db.run('PRAGMA foreign_keys = ON')
-    db.run('PRAGMA journal_mode = WAL')
   }
-  return db
+  return client
 }
 
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    getDb().run(sql, params, function (err) {
-      if (err) reject(err)
-      else resolve({ lastID: this.lastID, changes: this.changes })
-    })
-  })
+async function run(sql, params = []) {
+  const result = await getDb().execute({ sql, args: params })
+  return { lastID: Number(result.lastInsertRowid ?? 0), changes: result.rowsAffected }
 }
 
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    getDb().get(sql, params, (err, row) => {
-      if (err) reject(err)
-      else resolve(row)
-    })
-  })
+async function get(sql, params = []) {
+  const result = await getDb().execute({ sql, args: params })
+  return result.rows[0]
 }
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    getDb().all(sql, params, (err, rows) => {
-      if (err) reject(err)
-      else resolve(rows)
-    })
-  })
+async function all(sql, params = []) {
+  const result = await getDb().execute({ sql, args: params })
+  return Array.from(result.rows)
 }
 
 // Columns added to the schema after some databases were already created.
