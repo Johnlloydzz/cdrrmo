@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, ZoomControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
@@ -464,7 +464,8 @@ export default function GISMap() {
 
       {/* Map */}
       <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
-        <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
+        <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={false}>
+          <ZoomControl position="bottomleft" />
           <TileLayer
             key={activeLayer}
             url={layer.url}
@@ -589,7 +590,7 @@ export default function GISMap() {
 
         {/* Right-side barangay info panel — styled like a Google Maps place card */}
         {selectedBarangay && (
-          <div className="absolute top-3 right-3 left-3 sm:left-auto z-[400] w-auto sm:w-80 max-w-full bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+          <div className="absolute top-3 left-3 right-3 sm:right-auto z-[400] w-auto sm:w-80 max-w-full bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
             <div className="relative">
               {selectedBarangay.image_url ? (
                 <img
