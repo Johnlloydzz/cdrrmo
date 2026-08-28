@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, ZoomControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
@@ -368,6 +368,57 @@ export default function GISMap() {
             ) : (
               <p className="text-xs text-amber-600 mt-2">No emergency contact number on file.</p>
             )}
+            {(selectedBarangay.centroid || geocodedCenter) && (
+              <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+                <span className="w-2 h-0.5 bg-emerald-600 inline-block flex-shrink-0" />
+                {routing && !routeInfo && 'Calculating route…'}
+                {routeInfo && `${routeInfo.distanceKm.toFixed(1)} km · ~${Math.round(routeInfo.durationMin)} min drive from CDRRMO Office`}
+                {!routing && !routeInfo && `~${distanceKm(CDRRMO_OFFICE, selectedBarangay.centroid || geocodedCenter).toFixed(1)} km from CDRRMO Office (straight line)`}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-3">
+              <a
+                href={selectedBarangay.contact_number ? `tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}` : undefined}
+                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  selectedBarangay.contact_number
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer'
+                    : 'bg-gray-50 text-gray-300 pointer-events-none'
+                }`}
+                title={selectedBarangay.contact_number ? `Call ${selectedBarangay.contact_number}` : 'No contact number on file'}
+              >
+                <Phone size={16} />
+                Call
+              </a>
+              {(selectedBarangay.centroid || geocodedCenter) ? (
+                <button
+                  type="button"
+                  onClick={() => { setShowRoute(true); setFocusRoute(f => f + 1) }}
+                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                  title="Show route on map"
+                >
+                  <Route size={16} />
+                  Directions
+                </button>
+              ) : (
+                <div className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-300">
+                  <Route size={16} />
+                  Directions
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  const text = `${selectedBarangay.name} — Gingoog City${selectedBarangay.contact_number ? `\nContact: ${selectedBarangay.contact_number}` : ''}`
+                  navigator.clipboard?.writeText(text)
+                  setShareCopied(true)
+                  setTimeout(() => setShareCopied(false), 1500)
+                }}
+                className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
+                title="Copy barangay info"
+              >
+                <Share2 size={16} />
+                {shareCopied ? 'Copied!' : 'Share'}
+              </button>
+            </div>
             {!selectedBarangay.boundary_geojson && (
               <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
             )}
@@ -464,8 +515,7 @@ export default function GISMap() {
 
       {/* Map */}
       <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
-        <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={false}>
-          <ZoomControl position="bottomleft" />
+        <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
           <TileLayer
             key={activeLayer}
             url={layer.url}
@@ -588,102 +638,6 @@ export default function GISMap() {
           </button>
         </div>
 
-        {/* Right-side barangay info panel — styled like a Google Maps place card */}
-        {selectedBarangay && (
-          <div className="absolute top-3 left-3 right-3 sm:right-auto z-[400] w-auto sm:w-80 max-w-full bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
-            <div className="relative">
-              {selectedBarangay.image_url ? (
-                <img
-                  src={selectedBarangay.image_url}
-                  alt={selectedBarangay.name}
-                  className="w-full h-40 object-cover"
-                  onError={e => e.target.style.display = 'none'}
-                />
-              ) :null}
-              <button
-                onClick={() => setSelectedBarangay(null)}
-                className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full w-7 h-7 flex items-center justify-center shadow text-gray-600 text-sm"
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4">
-              <h3 className="font-semibold text-base text-gray-900">{selectedBarangay.name}</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Risk level: <span className="font-medium">{selectedBarangay.risk_level}</span>
-                {' · '}Pop. {(selectedBarangay.population || 0).toLocaleString()}
-              </p>
-              {(selectedBarangay.centroid || geocodedCenter) && (
-                <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                  <span className="w-2 h-0.5 bg-emerald-600 inline-block" />
-                  {routing && !routeInfo && 'Calculating route…'}
-                  {routeInfo && `${routeInfo.distanceKm.toFixed(1)} km · ~${Math.round(routeInfo.durationMin)} min drive from CDRRMO Office`}
-                  {!routing && !routeInfo && `~${distanceKm(CDRRMO_OFFICE, selectedBarangay.centroid || geocodedCenter).toFixed(1)} km from CDRRMO Office (straight line — no road route found)`}
-                </p>
-              )}
-
-              {/* Google-style icon action row */}
-              <div className="flex items-center gap-2 mt-3">
-                <a
-                  href={selectedBarangay.contact_number ? `tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}` : undefined}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    selectedBarangay.contact_number
-                      ? 'bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer'
-                      : 'bg-gray-50 text-gray-300 pointer-events-none'
-                  }`}
-                  title={selectedBarangay.contact_number ? `Call ${selectedBarangay.contact_number}` : 'No contact number on file'}
-                >
-                  <Phone size={16} />
-                  Call
-                </a>
-
-                {(selectedBarangay.centroid || geocodedCenter) ? (
-                  <button
-                    type="button"
-                    onClick={() => { setShowRoute(true); setFocusRoute(f => f + 1) }}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                    title="Show route on map"
-                  >
-                    <Route size={16} />
-                    Directions
-                  </button>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-300">
-                    <Route size={16} />
-                    Directions
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    const text = `${selectedBarangay.name} — Gingoog City${selectedBarangay.contact_number ? `\nContact: ${selectedBarangay.contact_number}` : ''}`
-                    navigator.clipboard?.writeText(text)
-                    setShareCopied(true)
-                    setTimeout(() => setShareCopied(false), 1500)
-                  }}
-                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
-                  title="Copy barangay info"
-                >
-                  <Share2 size={16} />
-                  {shareCopied ? 'Copied!' : 'Share'}
-                </button>
-              </div>
-
-              {/* Details */}
-              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
-                <p className="text-xs text-gray-500">Captain: <span className="text-gray-700">{selectedBarangay.captain || '—'}</span></p>
-                <p className="text-xs text-gray-500">
-                  Emergency contact: <span className="text-gray-700">{selectedBarangay.contact_number || 'Not on file'}</span>
-                </p>
-                {!selectedBarangay.boundary_geojson && (
-                  <p className="text-xs text-amber-600 pt-1">No boundary data uploaded for this barangay yet.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
