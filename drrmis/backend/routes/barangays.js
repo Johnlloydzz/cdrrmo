@@ -80,7 +80,7 @@ router.put('/:id', async (req, res) => {
     const boundary_geojson          = req.body.boundary_geojson ?? current.boundary_geojson
 
     await run(
-      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, updated_at=datetime('now') WHERE id=?`,
+      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
       [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])

@@ -16,8 +16,8 @@ const tables = [
     barangay_id   INTEGER REFERENCES barangays(id),
     status        TEXT    NOT NULL DEFAULT 'Active',
     last_login    TEXT,
-    created_at    TEXT    DEFAULT (datetime('now')),
-    updated_at    TEXT    DEFAULT (datetime('now'))
+    created_at    TEXT    DEFAULT (datetime('now', '+8 hours')),
+    updated_at    TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 
   // ── Barangays ─────────────────────────────────────────────────────────────
@@ -29,8 +29,8 @@ const tables = [
     landslide_susceptibility TEXT  DEFAULT 'Low',    -- High / Moderate / Low  (CDRA)
     population             INTEGER DEFAULT 0,
     boundary_geojson       TEXT,
-    created_at             TEXT    DEFAULT (datetime('now')),
-    updated_at             TEXT    DEFAULT (datetime('now'))
+    created_at             TEXT    DEFAULT (datetime('now', '+8 hours')),
+    updated_at             TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 
   // ── Puroks (Geofencing: flood_risk + flood_threshold_m from CDRA data) ────
@@ -41,7 +41,7 @@ const tables = [
     flood_risk        TEXT    DEFAULT 'Low',
     flood_threshold_m REAL    DEFAULT 1.0,
     landslide_risk    TEXT    DEFAULT 'Low',
-    created_at        TEXT    DEFAULT (datetime('now'))
+    created_at        TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 
   // ── Households (Household and Population Management Module) ──────────────
@@ -54,8 +54,8 @@ const tables = [
     latitude      REAL,
     longitude     REAL,
     contact       TEXT,
-    created_at    TEXT    DEFAULT (datetime('now')),
-    updated_at    TEXT    DEFAULT (datetime('now'))
+    created_at    TEXT    DEFAULT (datetime('now', '+8 hours')),
+    updated_at    TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 
   // ── Residents (household members, with birthdate for age-bracket tracking) ─
@@ -67,7 +67,7 @@ const tables = [
     birthdate         TEXT    NOT NULL,
     age_bracket       TEXT,
     relation_to_head  TEXT,
-    created_at        TEXT    DEFAULT (datetime('now'))
+    created_at        TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 ]
 

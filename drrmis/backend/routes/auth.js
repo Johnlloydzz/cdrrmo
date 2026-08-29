@@ -23,10 +23,10 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials.' })
 
-    await run('UPDATE users SET last_login = datetime(\'now\') WHERE id = ?', [user.id])
+    await run('UPDATE users SET last_login = datetime(\'now\', \'+8 hours\') WHERE id = ?', [user.id])
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role, name: user.name },
+      { id: user.id, username: user.username, role: user.role, name: user.name, barangay_id: user.barangay_id },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES }
     )
@@ -54,7 +54,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     if (!valid) return res.status(400).json({ error: 'Current password is incorrect.' })
 
     const hash = await bcrypt.hash(newPassword, 12)
-    await run('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\') WHERE id = ?', [hash, req.user.id])
+    await run('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\', \'+8 hours\') WHERE id = ?', [hash, req.user.id])
     res.json({ message: 'Password updated successfully.' })
   } catch (err) {
     res.status(500).json({ error: err.message })

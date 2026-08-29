@@ -13,7 +13,7 @@ function authenticate(req, res, next) {
     // Fire-and-forget: stamps this user as "active right now" on every
     // request, powering the live online/offline indicator in User
     // Management. Never awaited — must not slow down or block the request.
-    run('UPDATE users SET last_active = datetime(\'now\') WHERE id = ?', [decoded.id]).catch(() => {})
+    run('UPDATE users SET last_active = datetime(\'now\', \'+8 hours\') WHERE id = ?', [decoded.id]).catch(() => {})
     next()
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' })

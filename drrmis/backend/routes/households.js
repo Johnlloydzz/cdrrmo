@@ -7,7 +7,10 @@ router.use(authenticate)
 // GET /api/households — includes geofencing flag (in_flood_risk_zone)
 router.get('/', async (req, res) => {
   try {
-    const { barangay_id, purok_id, search, at_risk } = req.query
+    const { purok_id, search, at_risk } = req.query
+    // Barangay Officials only ever see their own barangay's households —
+    // enforced server-side, not just hidden in the UI.
+    const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
     let sql = `SELECT h.*, b.name as barangay_name, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
@@ -28,7 +31,10 @@ router.get('/', async (req, res) => {
 // POST /api/households
 router.post('/', async (req, res) => {
   try {
-    const { barangay_id, purok_id, head_family, latitude, longitude, contact } = req.body
+    const { purok_id, head_family, latitude, longitude, contact } = req.body
+    // Barangay Officials can only register households under their own barangay,
+    // regardless of what barangay_id is sent in the request body.
+    const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.body.barangay_id
     if (!barangay_id || !purok_id || !head_family) {
       return res.status(400).json({ error: 'barangay_id, purok_id, and head_family are required' })
     }
@@ -46,9 +52,15 @@ router.post('/', async (req, res) => {
 // PUT /api/households/:id
 router.put('/:id', async (req, res) => {
   try {
+    if (req.user.role === 'Barangay Official') {
+      const existing = await get('SELECT barangay_id FROM households WHERE id = ?', [req.params.id])
+      if (!existing || existing.barangay_id !== req.user.barangay_id) {
+        return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
+      }
+    }
     const { head_family, latitude, longitude, contact, purok_id } = req.body
     await run(
-      `UPDATE households SET head_family=?, latitude=?, longitude=?, contact=?, purok_id=?, updated_at=datetime('now') WHERE id=?`,
+      `UPDATE households SET head_family=?, latitude=?, longitude=?, contact=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
       [head_family, latitude, longitude, contact, purok_id, req.params.id]
     )
     const updated = await get('SELECT * FROM households WHERE id = ?', [req.params.id])
@@ -59,10 +71,16 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/households/:id
 router.delete('/:id', async (req, res) => {
   try {
+    if (req.user.role === 'Barangay Official') {
+      const existing = await get('SELECT barangay_id FROM households WHERE id = ?', [req.params.id])
+      if (!existing || existing.barangay_id !== req.user.barangay_id) {
+        return res.status(403).json({ error: 'You can only delete households in your own barangay.' })
+      }
+    }
     const result = await run('DELETE FROM households WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
     res.json({ message: 'Deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-module.exports = router 
+module.exports = router
