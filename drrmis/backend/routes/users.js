@@ -8,12 +8,14 @@ router.use(authenticate)
 router.get('/', async (req, res) => {
   try {
     const { search, role } = req.query
-    let sql = `SELECT u.id, u.name, u.username, u.email, u.role, u.barangay_id, b.name as barangay_name, u.status, u.last_login, u.created_at
+    let sql = `SELECT u.id, u.name, u.username, u.email, u.role, u.barangay_id, b.name as barangay_name, u.status, u.last_login, u.last_active, u.created_at,
+               (u.last_active IS NOT NULL AND (julianday('now') - julianday(u.last_active)) * 24 * 60 <= 2) AS is_online
                FROM users u LEFT JOIN barangays b ON u.barangay_id = b.id WHERE 1=1`
     const params = []
     if (search) { sql += ' AND (u.name LIKE ? OR u.username LIKE ? OR u.email LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
     if (role && role !== 'All') { sql += ' AND u.role = ?'; params.push(role) }
-    res.json(await all(sql, params))
+    const rows = await all(sql, params)
+    res.json(rows.map(u => ({ ...u, is_online: !!u.is_online })))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

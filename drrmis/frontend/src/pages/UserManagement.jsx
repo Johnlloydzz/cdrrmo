@@ -19,7 +19,14 @@ export default function UserManagement() {
   const [form, setForm] = useState(emptyForm)
 
   const load = () => { setLoading(true); apiGet('/users').then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false)) }
-  useEffect(() => { load(); apiGet('/barangays').then(setBarangays).catch(() => {}) }, [])
+  useEffect(() => {
+    load()
+    apiGet('/barangays').then(setBarangays).catch(() => {})
+    // Poll for live online/offline status — no manual refresh needed while
+    // this page stays open, e.g. during a live demo.
+    const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}) }, 15000)
+    return () => clearInterval(interval)
+  }, [])
 
   const filtered = users.filter(u =>
     ((u.name || '').toLowerCase().includes(search.toLowerCase()) || (u.username || '').toLowerCase().includes(search.toLowerCase())) &&
@@ -72,7 +79,7 @@ export default function UserManagement() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Name','Username','Email','Role','Barangay','Status','Last Login','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Name','Username','Email','Role','Barangay','Online','Status','Last Login','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(u => (
@@ -82,6 +89,22 @@ export default function UserManagement() {
                   <td className="table-cell">{u.email}</td>
                   <td className="table-cell">{u.role}</td>
                   <td className="table-cell">{u.barangay_name || '—'}</td>
+                  <td className="table-cell">
+                    {u.is_online ? (
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                        Online
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                        <span className="h-2.5 w-2.5 rounded-full bg-gray-300"></span>
+                        Offline
+                      </span>
+                    )}
+                  </td>
                   <td className="table-cell"><span className={STATUS_BADGE[u.status] || 'badge-gray'}>{u.status}</span></td>
                   <td className="table-cell text-xs text-gray-500">{u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}</td>
                   <td className="table-cell">
@@ -92,7 +115,7 @@ export default function UserManagement() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-8">No users found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={9} className="table-cell text-center text-gray-400 py-8">No users found.</td></tr>}
             </tbody>
           </table>
         </div>
