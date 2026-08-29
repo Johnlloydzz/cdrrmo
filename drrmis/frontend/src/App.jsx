@@ -89,7 +89,7 @@ function App() {
 
           {/* User Management Module — CDRRMO Personnel only */}
           <Route path="users"    element={<G><UserManagement currentUser={currentUser} /></G>} />
-          <Route path="settings" element={<G><Settings /></G>} />
+          <Route path="settings" element={<G><Settings currentUser={currentUser} /></G>} />
         </Route>
 
         <Route path="*" element={<Navigate to={defaultRouteFor(currentUser)} replace />} />
