@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
-const emptyForm = { barangay_id: '', purok_id: '', head_family: '', contact: '', latitude: '', longitude: '' }
+const emptyForm = { barangay_id: '', purok_id: '', head_family: '', head_birthdate: '', contact: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
@@ -41,6 +41,7 @@ export default function HouseholdManagement({ currentUser }) {
     setEditing(h.id)
     setForm({
       barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_family: h.head_family || '',
+      head_birthdate: h.head_birthdate || '',
       contact: h.contact || '', latitude: h.latitude || '', longitude: h.longitude || '',
     })
     setShowModal(true)
@@ -52,8 +53,8 @@ export default function HouseholdManagement({ currentUser }) {
   }
 
   const handleSave = async () => {
-    if (!form.head_family.trim() || !form.barangay_id || !form.purok_id) {
-      alert('Head of family, barangay, and purok are required.'); return
+    if (!form.head_family.trim() || !form.barangay_id || !form.purok_id || !form.head_birthdate) {
+      alert('Head of family, birthdate, barangay, and purok are required.'); return
     }
     setSaving(true)
     try {
@@ -131,6 +132,11 @@ export default function HouseholdManagement({ currentUser }) {
                 </select>
               </div>
               <div className="col-span-2"><label className="label">Head of Family</label><input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} /></div>
+              <div className="col-span-2">
+                <label className="label">Head's Birthdate</label>
+                <input className="input" type="date" value={form.head_birthdate} onChange={e => setForm({...form, head_birthdate: e.target.value})} />
+                <p className="text-xs text-gray-400 mt-1">The head is automatically added to Resident Management using this birthdate.</p>
+              </div>
               <div><label className="label">Contact</label><input className="input" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} /></div>
               <div><label className="label">Latitude</label><input className="input" value={form.latitude} onChange={e => setForm({...form, latitude: e.target.value})} /></div>
               <div><label className="label">Longitude</label><input className="input" value={form.longitude} onChange={e => setForm({...form, longitude: e.target.value})} /></div>
