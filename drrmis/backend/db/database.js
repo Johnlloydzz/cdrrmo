@@ -82,6 +82,13 @@ const PUROK_NAME_CORRECTIONS = [
 ]
 
 async function selfHealPurokNames() {
+  // Fast path: one query checks whether any of the known-wrong names still
+  // exist at all. If none do, skip the whole per-correction lookup loop.
+  const wrongNames = PUROK_NAME_CORRECTIONS.map(c => c.wrong)
+  const placeholders = wrongNames.map(() => '?').join(',')
+  const stillWrong = await get(`SELECT COUNT(*) as c FROM puroks WHERE name IN (${placeholders})`, wrongNames)
+  if ((stillWrong?.c || 0) === 0) return
+
   for (const c of PUROK_NAME_CORRECTIONS) {
     try {
       const barangay = await get('SELECT id FROM barangays WHERE name = ?', [c.barangay])
@@ -131,6 +138,12 @@ async function seedDefaultAdmin() {
       barangay_id: brgy ? brgy.id : null,
     },
   ]
+
+  const existingCount = await get(
+    'SELECT COUNT(*) as c FROM users WHERE username IN (?, ?)',
+    demoUsers.map(u => u.username)
+  )
+  if ((existingCount?.c || 0) >= demoUsers.length) return
 
   for (const user of demoUsers) {
     const existing = await get('SELECT id FROM users WHERE username = ?', [user.username])
@@ -231,16 +244,27 @@ async function seedBarangays() {
 
   const allBarangays = [...poblacionBarangays, ...ruralBarangays]
 
+  // Fast path: on a hosted database (Turso), each existence check is a real
+  // network round-trip — checking all 79 one by one adds several seconds to
+  // every cold start. Once seeding has already happened, one COUNT query
+  // confirms that and skips the whole loop.
+  const countRow = await get('SELECT COUNT(*) as c FROM barangays')
+  if ((countRow?.c || 0) >= allBarangays.length) {
+    console.log(`Barangays already seeded (${countRow.c}) — skipped.`)
+    return
+  }
+
+  // Bulk-fetch existing names once instead of querying per barangay.
+  const existingNames = new Set((await all('SELECT name FROM barangays')).map(r => r.name))
+
   for (const name of allBarangays) {
-    const existing = await get('SELECT id FROM barangays WHERE name = ?', [name])
-    if (!existing) {
-      const isPoblacion = name.includes('(Pob.)')
-      const sample = CDRA_SAMPLE[name] || (isPoblacion ? POBLACION_DEFAULT : null)
-      await run(
-        `INSERT INTO barangays (name, population, risk_level, flood_susceptibility, landslide_susceptibility) VALUES (?, ?, ?, ?, ?)`,
-        [name, 0, 'Low', sample?.flood || 'Low', sample?.landslide || 'Low']
-      )
-    }
+    if (existingNames.has(name)) continue
+    const isPoblacion = name.includes('(Pob.)')
+    const sample = CDRA_SAMPLE[name] || (isPoblacion ? POBLACION_DEFAULT : null)
+    await run(
+      `INSERT INTO barangays (name, population, risk_level, flood_susceptibility, landslide_susceptibility) VALUES (?, ?, ?, ?, ?)`,
+      [name, 0, 'Low', sample?.flood || 'Low', sample?.landslide || 'Low']
+    )
   }
   console.log(`Seeded ${allBarangays.length} barangays for Gingoog City`)
 }
