@@ -11,7 +11,6 @@ function computeAgeBracket(birthdate) {
   if (isNaN(dob)) return null
   const ageMs = Date.now() - dob.getTime()
   const age = Math.floor(ageMs / (1000 * 60 * 60 * 24 * 365.25))
-  if (age < 1) return 'Infant (0)'
   if (age <= 12) return 'Child (1-12)'
   if (age <= 17) return 'Teen (13-17)'
   if (age <= 59) return 'Adult (18-59)'
@@ -28,6 +27,9 @@ router.get('/', async (req, res) => {
                LEFT JOIN barangays b ON h.barangay_id = b.id
                WHERE 1=1`
     const params = []
+    // Barangay Officials only ever see residents whose household belongs to
+    // their own barangay — enforced server-side, not just hidden in the UI.
+    if (req.user.role === 'Barangay Official') { sql += ' AND h.barangay_id = ?'; params.push(req.user.barangay_id) }
     if (household_id) { sql += ' AND r.household_id = ?'; params.push(household_id) }
     if (search) { sql += ' AND r.name LIKE ?'; params.push(`%${search}%`) }
     res.json(await all(sql, params))
@@ -40,6 +42,14 @@ router.post('/', async (req, res) => {
     const { household_id, name, birthdate, relation_to_head } = req.body
     if (!household_id || !name || !birthdate) {
       return res.status(400).json({ error: 'household_id, name, and birthdate are required' })
+    }
+    // Barangay Officials can only register residents into a household that
+    // belongs to their own barangay.
+    if (req.user.role === 'Barangay Official') {
+      const household = await get('SELECT barangay_id FROM households WHERE id = ?', [household_id])
+      if (!household || household.barangay_id !== req.user.barangay_id) {
+        return res.status(403).json({ error: 'You can only register residents into households in your own barangay.' })
+      }
     }
     const count = await get('SELECT COUNT(*) as c FROM residents')
     const resident_id = `RES-${String((count?.c || 0) + 1).padStart(5, '0')}`
@@ -56,6 +66,15 @@ router.post('/', async (req, res) => {
 // PUT /api/residents/:id
 router.put('/:id', async (req, res) => {
   try {
+    if (req.user.role === 'Barangay Official') {
+      const existing = await get(
+        `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+        [req.params.id]
+      )
+      if (!existing || existing.barangay_id !== req.user.barangay_id) {
+        return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
+      }
+    }
     const { name, birthdate, relation_to_head } = req.body
     const age_bracket = computeAgeBracket(birthdate)
     await run(
@@ -70,6 +89,15 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/residents/:id
 router.delete('/:id', async (req, res) => {
   try {
+    if (req.user.role === 'Barangay Official') {
+      const existing = await get(
+        `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+        [req.params.id]
+      )
+      if (!existing || existing.barangay_id !== req.user.barangay_id) {
+        return res.status(403).json({ error: 'You can only delete residents in your own barangay.' })
+      }
+    }
     const result = await run('DELETE FROM residents WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
     res.json({ message: 'Deleted' })

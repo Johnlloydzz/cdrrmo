@@ -64,7 +64,7 @@ export default function ResidentManagement({ currentUser }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-800">{residents.length}</p><p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
-        {['Infant (0)','Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].slice(0,4).map(b => (
+        {['Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].map(b => (
           <div key={b} className="card p-4 text-center"><p className="text-2xl font-bold text-primary-700">{ageBracketCounts[b] || 0}</p><p className="text-xs text-gray-500 mt-1">{b}</p></div>
         ))}
       </div>
