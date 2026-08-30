@@ -4,6 +4,16 @@ import { apiGet, apiPost, apiPut } from '../utils/api'
 
 const emptyForm = { household_id: '', name: '', birthdate: '', relation_to_head: '' }
 
+// Displays a stored YYYY-MM-DD birthdate as DD-MM-YYYY. The underlying value
+// and the date input field stay in YYYY-MM-DD — that's what HTML date
+// inputs require — only the table display changes.
+function formatBirthdate(value) {
+  if (!value) return ''
+  const [y, m, d] = value.split('-')
+  if (!y || !m || !d) return value
+  return `${d}-${m}-${y}`
+}
+
 export default function ResidentManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [residents, setResidents] = useState([])
@@ -90,7 +100,7 @@ export default function ResidentManagement({ currentUser }) {
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
                   <td className="table-cell font-medium">{r.name}</td>
-                  <td className="table-cell">{r.birthdate}</td>
+                  <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
                   <td className="table-cell"><span className="badge-blue text-xs">{r.age_bracket}</span></td>
                   <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
