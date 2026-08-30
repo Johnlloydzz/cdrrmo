@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   try {
     const { search, role } = req.query
     let sql = `SELECT u.id, u.name, u.username, u.email, u.role, u.barangay_id, b.name as barangay_name, u.status, u.last_login, u.last_active, u.created_at,
-               (u.last_active IS NOT NULL AND (julianday('now', '+8 hours') - julianday(u.last_active)) * 24 * 60 <= 2) AS is_online
+               (u.last_active IS NOT NULL AND (julianday('now', '+8 hours') - julianday(u.last_active)) * 24 * 60 * 60 <= 30) AS is_online
                FROM users u LEFT JOIN barangays b ON u.barangay_id = b.id WHERE 1=1`
     const params = []
     if (search) { sql += ' AND (u.name LIKE ? OR u.username LIKE ? OR u.email LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
@@ -64,4 +64,4 @@ router.delete('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-module.exports = router 
+module.exports = router
