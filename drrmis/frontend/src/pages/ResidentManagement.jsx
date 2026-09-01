@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil } from 'lucide-react'
 import { apiGet, apiPost, apiPut } from '../utils/api'
 
-const emptyForm = { household_id: '', name: '', birthdate: '', relation_to_head: '' }
+const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '', blood_type: '' }
 
 // Displays a stored YYYY-MM-DD birthdate as DD-MM-YYYY. The underlying value
 // and the date input field stay in YYYY-MM-DD — that's what HTML date
@@ -44,13 +44,17 @@ export default function ResidentManagement({ currentUser }) {
   const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
   const openEdit = (r) => {
     setEditing(r.id)
-    setForm({ household_id: r.household_id || '', name: r.name || '', birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '' })
+    setForm({
+      household_id: r.household_id || '', last_name: r.last_name || '', first_name: r.first_name || '', middle_name: r.middle_name || '',
+      birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '',
+      sex: r.sex || '', contact_number: r.contact_number || '', blood_type: r.blood_type || '',
+    })
     setShowModal(true)
   }
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.household_id || !form.birthdate) {
-      alert('Name, household, and birthdate are required.'); return
+    if (!form.last_name.trim() || !form.first_name.trim() || !form.household_id || !form.birthdate) {
+      alert('Last name, first name, household, and birthdate are required.'); return
     }
     setSaving(true)
     try {
@@ -93,22 +97,24 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Birthdate','Age Bracket','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age Bracket','Blood Type','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
                   <td className="table-cell font-medium">{r.name}</td>
+                  <td className="table-cell">{r.sex || '—'}</td>
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
                   <td className="table-cell"><span className="badge-blue text-xs">{r.age_bracket}</span></td>
+                  <td className="table-cell">{r.blood_type || '—'}</td>
                   <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
                   <td className="table-cell"><button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(r)}><Pencil size={15} /></button></td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -117,17 +123,27 @@ export default function ResidentManagement({ currentUser }) {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6">
             <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Resident' : 'Register Resident'}</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="label">Household</label>
-                <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
-                  <option value="">Select household…</option>
-                  {households.map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
+
+            <label className="label">Household</label>
+            <select className="input mb-4" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
+              <option value="">Select household…</option>
+              {households.map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
+            </select>
+
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Personal Information</p>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div><label className="label">Last Name</label><input className="input" value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} /></div>
+              <div><label className="label">First Name</label><input className="input" value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} /></div>
+              <div><label className="label">Middle Name</label><input className="input" value={form.middle_name} onChange={e => setForm({...form, middle_name: e.target.value})} /></div>
+              <div>
+                <label className="label">Sex</label>
+                <select className="input" value={form.sex} onChange={e => setForm({...form, sex: e.target.value})}>
+                  <option value="">Select…</option>
+                  <option>Male</option><option>Female</option>
                 </select>
               </div>
-              <div className="col-span-2"><label className="label">Full Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
               <div><label className="label">Birthdate</label><input className="input" type="date" value={form.birthdate} onChange={e => setForm({...form, birthdate: e.target.value})} /></div>
               <div>
                 <label className="label">Relation to Head</label>
@@ -137,6 +153,19 @@ export default function ResidentManagement({ currentUser }) {
                 </select>
               </div>
             </div>
+
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact &amp; Emergency Medical Info</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
+              <div>
+                <label className="label">Blood Type</label>
+                <select className="input" value={form.blood_type} onChange={e => setForm({...form, blood_type: e.target.value})}>
+                  <option value="">Select…</option>
+                  {['A+','A-','B+','B-','AB+','AB-','O+','O-','Unknown'].map(bt => <option key={bt}>{bt}</option>)}
+                </select>
+              </div>
+            </div>
+
             <p className="text-xs text-gray-400 mt-3">Age bracket is computed automatically from the birthdate.</p>
             <div className="flex justify-end gap-3 mt-6">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
