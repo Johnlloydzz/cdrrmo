@@ -4,6 +4,9 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
 const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
 
+// Displays a stored YYYY-MM-DD birthdate as DD-MM-YYYY. The underlying value
+// and the date input field stay in YYYY-MM-DD — that's what HTML date
+// inputs require — only the table display changes.
 function formatBirthdate(value) {
   if (!value) return ''
   const [y, m, d] = value.split('-')
@@ -11,6 +14,8 @@ function formatBirthdate(value) {
   return `${d}-${m}-${y}`
 }
 
+// Actual numeric age (e.g. 27), computed the same way as the backend's
+// age_bracket logic — shown in the table instead of the bracket label.
 function computeAge(birthdate) {
   if (!birthdate) return '—'
   const dob = new Date(birthdate)
@@ -107,7 +112,7 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Household','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
@@ -120,15 +125,17 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
-                  <td className="table-cell">
-                    <div className="flex gap-2">
-                      <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(r)}><Pencil size={15} /></button>
-                      <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(r.id)}><Trash2 size={15} /></button>
-                    </div>
-                  </td>
+                  {canAdd && (
+                    <td className="table-cell">
+                      <div className="flex gap-2">
+                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(r)}><Pencil size={15} /></button>
+                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(r.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={9} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={canAdd ? 9 : 8} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>

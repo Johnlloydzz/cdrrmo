@@ -68,14 +68,15 @@ router.post('/', async (req, res) => {
 // PUT /api/residents/:id
 router.put('/:id', async (req, res) => {
   try {
-    if (req.user.role === 'Barangay Official') {
-      const existing = await get(
-        `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
-        [req.params.id]
-      )
-      if (!existing || existing.barangay_id !== req.user.barangay_id) {
-        return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
-      }
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to resident records.' })
+    }
+    const existing = await get(
+      `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+      [req.params.id]
+    )
+    if (!existing || existing.barangay_id !== req.user.barangay_id) {
+      return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
     }
     const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
     const age_bracket = computeAgeBracket(birthdate)
@@ -92,14 +93,15 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/residents/:id
 router.delete('/:id', async (req, res) => {
   try {
-    if (req.user.role === 'Barangay Official') {
-      const existing = await get(
-        `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
-        [req.params.id]
-      )
-      if (!existing || existing.barangay_id !== req.user.barangay_id) {
-        return res.status(403).json({ error: 'You can only delete residents in your own barangay.' })
-      }
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to resident records.' })
+    }
+    const existing = await get(
+      `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+      [req.params.id]
+    )
+    if (!existing || existing.barangay_id !== req.user.barangay_id) {
+      return res.status(403).json({ error: 'You can only delete residents in your own barangay.' })
     }
     const result = await run('DELETE FROM residents WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
