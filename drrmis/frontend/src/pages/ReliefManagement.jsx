@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil } from 'lucide-react'
 import { apiGet, apiPost, apiPut } from '../utils/api'
 
-const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '', blood_type: '' }
+const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
 
 // Displays a stored YYYY-MM-DD birthdate as DD-MM-YYYY. The underlying value
 // and the date input field stay in YYYY-MM-DD — that's what HTML date
@@ -47,7 +47,7 @@ export default function ResidentManagement({ currentUser }) {
     setForm({
       household_id: r.household_id || '', last_name: r.last_name || '', first_name: r.first_name || '', middle_name: r.middle_name || '',
       birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '',
-      sex: r.sex || '', contact_number: r.contact_number || '', blood_type: r.blood_type || '',
+      sex: r.sex || '', contact_number: r.contact_number || '',
     })
     setShowModal(true)
   }
@@ -97,7 +97,7 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age Bracket','Blood Type','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age Bracket','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
@@ -107,14 +107,13 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell">{r.sex || '—'}</td>
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
                   <td className="table-cell">{r.age_bracket}</td>
-                  <td className="table-cell">{r.blood_type || '—'}</td>
                   <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
                   <td className="table-cell"><button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(r)}><Pencil size={15} /></button></td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={9} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -154,17 +153,8 @@ export default function ResidentManagement({ currentUser }) {
               </div>
             </div>
 
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact &amp; Emergency Medical Info</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
-              <div>
-                <label className="label">Blood Type</label>
-                <select className="input" value={form.blood_type} onChange={e => setForm({...form, blood_type: e.target.value})}>
-                  <option value="">Select…</option>
-                  {['A+','A-','B+','B-','AB+','AB-','O+','O-','Unknown'].map(bt => <option key={bt}>{bt}</option>)}
-                </select>
-              </div>
-            </div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact Information</p>
+            <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
 
             <p className="text-xs text-gray-400 mt-3">Age bracket is computed automatically from the birthdate.</p>
             <div className="flex justify-end gap-3 mt-6">

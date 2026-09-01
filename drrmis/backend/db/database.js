@@ -51,7 +51,7 @@ const EXPECTED_COLUMNS = {
   residents: {
     resident_id: `TEXT`, age_bracket: `TEXT`, relation_to_head: `TEXT`, created_at: `TEXT`,
     last_name: `TEXT`, first_name: `TEXT`, middle_name: `TEXT`,
-    sex: `TEXT`, contact_number: `TEXT`, blood_type: `TEXT`,
+    sex: `TEXT`, contact_number: `TEXT`,
   },
 }
 
