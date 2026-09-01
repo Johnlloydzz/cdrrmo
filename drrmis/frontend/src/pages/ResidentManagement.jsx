@@ -14,6 +14,16 @@ function formatBirthdate(value) {
   return `${d}-${m}-${y}`
 }
 
+// Actual numeric age (e.g. 27), computed the same way as the backend's
+// age_bracket logic — shown in the table instead of the bracket label.
+function computeAge(birthdate) {
+  if (!birthdate) return '—'
+  const dob = new Date(birthdate)
+  if (isNaN(dob)) return '—'
+  const ageMs = Date.now() - dob.getTime()
+  return Math.floor(ageMs / (1000 * 60 * 60 * 24 * 365.25))
+}
+
 export default function ResidentManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [residents, setResidents] = useState([])
@@ -97,7 +107,7 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age Bracket','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Household','Barangay','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
@@ -106,7 +116,7 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell font-medium">{r.name}</td>
                   <td className="table-cell">{r.sex || '—'}</td>
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
-                  <td className="table-cell">{r.age_bracket}</td>
+                  <td className="table-cell">{computeAge(r.birthdate)}</td>
                   <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
