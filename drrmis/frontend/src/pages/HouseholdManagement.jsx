@@ -84,13 +84,13 @@ export default function HouseholdManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['HH ID','Barangay','Purok','Head of Family','Contact','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Contact','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{h.household_id}</td>
-                  <td className="table-cell">{h.barangay_name || '—'}</td>
+                  {!canAdd && <td className="table-cell">{h.barangay_name || '—'}</td>}
                   <td className="table-cell">
                     {h.purok_name || '—'}
                     {h.in_flood_risk_zone && <span className="badge-red text-xs ml-2">High Risk</span>}
@@ -105,7 +105,7 @@ export default function HouseholdManagement({ currentUser }) {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={canAdd ? 5 : 6} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
             </tbody>
           </table>
         </div>
