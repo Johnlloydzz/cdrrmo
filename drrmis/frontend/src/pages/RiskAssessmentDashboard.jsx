@@ -281,7 +281,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 position={[focusedHousehold.latitude, focusedHousehold.longitude]}
                 icon={focusedHousehold.in_flood_risk_zone ? redPinIcon : bluePinIcon}
               >
-                <Popup><strong>{focusedHousehold.household_id}</strong> — {focusedHousehold.head_family}<br />{focusedHousehold.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
+                <Popup><strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
               </Marker>
             )}
           </MapContainer>
