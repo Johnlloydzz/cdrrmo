@@ -69,6 +69,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const [residents, setResidents] = useState([])
   const [residentsLoading, setResidentsLoading] = useState(false)
   const [flyTarget, setFlyTarget] = useState(null)
+  const [focusedHousehold, setFocusedHousehold] = useState(null)
 
   useEffect(() => {
     setLoading(true)
@@ -119,6 +120,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const flyToHousehold = (h) => {
     if (!h.latitude || !h.longitude) { alert('No location recorded for this household yet.'); return }
     setFlyTarget([h.latitude, h.longitude])
+    setFocusedHousehold(h)
     setShowHouseholds(false)
   }
 
@@ -269,16 +271,18 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               </>
             )}
 
-            {/* Households — pin markers, colored by geofencing risk status */}
-            {visibleHouseholds.filter(h => h.latitude && h.longitude).map(h => (
+            {/* Only the household most recently selected from the drill-down
+                list gets a pin — it moves when a different family is picked,
+                and disappears entirely when the Dashboard is left and
+                revisited (this state resets on unmount). */}
+            {focusedHousehold && (
               <Marker
-                key={h.id}
-                position={[h.latitude, h.longitude]}
-                icon={h.in_flood_risk_zone ? redPinIcon : bluePinIcon}
+                position={[focusedHousehold.latitude, focusedHousehold.longitude]}
+                icon={focusedHousehold.in_flood_risk_zone ? redPinIcon : bluePinIcon}
               >
-                <Popup><strong>{h.household_id}</strong> — {h.head_family}<br />{h.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
+                <Popup><strong>{focusedHousehold.household_id}</strong> — {focusedHousehold.head_family}<br />{focusedHousehold.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
               </Marker>
-            ))}
+            )}
           </MapContainer>
         </div>
       </div>
