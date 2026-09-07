@@ -291,14 +291,18 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         "At-risk" households/population are those located within puroks classified as High flood-risk, per the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) data. Red dot in the barangay list = has at-risk households.
       </p>
 
-      {/* Total Households drill-down — compact, fixed-height, scrollable list */}
-      {showHouseholds && (
-        <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowHouseholds(false)}>
-          <div
-            className="absolute top-0 left-0 h-full w-full sm:w-72 bg-white shadow-2xl flex flex-col"
-            style={{ maxHeight: '100vh' }}
-            onClick={e => e.stopPropagation()}
-          >
+      {/* Total Households drill-down — docked to the right (away from the
+          Dashboard's own Search/Barangays sidebar on the left), with a
+          smooth slide-in/out transition rather than appearing instantly. */}
+      <div
+        className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${showHouseholds ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setShowHouseholds(false)}
+      >
+        <div
+          className={`absolute top-0 right-0 h-full w-full sm:w-72 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${showHouseholds ? 'translate-x-0' : 'translate-x-full'}`}
+          style={{ maxHeight: '100vh' }}
+          onClick={e => e.stopPropagation()}
+        >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
               <h3 className="font-semibold text-gray-800 text-sm">Registered Households ({visibleHouseholds.length})</h3>
               <button onClick={() => setShowHouseholds(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -347,9 +351,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 </div>
               )}
             </div>
-          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
