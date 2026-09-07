@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Search, Plus, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
@@ -21,6 +21,19 @@ function LocationPicker({ onPick }) {
   return null
 }
 
+// Flies the embedded map to the selected barangay's boundary — but only if
+// no location has been pinned yet, so it never overrides the zoom-in view
+// of an already-saved household location.
+function FitToBarangayBoundary({ geojsonLayer, hasPin }) {
+  const map = useMap()
+  useEffect(() => {
+    if (hasPin || !geojsonLayer) return
+    const bounds = geojsonLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] })
+  }, [geojsonLayer, hasPin, map])
+  return null
+}
+
 const emptyForm = { barangay_id: '', purok_id: '', head_family: '', contact: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
@@ -35,6 +48,7 @@ export default function HouseholdManagement({ currentUser }) {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [selectedBoundaryLayer, setSelectedBoundaryLayer] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -167,6 +181,23 @@ export default function HouseholdManagement({ currentUser }) {
                     >
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
                       <LocationPicker onPick={(lat, lng) => setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} />
+                      {(() => {
+                        const brgy = barangays.find(b => String(b.id) === String(form.barangay_id))
+                        if (!brgy?.boundary_geojson) return null
+                        let geo
+                        try { geo = JSON.parse(brgy.boundary_geojson) } catch { return null }
+                        return (
+                          <>
+                            <GeoJSON
+                              key={brgy.id}
+                              data={geo}
+                              pathOptions={{ color: '#0ea5e9', weight: 2.5, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
+                              ref={setSelectedBoundaryLayer}
+                            />
+                            <FitToBarangayBoundary geojsonLayer={selectedBoundaryLayer} hasPin={!!(form.latitude && form.longitude)} />
+                          </>
+                        )
+                      })()}
                       {form.latitude && form.longitude && (
                         <Marker position={[Number(form.latitude), Number(form.longitude)]} />
                       )}
