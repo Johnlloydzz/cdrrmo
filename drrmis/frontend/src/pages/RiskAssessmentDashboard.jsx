@@ -293,8 +293,12 @@ export default function RiskAssessmentDashboard({ currentUser }) {
 
       {/* Total Households drill-down — compact, fixed-height, scrollable list */}
       {showHouseholds && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '22rem' }}>
+        <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setShowHouseholds(false)}>
+          <div
+            className="absolute top-0 left-0 h-full w-full sm:w-72 bg-white shadow-2xl flex flex-col"
+            style={{ maxHeight: '100vh' }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
               <h3 className="font-semibold text-gray-800 text-sm">Registered Households ({visibleHouseholds.length})</h3>
               <button onClick={() => setShowHouseholds(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
