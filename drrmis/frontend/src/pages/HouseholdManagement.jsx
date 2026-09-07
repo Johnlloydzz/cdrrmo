@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import L from 'leaflet'
+import { Search, Plus, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+const GINGOOG_CENTER = [8.8231, 125.1109]
+
+// Captures a click anywhere on the embedded map and reports the coordinates —
+// this is how the Barangay Official pins exactly where a household is
+// located, since they're the ones who actually know.
+function LocationPicker({ onPick }) {
+  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng) } })
+  return null
+}
 
 const emptyForm = { barangay_id: '', purok_id: '', head_family: '', head_birthdate: '', contact: '', latitude: '', longitude: '' }
 
@@ -138,8 +157,26 @@ export default function HouseholdManagement({ currentUser }) {
                 <p className="text-xs text-gray-400 mt-1">The head is automatically added to Resident Management using this birthdate.</p>
               </div>
               <div><label className="label">Contact</label><input className="input" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} /></div>
-              <div><label className="label">Latitude</label><input className="input" value={form.latitude} onChange={e => setForm({...form, latitude: e.target.value})} /></div>
-              <div><label className="label">Longitude</label><input className="input" value={form.longitude} onChange={e => setForm({...form, longitude: e.target.value})} /></div>
+              <div className="col-span-2">
+                <label className="label flex items-center gap-1.5"><MapPin size={14} /> Household Location</label>
+                <p className="text-xs text-gray-400 mb-2">Click on the map below at exactly where this family lives.</p>
+                <div className="h-56 rounded-lg overflow-hidden border border-gray-200">
+                  <MapContainer
+                    center={form.latitude && form.longitude ? [Number(form.latitude), Number(form.longitude)] : GINGOOG_CENTER}
+                    zoom={form.latitude && form.longitude ? 17 : 13}
+                    className="w-full h-full"
+                  >
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+                    <LocationPicker onPick={(lat, lng) => setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} />
+                    {form.latitude && form.longitude && (
+                      <Marker position={[Number(form.latitude), Number(form.longitude)]} />
+                    )}
+                  </MapContainer>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  {form.latitude && form.longitude ? `Pinned: ${form.latitude}, ${form.longitude}` : 'No location pinned yet.'}
+                </p>
+              </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
