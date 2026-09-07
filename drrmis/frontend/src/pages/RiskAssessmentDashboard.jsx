@@ -1,7 +1,32 @@
 import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, GeoJSON, Circle, Tooltip, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import { AlertTriangle, Home, Users, X, MapPin, Search, Building2, ShieldAlert } from 'lucide-react'
 import { apiGet } from '../utils/api'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
+
+// Red pin for households within a high flood-risk (geofenced) zone
+const redPinIcon = new L.DivIcon({
+  className: 'household-pin',
+  html: `<div style="background:#dc2626;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 16],
+  popupAnchor: [0, -16],
+})
+// Blue pin for households outside the high-risk zone
+const bluePinIcon = new L.DivIcon({
+  className: 'household-pin',
+  html: `<div style="background:#3b82f6;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 16],
+  popupAnchor: [0, -16],
+})
 
 const CENTER = [8.8231, 125.1109]
 
@@ -244,16 +269,15 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               </>
             )}
 
-            {/* Households — colored by geofencing risk status */}
+            {/* Households — pin markers, colored by geofencing risk status */}
             {visibleHouseholds.filter(h => h.latitude && h.longitude).map(h => (
-              <Circle
+              <Marker
                 key={h.id}
-                center={[h.latitude, h.longitude]}
-                radius={15}
-                pathOptions={{ color: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6', fillColor: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6', fillOpacity: 0.7 }}
+                position={[h.latitude, h.longitude]}
+                icon={h.in_flood_risk_zone ? redPinIcon : bluePinIcon}
               >
                 <Popup><strong>{h.household_id}</strong> — {h.head_family}<br />{h.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
-              </Circle>
+              </Marker>
             ))}
           </MapContainer>
         </div>
