@@ -213,17 +213,17 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <FlyToHandler target={flyTarget} />
 
-            {/* All barangays — colored red/green by at-risk status, click to select + zoom */}
+            {/* All barangays — invisible by default (still clickable), so the
+                map stays clean until a barangay is selected. The sidebar list's
+                red dot already shows which barangays are at-risk. */}
             {visibleBarangays.filter(b => b.boundary_geojson).map(b => {
               let geo
               try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-              const atRisk = (atRiskByBarangay[b.id]?.at_risk_households || 0) > 0
-              const color = atRisk ? '#dc2626' : '#16a34a'
               return (
                 <GeoJSON
                   key={b.id}
                   data={geo}
-                  pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: atRisk ? 0.28 : 0.12 }}
+                  pathOptions={{ color: 'transparent', weight: 0, fillColor: 'transparent', fillOpacity: 0 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}
                 >
                   <Tooltip sticky>{b.name} — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
