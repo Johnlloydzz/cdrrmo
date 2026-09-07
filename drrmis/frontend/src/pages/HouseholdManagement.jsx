@@ -21,7 +21,7 @@ function LocationPicker({ onPick }) {
   return null
 }
 
-const emptyForm = { barangay_id: '', purok_id: '', head_family: '', head_birthdate: '', contact: '', latitude: '', longitude: '' }
+const emptyForm = { barangay_id: '', purok_id: '', head_family: '', contact: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
@@ -60,7 +60,6 @@ export default function HouseholdManagement({ currentUser }) {
     setEditing(h.id)
     setForm({
       barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_family: h.head_family || '',
-      head_birthdate: h.head_birthdate || '',
       contact: h.contact || '', latitude: h.latitude || '', longitude: h.longitude || '',
     })
     setShowModal(true)
@@ -72,8 +71,8 @@ export default function HouseholdManagement({ currentUser }) {
   }
 
   const handleSave = async () => {
-    if (!form.head_family.trim() || !form.barangay_id || !form.purok_id || !form.head_birthdate) {
-      alert('Head of family, birthdate, barangay, and purok are required.'); return
+    if (!form.head_family.trim() || !form.barangay_id || !form.purok_id) {
+      alert('Head of family, barangay, and purok are required.'); return
     }
     setSaving(true)
     try {
@@ -133,52 +132,53 @@ export default function HouseholdManagement({ currentUser }) {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Household' : 'Register Household'}</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Barangay</label>
-                <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, purok_id: ''})} disabled={!!editing}>
-                  <option value="">Select barangay…</option>
-                  {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">Purok</label>
-                <select className="input" value={form.purok_id} onChange={e => setForm({...form, purok_id: e.target.value})} disabled={!form.barangay_id}>
-                  <option value="">Select purok…</option>
-                  {puroksForBarangay(form.barangay_id).map(p => <option key={p.id} value={p.id}>{p.name} ({p.flood_risk} risk)</option>)}
-                </select>
-              </div>
-              <div className="col-span-2"><label className="label">Head of Family</label><input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} /></div>
-              <div className="col-span-2">
-                <label className="label">Head's Birthdate</label>
-                <input className="input" type="date" value={form.head_birthdate} onChange={e => setForm({...form, head_birthdate: e.target.value})} />
-                <p className="text-xs text-gray-400 mt-1">The head is automatically added to Resident Management using this birthdate.</p>
-              </div>
-              <div><label className="label">Contact</label><input className="input" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} /></div>
-              <div className="col-span-2">
-                <label className="label flex items-center gap-1.5"><MapPin size={14} /> Household Location</label>
-                <p className="text-xs text-gray-400 mb-2">Click on the map below at exactly where this family lives.</p>
-                <div className="h-56 rounded-lg overflow-hidden border border-gray-200">
-                  <MapContainer
-                    center={form.latitude && form.longitude ? [Number(form.latitude), Number(form.longitude)] : GINGOOG_CENTER}
-                    zoom={form.latitude && form.longitude ? 17 : 13}
-                    className="w-full h-full"
-                  >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-                    <LocationPicker onPick={(lat, lng) => setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} />
-                    {form.latitude && form.longitude && (
-                      <Marker position={[Number(form.latitude), Number(form.longitude)]} />
-                    )}
-                  </MapContainer>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
+            <h3 className="text-lg font-semibold px-6 pt-6 flex-shrink-0">{editing ? 'Edit Household' : 'Register Household'}</h3>
+            <div className="overflow-y-auto px-6 py-4 flex-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Barangay</label>
+                  <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, purok_id: ''})} disabled={!!editing}>
+                    <option value="">Select barangay…</option>
+                    {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  {form.latitude && form.longitude ? `Pinned: ${form.latitude}, ${form.longitude}` : 'No location pinned yet.'}
-                </p>
+                <div>
+                  <label className="label">Purok</label>
+                  <select className="input" value={form.purok_id} onChange={e => setForm({...form, purok_id: e.target.value})} disabled={!form.barangay_id}>
+                    <option value="">Select purok…</option>
+                    {puroksForBarangay(form.barangay_id).map(p => <option key={p.id} value={p.id}>{p.name} ({p.flood_risk} risk)</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="label">Head of Family</label>
+                  <input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} />
+                  <p className="text-xs text-gray-400 mt-1">Add the head's birthdate and other family members in Resident Management.</p>
+                </div>
+                <div><label className="label">Contact</label><input className="input" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} /></div>
+                <div className="col-span-2">
+                  <label className="label flex items-center gap-1.5"><MapPin size={14} /> Household Location</label>
+                  <p className="text-xs text-gray-400 mb-2">Click on the map below at exactly where this family lives.</p>
+                  <div className="h-56 rounded-lg overflow-hidden border border-gray-200">
+                    <MapContainer
+                      center={form.latitude && form.longitude ? [Number(form.latitude), Number(form.longitude)] : GINGOOG_CENTER}
+                      zoom={form.latitude && form.longitude ? 17 : 13}
+                      className="w-full h-full"
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+                      <LocationPicker onPick={(lat, lng) => setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} />
+                      {form.latitude && form.longitude && (
+                        <Marker position={[Number(form.latitude), Number(form.longitude)]} />
+                      )}
+                    </MapContainer>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {form.latitude && form.longitude ? `Pinned: ${form.latitude}, ${form.longitude}` : 'No location pinned yet.'}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 px-6 pb-6 pt-2 flex-shrink-0 border-t border-gray-100">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </div>

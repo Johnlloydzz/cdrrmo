@@ -21,8 +21,8 @@ const navGroups = [
     items: [
       { to: '/barangays',  icon: Building2, label: 'Barangays' },
       { to: '/puroks',     icon: TreePine,  label: 'Puroks' },
-      { to: '/households', icon: Home,      label: 'Households' },
       { to: '/residents',  icon: Users,     label: 'Residents' },
+      { to: '/households', icon: Home,      label: 'Households' },
     ],
   },
   {
