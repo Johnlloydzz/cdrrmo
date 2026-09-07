@@ -52,11 +52,12 @@ router.post('/', async (req, res) => {
 // PUT /api/households/:id
 router.put('/:id', async (req, res) => {
   try {
-    if (req.user.role === 'Barangay Official') {
-      const existing = await get('SELECT barangay_id FROM households WHERE id = ?', [req.params.id])
-      if (!existing || existing.barangay_id !== req.user.barangay_id) {
-        return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
-      }
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to household records.' })
+    }
+    const existing = await get('SELECT barangay_id FROM households WHERE id = ?', [req.params.id])
+    if (!existing || existing.barangay_id !== req.user.barangay_id) {
+      return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
     }
     const { head_family, latitude, longitude, contact, purok_id } = req.body
     await run(
@@ -71,11 +72,12 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/households/:id
 router.delete('/:id', async (req, res) => {
   try {
-    if (req.user.role === 'Barangay Official') {
-      const existing = await get('SELECT barangay_id FROM households WHERE id = ?', [req.params.id])
-      if (!existing || existing.barangay_id !== req.user.barangay_id) {
-        return res.status(403).json({ error: 'You can only delete households in your own barangay.' })
-      }
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to household records.' })
+    }
+    const existing = await get('SELECT barangay_id FROM households WHERE id = ?', [req.params.id])
+    if (!existing || existing.barangay_id !== req.user.barangay_id) {
+      return res.status(403).json({ error: 'You can only delete households in your own barangay.' })
     }
     const result = await run('DELETE FROM households WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })

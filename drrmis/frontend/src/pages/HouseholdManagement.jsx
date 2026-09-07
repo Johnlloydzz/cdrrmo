@@ -116,7 +116,7 @@ export default function HouseholdManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Contact','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Contact', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(h => (
@@ -129,15 +129,17 @@ export default function HouseholdManagement({ currentUser }) {
                   </td>
                   <td className="table-cell font-medium">{h.head_family}</td>
                   <td className="table-cell">{h.contact}</td>
-                  <td className="table-cell">
-                    <div className="flex gap-2">
-                      <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(h)}><Pencil size={15} /></button>
-                      <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(h.id)}><Trash2 size={15} /></button>
-                    </div>
-                  </td>
+                  {canAdd && (
+                    <td className="table-cell">
+                      <div className="flex gap-2">
+                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(h)}><Pencil size={15} /></button>
+                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(h.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={canAdd ? 5 : 6} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={5} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
             </tbody>
           </table>
         </div>
