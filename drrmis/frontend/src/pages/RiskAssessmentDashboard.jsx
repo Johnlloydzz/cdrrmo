@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, GeoJSON, Circle, Tooltip, Popup, useMap } from 'react-leaflet'
-import { AlertTriangle, Home, Users, X, MapPin } from 'lucide-react'
+import { AlertTriangle, Home, Users, X, MapPin, Search, Building2, ShieldAlert } from 'lucide-react'
 import { apiGet } from '../utils/api'
 
 const CENTER = [8.8231, 125.1109]
@@ -15,6 +15,18 @@ function FlyToHandler({ target }) {
   return null
 }
 
+// Fits the map to the selected barangay's boundary — same click-to-zoom
+// behavior as the Hazard Map & Geofencing page.
+function FitToBoundary({ geojsonLayer }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!geojsonLayer) return
+    const bounds = geojsonLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] })
+  }, [geojsonLayer, map])
+  return null
+}
+
 export default function RiskAssessmentDashboard({ currentUser }) {
   const [summary, setSummary] = useState([])
   const [barangays, setBarangays] = useState([])
@@ -22,10 +34,12 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const [loading, setLoading] = useState(true)
   const [wakingUp, setWakingUp] = useState(false)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [selectedBarangay, setSelectedBarangay] = useState(null)
+  const [selectedGeojsonLayer, setSelectedGeojsonLayer] = useState(null)
 
   // Drill-down: Total Households card -> household list -> that household's residents
   const [showHouseholds, setShowHouseholds] = useState(false)
-  const [householdsLoading, setHouseholdsLoading] = useState(false)
   const [expandedHousehold, setExpandedHousehold] = useState(null)
   const [residents, setResidents] = useState([])
   const [residentsLoading, setResidentsLoading] = useState(false)
@@ -49,6 +63,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     ? summary.filter(s => s.barangay_name === currentUser.barangay)
     : summary
   const visibleBarangayIds = new Set(visible.map(s => s.barangay_id))
+  const visibleBarangays = barangays.filter(b => visibleBarangayIds.has(b.id))
   const visibleHouseholds = currentUser?.role === 'Barangay Official'
     ? households.filter(h => h.barangay_name === currentUser.barangay)
     : households
@@ -60,7 +75,16 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     atRiskPopulation: acc.atRiskPopulation + (s.at_risk_population || 0),
   }), { households: 0, atRiskHouseholds: 0, population: 0, atRiskPopulation: 0 })
 
-  const atRiskByBarangay = Object.fromEntries(visible.map(s => [s.barangay_id, s.at_risk_households]))
+  const atRiskByBarangay = Object.fromEntries(visible.map(s => [s.barangay_id, s]))
+
+  const filteredBarangays = visibleBarangays.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
+
+  const selectedGeojson = (() => {
+    if (!selectedBarangay?.boundary_geojson) return null
+    try { return JSON.parse(selectedBarangay.boundary_geojson) } catch { return null }
+  })()
+  const selectedStats = selectedBarangay ? atRiskByBarangay[selectedBarangay.id] : null
+  const selectedHouseholds = selectedBarangay ? visibleHouseholds.filter(h => h.barangay_name === selectedBarangay.name) : []
 
   const openHouseholdList = () => {
     setShowHouseholds(true)
@@ -125,28 +149,102 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         </div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h3 className="font-semibold text-sm">City-Wide Risk Map</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Red barangays have at least one at-risk household. Click a household in the list below to fly to its location.</p>
+      {/* Map section — same two-column layout as Hazard Map & Geofencing:
+          barangay list on the left, click one to zoom to its boundary. */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:h-[560px]">
+        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto order-2 lg:order-1">
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
+            <input className="input text-sm" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
+            <div className="space-y-0.5 max-h-64 overflow-y-auto">
+              {filteredBarangays.map(b => {
+                const atRisk = (atRiskByBarangay[b.id]?.at_risk_households || 0) > 0
+                return (
+                  <button
+                    key={b.id}
+                    onClick={() => setSelectedBarangay(b)}
+                    className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between ${
+                      selectedBarangay?.id === b.id ? 'bg-primary-100 text-primary-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <span>{b.name}</span>
+                    {atRisk && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                  </button>
+                )
+              })}
+              {filteredBarangays.length === 0 && <p className="text-xs text-gray-400 py-2">No barangays found.</p>}
+            </div>
+          </div>
+
+          {selectedBarangay && selectedStats && (
+            <div className="card p-4">
+              <h3 className="font-semibold text-sm mb-2 flex items-center gap-2"><ShieldAlert size={15} /> {selectedBarangay.name}</h3>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="bg-gray-50 rounded-lg py-2 text-center">
+                  <p className="text-lg font-bold text-gray-700">{selectedStats.total_households}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Households</p>
+                </div>
+                <div className="bg-red-50 rounded-lg py-2 text-center">
+                  <p className="text-lg font-bold text-red-600">{selectedStats.at_risk_households}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">At-Risk</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg py-2 text-center">
+                  <p className="text-lg font-bold text-gray-700">{selectedStats.total_population}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">Population</p>
+                </div>
+                <div className="bg-red-50 rounded-lg py-2 text-center">
+                  <p className="text-lg font-bold text-red-600">{selectedStats.at_risk_population}</p>
+                  <p className="text-[10px] text-gray-500 uppercase">At-Risk Pop.</p>
+                </div>
+              </div>
+              {!selectedBarangay.boundary_geojson && (
+                <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
+              )}
+            </div>
+          )}
         </div>
-        <div className="h-[420px]">
+
+        <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <FlyToHandler target={flyTarget} />
 
-            {barangays.filter(b => visibleBarangayIds.has(b.id) && b.boundary_geojson).map(b => {
+            {/* All barangays — colored red/green by at-risk status, click to select + zoom */}
+            {visibleBarangays.filter(b => b.boundary_geojson).map(b => {
               let geo
               try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-              const atRisk = atRiskByBarangay[b.id] > 0
+              const atRisk = (atRiskByBarangay[b.id]?.at_risk_households || 0) > 0
               const color = atRisk ? '#dc2626' : '#16a34a'
               return (
-                <GeoJSON key={b.id} data={geo} pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: atRisk ? 0.28 : 0.12 }}>
-                  <Tooltip sticky>{b.name} — {atRiskByBarangay[b.id] || 0} at-risk household{atRiskByBarangay[b.id] === 1 ? '' : 's'}</Tooltip>
+                <GeoJSON
+                  key={b.id}
+                  data={geo}
+                  pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: atRisk ? 0.28 : 0.12 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                >
+                  <Tooltip sticky>{b.name} — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
                 </GeoJSON>
               )
             })}
 
+            {/* Selected barangay — highlighted outline, same style as Hazard Map & Geofencing */}
+            {selectedGeojson && (
+              <>
+                <GeoJSON
+                  key={`selected-${selectedBarangay.id}`}
+                  data={selectedGeojson}
+                  pathOptions={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
+                  ref={setSelectedGeojsonLayer}
+                />
+                <FitToBoundary geojsonLayer={selectedGeojsonLayer} />
+              </>
+            )}
+
+            {/* Households — colored by geofencing risk status */}
             {visibleHouseholds.filter(h => h.latitude && h.longitude).map(h => (
               <Circle
                 key={h.id}
@@ -154,7 +252,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 radius={15}
                 pathOptions={{ color: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6', fillColor: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6', fillOpacity: 0.7 }}
               >
-                <Popup><strong>{h.household_id}</strong> — {h.head_family}<br />{h.in_flood_risk_zone ? '⚠️ Within high flood-risk zone' : 'Outside high-risk zone'}</Popup>
+                <Popup><strong>{h.household_id}</strong> — {h.head_family}<br />{h.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
               </Circle>
             ))}
           </MapContainer>
@@ -162,7 +260,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       </div>
 
       <p className="text-xs text-gray-400 italic">
-        "At-risk" households/population are those located within puroks classified as High flood-risk, per the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) data.
+        "At-risk" households/population are those located within puroks classified as High flood-risk, per the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) data. Red dot in the barangay list = has at-risk households.
       </p>
 
       {/* Total Households drill-down — compact, fixed-height, scrollable list */}
