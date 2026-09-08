@@ -13,16 +13,16 @@ L.Icon.Default.mergeOptions({
 
 // Red pin for households within a high flood-risk (geofenced) zone
 const redPinIcon = new L.DivIcon({
-  className: 'household-pin household-pin-focused',
-  html: `<div style="background:#dc2626;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+  className: 'household-pin',
+  html: `<div class="household-pin-focused" style="background:#dc2626;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
   iconSize: [16, 16],
   iconAnchor: [8, 16],
   popupAnchor: [0, -16],
 })
 // Blue pin for households outside the high-risk zone
 const bluePinIcon = new L.DivIcon({
-  className: 'household-pin household-pin-focused',
-  html: `<div style="background:#3b82f6;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+  className: 'household-pin',
+  html: `<div class="household-pin-focused" style="background:#3b82f6;width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
   iconSize: [16, 16],
   iconAnchor: [8, 16],
   popupAnchor: [0, -16],
