@@ -110,7 +110,20 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     try { return JSON.parse(selectedBarangay.boundary_geojson) } catch { return null }
   })()
   const selectedStats = selectedBarangay ? atRiskByBarangay[selectedBarangay.id] : null
-  const selectedHouseholds = selectedBarangay ? visibleHouseholds.filter(h => h.barangay_name === selectedBarangay.name) : []
+
+  // When a barangay is selected, the summary cards and the household
+  // drill-down list narrow to just that barangay — otherwise they show the
+  // city-wide (or, for a Barangay Official, their own barangay's) totals.
+  const displayTotals = selectedBarangay && selectedStats ? {
+    households: selectedStats.total_households || 0,
+    atRiskHouseholds: selectedStats.at_risk_households || 0,
+    population: selectedStats.total_population || 0,
+    atRiskPopulation: selectedStats.at_risk_population || 0,
+  } : totals
+
+  const householdsToList = selectedBarangay
+    ? visibleHouseholds.filter(h => h.barangay_name === selectedBarangay.name)
+    : visibleHouseholds
 
   const openHouseholdList = () => {
     setShowHouseholds(true)
@@ -151,27 +164,33 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         <p className="text-sm text-gray-500 mt-1">
           Projected households and population within high flood-risk zones, based on CDRA-aligned purok classification (geofencing).
         </p>
+        {selectedBarangay && (
+          <p className="text-xs text-primary-700 font-medium mt-1 flex items-center gap-1">
+            <Building2 size={12} /> Showing figures for {selectedBarangay.name} only
+            <button type="button" onClick={() => setSelectedBarangay(null)} className="text-gray-400 hover:text-gray-600 underline ml-1">clear</button>
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <button type="button" onClick={openHouseholdList} className="card p-4 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
           <Home size={20} className="mx-auto mb-1 text-gray-400" />
-          <p className="text-2xl font-bold text-gray-800">{totals.households.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-gray-800">{displayTotals.households.toLocaleString()}</p>
           <p className="text-xs text-gray-500 mt-1">Total Households</p>
         </button>
         <div className="card p-4 text-center">
           <AlertTriangle size={20} className="mx-auto mb-1 text-red-500" />
-          <p className="text-2xl font-bold text-red-600">{totals.atRiskHouseholds.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-red-600">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
           <p className="text-xs text-gray-500 mt-1">Households in High-Risk Zones</p>
         </div>
         <div className="card p-4 text-center">
           <Users size={20} className="mx-auto mb-1 text-gray-400" />
-          <p className="text-2xl font-bold text-gray-800">{totals.population.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-gray-800">{displayTotals.population.toLocaleString()}</p>
           <p className="text-xs text-gray-500 mt-1">Total Population</p>
         </div>
         <div className="card p-4 text-center">
           <AlertTriangle size={20} className="mx-auto mb-1 text-red-500" />
-          <p className="text-2xl font-bold text-red-600">{totals.atRiskPopulation.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-red-600">{displayTotals.atRiskPopulation.toLocaleString()}</p>
           <p className="text-xs text-gray-500 mt-1">Population in High-Risk Zones</p>
         </div>
       </div>
@@ -281,7 +300,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 position={[focusedHousehold.latitude, focusedHousehold.longitude]}
                 icon={focusedHousehold.in_flood_risk_zone ? redPinIcon : bluePinIcon}
               >
-                <Popup><strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}</Popup>
+                <Popup eventHandlers={{ remove: () => setFocusedHousehold(null) }}>
+                  <strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
+                </Popup>
               </Marker>
             )}
           </MapContainer>
@@ -305,15 +326,17 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           onClick={e => e.stopPropagation()}
         >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
-              <h3 className="font-semibold text-gray-800 text-sm">Registered Households ({visibleHouseholds.length})</h3>
+              <h3 className="font-semibold text-gray-800 text-sm">
+                {selectedBarangay ? `${selectedBarangay.name} Households` : 'Registered Households'} ({householdsToList.length})
+              </h3>
               <button onClick={() => setShowHouseholds(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="overflow-y-auto flex-1">
-              {visibleHouseholds.length === 0 ? (
+              {householdsToList.length === 0 ? (
                 <p className="text-center text-gray-400 py-8 text-sm">No households registered yet.</p>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {visibleHouseholds.map(h => (
+                  {householdsToList.map(h => (
                     <div key={h.id} className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50">
                       <button type="button" onClick={() => flyToHousehold(h)} className="flex-1 flex items-center gap-2 text-left min-w-0" title="Fly to location on map">
                         <MapPin size={14} className="text-primary-500 flex-shrink-0" />
