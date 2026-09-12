@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+import { SkeletonStatCards, SkeletonTableRows } from '../components/Skeleton'
 
 const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
 
@@ -86,7 +87,23 @@ export default function ResidentManagement({ currentUser }) {
     return acc
   }, {})
 
-  if (loading) return <div className="card p-10 text-center text-gray-400">Loading residents…</div>
+  if (loading) return (
+    <div className="space-y-4">
+      <SkeletonStatCards count={5} />
+      <div className="card p-4 flex gap-3 items-center justify-between">
+        <div className="h-9 bg-gray-100 rounded flex-1 max-w-xs animate-pulse" />
+        <div className="h-9 w-36 bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Household','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+          </thead>
+          <tbody><SkeletonTableRows columns={8} rows={5} /></tbody>
+        </table>
+      </div>
+    </div>
+  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (

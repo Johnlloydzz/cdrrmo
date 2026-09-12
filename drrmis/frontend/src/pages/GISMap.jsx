@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tool
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
+import { SkeletonList } from '../components/Skeleton'
 
 // Fix Leaflet default icons in Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -287,10 +288,10 @@ export default function GISMap() {
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
           <div className="space-y-0.5 max-h-56 overflow-y-auto">
             {barangaysLoading && (
-              <p className="text-xs text-gray-400 py-2 flex items-center gap-2">
-                <span className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin inline-block" />
-                {wakingUp ? 'Waking up the server… (up to a minute)' : 'Connecting to server…'}
-              </p>
+              <>
+                {wakingUp && <p className="text-xs text-gray-400 pb-2">Waking up the server… (up to a minute)</p>}
+                <SkeletonList rows={6} />
+              </>
             )}
             {!barangaysLoading && filteredBarangays.map(b => (
               <button

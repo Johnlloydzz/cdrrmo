@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Search, Pencil, Building2 } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
+import { SkeletonTableRows } from '../components/Skeleton'
 
 // Badge colors matched to the official MGB Landslide and Flood Susceptibility Map legend.
 // Landslide: brown (Very High) → red (High) → green (Moderate) → yellow (Low)
@@ -43,7 +44,19 @@ export default function BarangayManagement() {
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
-  if (loading) return <div className="card p-10 text-center text-gray-400">Loading barangays…</div>
+  if (loading) return (
+    <div className="space-y-4">
+      <div className="card p-4"><div className="h-9 bg-gray-100 rounded max-w-xs animate-pulse" /></div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>{['Barangay','Population','Flood Susceptibility (CDRA)','Landslide Susceptibility (CDRA)','Boundary','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+          </thead>
+          <tbody><SkeletonTableRows columns={6} rows={6} /></tbody>
+        </table>
+      </div>
+    </div>
+  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (

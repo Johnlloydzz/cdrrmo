@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+import { SkeletonTableRows } from '../components/Skeleton'
 
 const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
 const emptyForm = { barangay_id: '', name: '', flood_risk: 'Low', flood_threshold_m: '1.0', landslide_risk: 'Low' }
@@ -54,7 +55,22 @@ export default function PurokManagement({ currentUser }) {
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
-  if (loading) return <div className="card p-10 text-center text-gray-400">Loading puroks…</div>
+  if (loading) return (
+    <div className="space-y-4">
+      <div className="card p-4 flex gap-3 items-center justify-between">
+        <div className="h-9 bg-gray-100 rounded flex-1 max-w-xs animate-pulse" />
+        <div className="h-9 w-36 bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>{['Purok','Barangay','Flood Risk','Flood Threshold (m)','Landslide Risk','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+          </thead>
+          <tbody><SkeletonTableRows columns={6} rows={5} /></tbody>
+        </table>
+      </div>
+    </div>
+  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (

@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from
 import L from 'leaflet'
 import { AlertTriangle, Home, Users, X, MapPin, Search, Building2, ShieldAlert } from 'lucide-react'
 import { apiGet } from '../utils/api'
+import { SkeletonStatCards, SkeletonList, SkeletonBlock } from '../components/Skeleton'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -145,14 +146,27 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   }
 
   if (loading) return (
-    <div className="card p-10 text-center text-gray-400">
-      {wakingUp ? (
-        <>
-          <div className="w-6 h-6 border-2 border-primary-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="font-medium text-gray-500">Waking up the server…</p>
-          <p className="text-xs mt-1">This can take up to a minute after a period of inactivity. Thanks for your patience.</p>
-        </>
-      ) : 'Loading risk assessment data…'}
+    <div className="space-y-4">
+      <div>
+        <div className="h-6 w-64 bg-gray-100 rounded animate-pulse mb-2" />
+        <div className="h-4 w-96 max-w-full bg-gray-100 rounded animate-pulse" />
+      </div>
+      <SkeletonStatCards count={4} />
+      {wakingUp && (
+        <div className="card p-3 text-center text-xs text-gray-400 flex items-center justify-center gap-2">
+          <div className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
+          Waking up the server… (up to a minute after a period of inactivity)
+        </div>
+      )}
+      <div className="flex flex-col lg:flex-row gap-4 lg:h-[560px]">
+        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3">
+          <div className="card p-4"><div className="h-9 bg-gray-100 rounded animate-pulse" /></div>
+          <div className="card p-4"><SkeletonList rows={7} /></div>
+        </div>
+        <div className="lg:flex-1 rounded-xl overflow-hidden">
+          <SkeletonBlock className="h-[70vh] lg:h-full w-full" />
+        </div>
+      </div>
     </div>
   )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
