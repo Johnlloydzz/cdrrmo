@@ -18,6 +18,7 @@ const PurokManagement         = lazy(() => import('./pages/PurokManagement'))
 const HouseholdManagement     = lazy(() => import('./pages/HouseholdManagement'))
 const ResidentManagement      = lazy(() => import('./pages/ResidentManagement'))
 const GISMap                  = lazy(() => import('./pages/GISMap'))
+const FloodSimulationControl  = lazy(() => import('./pages/FloodSimulationControl'))
 const UserManagement          = lazy(() => import('./pages/UserManagement'))
 const Settings                = lazy(() => import('./pages/Settings'))
 
@@ -86,6 +87,7 @@ function App() {
 
           {/* Web-Based Hazard Mapping + Geofencing Module */}
           <Route path="map" element={<G><GISMap /></G>} />
+          <Route path="flood-control" element={<G><FloodSimulationControl /></G>} />
 
           {/* User Management Module — CDRRMO Personnel only */}
           <Route path="users"    element={<G><UserManagement currentUser={currentUser} /></G>} />

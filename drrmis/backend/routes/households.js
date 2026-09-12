@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     // Barangay Officials only ever see their own barangay's households —
     // enforced server-side, not just hidden in the UI.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
-    let sql = `SELECT h.*, b.name as barangay_name, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m
+    let sql = `SELECT h.*, b.name as barangay_name, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
                LEFT JOIN puroks p ON h.purok_id = p.id
@@ -22,8 +22,22 @@ router.get('/', async (req, res) => {
     if (search)      { sql += ' AND (h.head_family LIKE ? OR h.household_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
     if (at_risk === '1') { sql += " AND p.flood_risk = 'High'" }
     const rows = await all(sql, params)
-    // Geofencing: household is "at risk" if its purok is classified High flood-risk
-    const withRisk = rows.map(h => ({ ...h, in_flood_risk_zone: h.purok_flood_risk === 'High' }))
+
+    // Same dynamic-vs-static logic as /api/risk-assessment/summary: if a
+    // flood water level has been manually reported, use it to compute
+    // real-time at-risk status; otherwise fall back to the static CDRA
+    // classification (flood_risk = 'High').
+    const levelRow = await get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m'])
+    const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
+    const withRisk = rows.map(h => ({
+      ...h,
+      in_flood_risk_zone: floodLevel > 0
+        ? floodLevel >= h.flood_threshold_m
+        : h.purok_flood_risk === 'High',
+      // Landslide has no continuous measured value like flood depth — it
+      // always uses the static official CDRA classification.
+      in_landslide_risk_zone: h.purok_landslide_risk === 'High',
+    }))
     res.json(withRisk)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
