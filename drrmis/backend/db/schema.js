@@ -69,6 +69,15 @@ const tables = [
     relation_to_head  TEXT,
     created_at        TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
+
+  // ── System Settings (key-value store) — currently used for the manually
+  // reported flood water level that drives the real-time geofencing
+  // simulation on the Risk Assessment Dashboard ──────────────────────────────
+  `CREATE TABLE IF NOT EXISTS system_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT DEFAULT (datetime('now', '+8 hours'))
+  )`,
 ]
 
 module.exports = tables

@@ -10,6 +10,7 @@ const householdRoutes      = require('./routes/households')
 const residentRoutes       = require('./routes/residents')
 const userRoutes           = require('./routes/users')
 const riskAssessmentRoutes = require('./routes/riskAssessment')
+const settingsRoutes       = require('./routes/settings')
 
 const { initDb } = require('./db/database')
 
@@ -55,6 +56,7 @@ app.use('/api/households',      householdRoutes)
 app.use('/api/residents',       residentRoutes)
 app.use('/api/users',           userRoutes)
 app.use('/api/risk-assessment', riskAssessmentRoutes)
+app.use('/api/settings',        settingsRoutes)
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
