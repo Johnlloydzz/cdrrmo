@@ -75,7 +75,7 @@ export default function FloodSimulationControl() {
     setLiveLoading(true)
     setLiveError(false)
     Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain,temperature_2m,relative_humidity_2m&timezone=Asia%2FManila`).then(r => r.json()),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&timezone=Asia%2FManila`).then(r => r.json()),
       fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3`).then(r => r.json()),
     ])
       .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood) })
@@ -179,18 +179,10 @@ export default function FloodSimulationControl() {
           <p className="text-xs text-red-500">Could not load live data right now — try Refresh.</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-blue-50 rounded-lg p-2 text-center">
                 <p className="text-lg font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
                 <p className="text-[10px] text-gray-500 uppercase">Current Rain</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2 text-center">
-                <p className="text-lg font-bold text-gray-700">{liveWeather?.current?.temperature_2m ?? '—'}°C</p>
-                <p className="text-[10px] text-gray-500 uppercase">Temperature</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2 text-center">
-                <p className="text-lg font-bold text-gray-700">{liveWeather?.current?.relative_humidity_2m ?? '—'}%</p>
-                <p className="text-[10px] text-gray-500 uppercase">Humidity</p>
               </div>
               <div className="bg-amber-50 rounded-lg p-2 text-center">
                 <p className="text-lg font-bold text-amber-700">{liveFlood?.daily?.river_discharge?.[0] ?? '—'} m³/s</p>
