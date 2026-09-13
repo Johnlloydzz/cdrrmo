@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { AlertTriangle, Home, Users, X, MapPin, Search, Building2, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { SkeletonStatCards, SkeletonList, SkeletonBlock } from '../components/Skeleton'
 
@@ -71,6 +71,14 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const [residentsLoading, setResidentsLoading] = useState(false)
   const [flyTarget, setFlyTarget] = useState(null)
   const [focusedHousehold, setFocusedHousehold] = useState(null)
+  const [floodLevel, setFloodLevel] = useState(0)
+
+  const loadDashboardData = () =>
+    Promise.all([
+      apiGet('/risk-assessment/summary'),
+      apiGet('/households'),
+      apiGet('/settings/flood-level'),
+    ]).then(([s, h, fl]) => { setSummary(s); setHouseholds(h); setFloodLevel(fl.level_m) })
 
   useEffect(() => {
     setLoading(true)
@@ -79,10 +87,17 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       apiGet('/risk-assessment/summary', { onColdStart: () => setWakingUp(true) }),
       apiGet('/barangays'),
       apiGet('/households'),
+      apiGet('/settings/flood-level'),
     ])
-      .then(([s, b, h]) => { setSummary(s); setBarangays(b); setHouseholds(h) })
+      .then(([s, b, h, fl]) => { setSummary(s); setBarangays(b); setHouseholds(h); setFloodLevel(fl.level_m) })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
+
+    // The flood level is now set from a separate Flood Simulation Control
+    // page — poll here so the Dashboard's figures stay current even though
+    // the two pages aren't directly connected.
+    const interval = setInterval(() => loadDashboardData().catch(() => {}), 20000)
+    return () => clearInterval(interval)
   }, [])
 
   // Barangay Officials only see their own barangay's data
@@ -103,6 +118,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   }), { households: 0, atRiskHouseholds: 0, population: 0, atRiskPopulation: 0 })
 
   const atRiskByBarangay = Object.fromEntries(visible.map(s => [s.barangay_id, s]))
+  const barangaysInRiskZoneCount = Object.values(atRiskByBarangay).filter(s => (s.at_risk_households || 0) > 0).length
+
+  const scrollToMap = () => {
+    document.getElementById('dashboard-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const filteredBarangays = visibleBarangays.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -186,21 +206,25 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <button type="button" onClick={openHouseholdList} className="card p-4 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
-          <Home size={20} className="mx-auto mb-1 text-gray-400" />
-          <p className="text-2xl font-bold text-gray-800">{displayTotals.households.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Households</p>
+      {floodLevel > 0 && (
+        <div className="card p-3 bg-red-50 border border-red-200 flex items-center gap-2">
+          <Waves size={15} className="text-red-500 flex-shrink-0" />
+          <p className="text-xs text-red-700">
+            <strong>Active flood simulation:</strong> reported water level is {floodLevel} m — figures below reflect puroks whose flood threshold is at or below this level, overriding the static CDRA classification.
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button type="button" onClick={scrollToMap} className="card p-4 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
+          <Waves size={20} className="mx-auto mb-1 text-blue-500" />
+          <p className="text-2xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-1">Barangays in Risk Zone {floodLevel > 0 ? '(live)' : ''}</p>
         </button>
         <div className="card p-4 text-center">
           <AlertTriangle size={20} className="mx-auto mb-1 text-red-500" />
           <p className="text-2xl font-bold text-red-600">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-1">Households in High-Risk Zones</p>
-        </div>
-        <div className="card p-4 text-center">
-          <Users size={20} className="mx-auto mb-1 text-gray-400" />
-          <p className="text-2xl font-bold text-gray-800">{displayTotals.population.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Population</p>
+          <p className="text-xs text-gray-500 mt-1">Total Households in High-Risk Zones</p>
         </div>
         <div className="card p-4 text-center">
           <AlertTriangle size={20} className="mx-auto mb-1 text-red-500" />
@@ -211,7 +235,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
 
       {/* Map section — same two-column layout as Hazard Map & Geofencing:
           barangay list on the left, click one to zoom to its boundary. */}
-      <div className="flex flex-col lg:flex-row gap-4 lg:h-[560px]">
+      <div id="dashboard-map-section" className="flex flex-col lg:flex-row gap-4 lg:h-[560px]">
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto order-2 lg:order-1">
           <div className="card p-4">
             <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
@@ -253,8 +277,14 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   <p className="text-[10px] text-gray-500 uppercase">At-Risk</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg py-2 text-center">
-                  <p className="text-lg font-bold text-gray-700">{selectedStats.total_population}</p>
-                  <p className="text-[10px] text-gray-500 uppercase">Population</p>
+                  <p className="text-lg font-bold text-gray-700">
+                    {(() => {
+                      const puroks = selectedBarangay.puroks || []
+                      const atRisk = puroks.filter(p => floodLevel > 0 ? floodLevel >= p.flood_threshold_m : p.flood_risk === 'High').length
+                      return `${atRisk} / ${puroks.length}`
+                    })()}
+                  </p>
+                  <p className="text-[10px] text-gray-500 uppercase">Puroks At-Risk</p>
                 </div>
                 <div className="bg-red-50 rounded-lg py-2 text-center">
                   <p className="text-lg font-bold text-red-600">{selectedStats.at_risk_population}</p>
@@ -264,6 +294,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               {!selectedBarangay.boundary_geojson && (
                 <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
               )}
+              <button type="button" onClick={openHouseholdList} className="text-xs text-primary-600 hover:text-primary-800 underline mt-3">
+                View household list for {selectedBarangay.name}
+              </button>
             </div>
           )}
         </div>
