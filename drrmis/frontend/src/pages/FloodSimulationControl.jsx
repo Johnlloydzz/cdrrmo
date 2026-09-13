@@ -139,12 +139,20 @@ export default function FloodSimulationControl() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-          {isFlood ? <Waves size={20} className="text-blue-500" /> : <Mountain size={20} className="text-amber-600" />}
-          Flood & Landslide Simulation Control
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            {isFlood ? <Waves size={20} className="text-blue-500" /> : <Mountain size={20} className="text-amber-600" />}
+            Flood & Landslide Simulation Control
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>
+        </div>
+        <a
+          href="/flood-control/display" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
+        >
+          <ExternalLink size={13} /> Open Big-Screen Display Mode
+        </a>
       </div>
 
       {/* Hazard type toggle */}

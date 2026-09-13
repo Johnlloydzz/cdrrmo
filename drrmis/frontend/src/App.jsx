@@ -61,6 +61,18 @@ function App() {
         />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
+        {/* Fullscreen "big screen" display mode for the Flood Simulation
+            Control — same page, same login/role requirement, but rendered
+            without the sidebar/header for wall-mounted monitors. */}
+        <Route
+          path="/flood-control/display"
+          element={
+            currentUser
+              ? <Protected currentUser={currentUser}><FloodSimulationControl /></Protected>
+              : <Navigate to="/login" replace />
+          }
+        />
+
         {/* Protected shell */}
         <Route
           path="/"
