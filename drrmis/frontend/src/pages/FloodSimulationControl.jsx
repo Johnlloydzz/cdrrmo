@@ -204,20 +204,9 @@ export default function FloodSimulationControl() {
         )}
       </div>
 
-      {/* Flood-only manual water level input + PAGASA reference */}
+      {/* Flood-only manual water level input */}
       {isFlood && (
         <div className="card p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-            <p className="text-xs text-gray-400 max-w-xl">
-              No confirmed public real-time water-level API exists for Gingoog City specifically. PAGASA's PANaHON network shows near real-time rainfall, temperature, and river water-level data nationwide — check it for the closest station to Gingoog, then report the observed level below.
-            </p>
-            <a
-              href="https://www.panahon.gov.ph/" target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-1.5 flex-shrink-0"
-            >
-              <ExternalLink size={13} /> Open PAGASA PANaHON (Real-Time)
-            </a>
-          </div>
           <div className="flex flex-wrap items-center gap-2">
             <input type="number" step="0.1" min="0" className="input w-32" placeholder="0.0" value={input} onChange={e => setInput(e.target.value)} />
             <span className="text-sm text-gray-500">meters</span>
