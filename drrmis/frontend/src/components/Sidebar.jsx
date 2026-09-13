@@ -3,7 +3,7 @@ import {
   LayoutDashboard, MapPin, Home, Users, Shield, AlertTriangle,
   Tent, Package, Truck, CloudRain, Map, Bell, UserCog,
   FileText, BarChart2, ClipboardList, Settings, ChevronDown,
-  Building2, TreePine, LogOut, Archive, Waves
+  Building2, TreePine, LogOut, Archive
 } from 'lucide-react'
 import { useState } from 'react'
 import { ROLE_ACCESS, ROLE_COLORS } from '../data/users'
@@ -14,7 +14,6 @@ const navGroups = [
     items: [
       { to: '/',    icon: LayoutDashboard, label: 'Risk Assessment Dashboard', exact: true },
       { to: '/map', icon: Map,             label: 'Hazard Map & Geofencing' },
-      { to: '/flood-control', icon: Waves, label: 'Flood Simulation Control' },
     ],
   },
   {
