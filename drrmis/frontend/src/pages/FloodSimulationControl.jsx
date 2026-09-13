@@ -13,6 +13,12 @@ L.Icon.Default.mergeOptions({
 
 const CENTER = [8.8231, 125.1109]
 
+// Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors —
+// same palette as Hazard Map & Geofencing, matching the City of Gingoog CLUP
+// Landslide and Flood Susceptibility Map.
+const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
+const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
+
 const barangayIcon = new L.DivIcon({
   className: 'barangay-pin',
   html: `<div style="background:#1d4ed8;width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
@@ -256,6 +262,28 @@ export default function FloodSimulationControl() {
               {filteredBarangays.length === 0 && <p className="text-xs text-gray-400 py-2">No barangays found.</p>}
             </div>
           </div>
+
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-3">Legend</h3>
+            <div className="space-y-2">
+              {isFlood ? (
+                <>
+                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: FLOOD_COLOR.High }} />High Susceptibility of Flooding</div>
+                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: FLOOD_COLOR.Low }} />Low Susceptibility of Flooding</div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: LANDSLIDE_COLOR.High }} />High Susceptibility to Landslide</div>
+                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: LANDSLIDE_COLOR.Moderate }} />Moderate Susceptibility to Landslide</div>
+                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: LANDSLIDE_COLOR.Low }} />Low Susceptibility to Landslide</div>
+                </>
+              )}
+              <div className="border-t border-gray-100 my-2" />
+              <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full flex-shrink-0 bg-red-600" />Household — High Risk Zone</div>
+              <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full flex-shrink-0 bg-blue-600" />Household — Outside High-Risk Zone</div>
+              <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#0ea5e9' }} />Selected Barangay Boundary</div>
+            </div>
+          </div>
         </div>
 
         <div className="flood-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200">
@@ -266,15 +294,16 @@ export default function FloodSimulationControl() {
             {barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
               let geo
               try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-              const atRisk = b[susceptKey] === 'High'
-              const color = atRisk ? '#dc2626' : '#16a34a'
+              const colorMap = isFlood ? FLOOD_COLOR : LANDSLIDE_COLOR
+              const level = b[susceptKey] || 'Low'
+              const color = colorMap[level] || colorMap.Low
               return (
                 <GeoJSON
                   key={b.id} data={geo}
-                  pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: atRisk ? 0.25 : 0.1 }}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}
                 >
-                  <Tooltip sticky>{b.name}</Tooltip>
+                  <Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip>
                 </GeoJSON>
               )
             })}

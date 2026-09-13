@@ -12,6 +12,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+// Official CDRA (Climate and Disaster Risk Assessment) flood susceptibility
+// colors — same palette as Hazard Map & Geofencing and Flood Simulation
+// Control, matching the City of Gingoog CLUP Flood Susceptibility Map.
+const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
+
 // Red pin for households within a high flood-risk (geofenced) zone
 const redPinIcon = new L.DivIcon({
   className: 'household-pin',
@@ -299,6 +304,32 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               </button>
             </div>
           )}
+
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-3">Legend</h3>
+            <div className="space-y-2">
+              {[
+                { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
+                { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
+              ].map(l => (
+                <div key={l.label} className="flex items-center gap-2 text-xs">
+                  <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
+                  {l.label}
+                </div>
+              ))}
+              <div className="border-t border-gray-100 my-2" />
+              {[
+                { color: '#dc2626', label: 'Household — High Flood-Risk Zone' },
+                { color: '#3b82f6', label: 'Household — Outside High-Risk Zone' },
+                { color: '#0ea5e9', label: 'Selected Barangay Boundary' },
+              ].map(l => (
+                <div key={l.label} className="flex items-center gap-2 text-xs">
+                  <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                  {l.label}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="dashboard-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
@@ -306,20 +337,22 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <FlyToHandler target={flyTarget} />
 
-            {/* All barangays — thin black outline only (no fill), so the map
-                stays clean but boundaries are still faintly visible. The
-                sidebar list's red dot shows which barangays are at-risk. */}
+            {/* All barangays — colored by official CDRA flood susceptibility
+                classification, same palette as Hazard Map & Geofencing and
+                Flood Simulation Control. */}
             {visibleBarangays.filter(b => b.boundary_geojson).map(b => {
               let geo
               try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+              const level = b.flood_susceptibility || 'Low'
+              const color = FLOOD_COLOR[level] || FLOOD_COLOR.Low
               return (
                 <GeoJSON
                   key={b.id}
                   data={geo}
-                  pathOptions={{ color: '#000000', weight: 0.75, opacity: 0.4, fillColor: 'transparent', fillOpacity: 0 }}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}
                 >
-                  <Tooltip sticky>{b.name} — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
+                  <Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
                 </GeoJSON>
               )
             })}
