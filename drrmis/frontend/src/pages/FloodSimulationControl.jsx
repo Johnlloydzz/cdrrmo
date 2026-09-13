@@ -63,6 +63,28 @@ export default function FloodSimulationControl() {
   const [residents, setResidents] = useState([])
   const [residentsLoading, setResidentsLoading] = useState(false)
 
+  // Live reference data for Gingoog City — Open-Meteo's weather forecast
+  // (current rainfall) and Global Flood API (GloFAS river discharge), both
+  // free, no API key, CORS-enabled, and fetched directly from the browser.
+  const [liveWeather, setLiveWeather] = useState(null)
+  const [liveFlood, setLiveFlood] = useState(null)
+  const [liveLoading, setLiveLoading] = useState(true)
+  const [liveError, setLiveError] = useState(false)
+
+  const loadLiveData = () => {
+    setLiveLoading(true)
+    setLiveError(false)
+    Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain,temperature_2m,relative_humidity_2m&timezone=Asia%2FManila`).then(r => r.json()),
+      fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3`).then(r => r.json()),
+    ])
+      .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood) })
+      .catch(() => setLiveError(true))
+      .finally(() => setLiveLoading(false))
+  }
+
+  useEffect(() => { loadLiveData() }, [])
+
   const load = () => {
     setLoading(true)
     Promise.all([
@@ -139,6 +161,47 @@ export default function FloodSimulationControl() {
         >
           <Mountain size={16} /> Landslide
         </button>
+      </div>
+
+      {/* Live reference data for Gingoog City — real-time rainfall and river
+          discharge, fetched directly from Open-Meteo (free, no key). */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            Live Reference — Gingoog City ({CENTER[0]}, {CENTER[1]})
+          </h3>
+          <button type="button" onClick={loadLiveData} className="text-xs text-primary-600 hover:text-primary-800">Refresh</button>
+        </div>
+        {liveLoading ? (
+          <p className="text-xs text-gray-400">Loading live data…</p>
+        ) : liveError ? (
+          <p className="text-xs text-red-500">Could not load live data right now — try Refresh.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-blue-50 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
+                <p className="text-[10px] text-gray-500 uppercase">Current Rain</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-gray-700">{liveWeather?.current?.temperature_2m ?? '—'}°C</p>
+                <p className="text-[10px] text-gray-500 uppercase">Temperature</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-gray-700">{liveWeather?.current?.relative_humidity_2m ?? '—'}%</p>
+                <p className="text-[10px] text-gray-500 uppercase">Humidity</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-amber-700">{liveFlood?.daily?.river_discharge?.[0] ?? '—'} m³/s</p>
+                <p className="text-[10px] text-gray-500 uppercase">River Discharge Today</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Source: Open-Meteo (rainfall/temperature) and GloFAS/Open-Meteo Flood API (river discharge). River discharge is volume flow (m³/s), not water depth — use it as a reference trend, not a direct meters reading, when estimating the level below.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Flood-only manual water level input + PAGASA reference */}
