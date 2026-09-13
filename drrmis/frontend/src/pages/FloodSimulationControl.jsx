@@ -206,7 +206,7 @@ export default function FloodSimulationControl() {
           </div>
         </div>
 
-        <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200">
+        <div className="flood-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
@@ -230,6 +230,20 @@ export default function FloodSimulationControl() {
             {barangaysWithCentroid.filter(b => b.centroid).map(b => (
               <Marker key={`brgy-${b.id}`} position={b.centroid} icon={barangayIcon} eventHandlers={{ click: () => setSelectedBarangay(b) }} />
             ))}
+
+            {/* Highlighted outline for the selected barangay — same blue
+                style as Hazard Map & Geofencing */}
+            {selectedBarangay?.boundary_geojson && (() => {
+              let geo
+              try { geo = JSON.parse(selectedBarangay.boundary_geojson) } catch { return null }
+              return (
+                <GeoJSON
+                  key={`selected-${selectedBarangay.id}`}
+                  data={geo}
+                  pathOptions={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
+                />
+              )
+            })()}
 
             {households.filter(h => h.latitude && h.longitude).map(h => (
               <Marker key={h.id} position={[h.latitude, h.longitude]} icon={h[atRiskKey] ? redPin : bluePin}>

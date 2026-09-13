@@ -74,11 +74,14 @@
 
 /* Removes the default browser focus outline (shows as a black rectangle)
    that appears after clicking a polygon on the Risk Assessment Dashboard's
-   map specifically — scoped here so it does not affect the Hazard Map &
-   Geofencing page or any other map. */
+   or Flood Simulation Control's map specifically — scoped here so it does
+   not affect the Hazard Map & Geofencing page or any other map. */
 .dashboard-map-container .leaflet-container:focus,
 .dashboard-map-container .leaflet-container path:focus,
-.dashboard-map-container .leaflet-interactive:focus {
+.dashboard-map-container .leaflet-interactive:focus,
+.flood-map-container .leaflet-container:focus,
+.flood-map-container .leaflet-container path:focus,
+.flood-map-container .leaflet-interactive:focus {
   outline: none;
 }
 
