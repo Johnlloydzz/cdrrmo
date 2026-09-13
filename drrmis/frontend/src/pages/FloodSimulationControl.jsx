@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup } from 'react-leaflet'
+import { useState, useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { Waves, Mountain, AlertTriangle, X } from 'lucide-react'
+import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -13,6 +13,11 @@ L.Icon.Default.mergeOptions({
 
 const CENTER = [8.8231, 125.1109]
 
+const barangayIcon = new L.DivIcon({
+  className: 'barangay-pin',
+  html: `<div style="background:#1d4ed8;width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+  iconSize: [14, 14], iconAnchor: [7, 14], popupAnchor: [0, -14],
+})
 const pinIcon = (color) => new L.DivIcon({
   className: '',
   html: `<div style="background:${color};width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
@@ -20,6 +25,25 @@ const pinIcon = (color) => new L.DivIcon({
 })
 const redPin = pinIcon('#dc2626')
 const bluePin = pinIcon('#3b82f6')
+
+function getCentroid(geojson) {
+  if (!geojson) return null
+  try {
+    let rings = []
+    if (geojson.type === 'Polygon') rings = [geojson.coordinates[0]]
+    else if (geojson.type === 'MultiPolygon') rings = geojson.coordinates.map(poly => poly[0])
+    else return null
+    let sumLat = 0, sumLng = 0, count = 0
+    rings.forEach(ring => ring.forEach(([lng, lat]) => { sumLat += lat; sumLng += lng; count++ }))
+    return count === 0 ? null : [sumLat / count, sumLng / count]
+  } catch { return null }
+}
+
+function FlyToBarangay({ target }) {
+  const map = useMap()
+  useEffect(() => { if (target) map.flyTo(target, 15, { duration: 0.8 }) }, [target, map])
+  return null
+}
 
 export default function FloodSimulationControl() {
   const [hazard, setHazard] = useState('flood') // 'flood' | 'landslide'
@@ -32,6 +56,8 @@ export default function FloodSimulationControl() {
   const [households, setHouseholds] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [selectedBarangay, setSelectedBarangay] = useState(null)
 
   const [expanded, setExpanded] = useState(null)
   const [residents, setResidents] = useState([])
@@ -73,6 +99,13 @@ export default function FloodSimulationControl() {
   const susceptKey = isFlood ? 'flood_susceptibility' : 'landslide_susceptibility'
   const atRiskHouseholds = households.filter(h => h[atRiskKey])
 
+  const barangaysWithCentroid = useMemo(() => barangays.map(b => {
+    if (!b.boundary_geojson) return { ...b, centroid: null }
+    try { return { ...b, centroid: getCentroid(JSON.parse(b.boundary_geojson)) } } catch { return { ...b, centroid: null } }
+  }), [barangays])
+
+  const filteredBarangays = barangaysWithCentroid.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
+
   const toggleFamily = (h) => {
     if (expanded === h.id) { setExpanded(null); return }
     setExpanded(h.id)
@@ -108,12 +141,20 @@ export default function FloodSimulationControl() {
         </button>
       </div>
 
-      {/* Flood-only manual water level input */}
+      {/* Flood-only manual water level input + PAGASA reference */}
       {isFlood && (
         <div className="card p-4">
-          <p className="text-xs text-gray-400 mb-3">
-            No public real-time water-level feed exists for Gingoog City's rivers — PAGASA's live telemetry only covers major dam/river systems. Report the observed level here, based on PAGASA advisories or local gauges.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <p className="text-xs text-gray-400 max-w-xl">
+              No confirmed public real-time water-level API exists for Gingoog City specifically. PAGASA's PANaHON network shows near real-time rainfall, temperature, and river water-level data nationwide — check it for the closest station to Gingoog, then report the observed level below.
+            </p>
+            <a
+              href="https://www.panahon.gov.ph/" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-1.5 flex-shrink-0"
+            >
+              <ExternalLink size={13} /> Open PAGASA PANaHON (Real-Time)
+            </a>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <input type="number" step="0.1" min="0" className="input w-32" placeholder="0.0" value={input} onChange={e => setInput(e.target.value)} />
             <span className="text-sm text-gray-500">meters</span>
@@ -139,26 +180,57 @@ export default function FloodSimulationControl() {
         </div>
       )}
 
-      {/* Map */}
-      <div className="card p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h3 className="font-semibold text-sm">{isFlood ? 'Flood' : 'Landslide'} Risk Map</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Red = at-risk barangay. Pins show household locations.</p>
+      {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:h-[520px]">
+        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto">
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
+            <input className="input text-sm" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <div className="card p-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
+            <div className="space-y-0.5 max-h-64 overflow-y-auto">
+              {filteredBarangays.map(b => (
+                <button
+                  key={b.id} onClick={() => setSelectedBarangay(b)}
+                  className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between ${
+                    selectedBarangay?.id === b.id ? 'bg-primary-100 text-primary-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <span>{b.name}</span>
+                  {b[susceptKey] === 'High' && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                </button>
+              ))}
+              {filteredBarangays.length === 0 && <p className="text-xs text-gray-400 py-2">No barangays found.</p>}
+            </div>
+          </div>
         </div>
-        <div className="h-[420px]">
+
+        <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-            {barangays.filter(b => b.boundary_geojson).map(b => {
+            {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
+
+            {barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
               let geo
               try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
               const atRisk = b[susceptKey] === 'High'
               const color = atRisk ? '#dc2626' : '#16a34a'
               return (
-                <GeoJSON key={b.id} data={geo} pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: atRisk ? 0.25 : 0.1 }}>
+                <GeoJSON
+                  key={b.id} data={geo}
+                  pathOptions={{ color, weight: 1.5, fillColor: color, fillOpacity: atRisk ? 0.25 : 0.1 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                >
                   <Tooltip sticky>{b.name}</Tooltip>
                 </GeoJSON>
               )
             })}
+
+            {barangaysWithCentroid.filter(b => b.centroid).map(b => (
+              <Marker key={`brgy-${b.id}`} position={b.centroid} icon={barangayIcon} eventHandlers={{ click: () => setSelectedBarangay(b) }} />
+            ))}
+
             {households.filter(h => h.latitude && h.longitude).map(h => (
               <Marker key={h.id} position={[h.latitude, h.longitude]} icon={h[atRiskKey] ? redPin : bluePin}>
                 <Popup><strong>{h.household_id}</strong> - {h.head_family}<br />{h[atRiskKey] ? `WARNING: Within high ${hazard}-risk zone` : 'Outside high-risk zone'}</Popup>
