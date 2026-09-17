@@ -13,6 +13,19 @@ L.Icon.Default.mergeOptions({
 
 const CENTER = [8.8231, 125.1109]
 
+// Official PAGASA color-coded rainfall warning thresholds (mm observed within
+// one hour). Used to automatically classify the live rain reading below —
+// this is the closest thing to a "real-time, automatic" flood early-warning
+// signal we can build for free, since PAGASA has no live water-level API for
+// Gingoog City specifically, but does publish these official rain thresholds.
+function getRainfallWarning(mm) {
+  if (mm == null) return null
+  if (mm > 30) return { level: 'Red', color: '#dc2626', bg: '#fef2f2', message: 'Torrential rain — severe flooding expected. Evacuation of low-lying and high-risk areas should begin.' }
+  if (mm >= 15) return { level: 'Orange', color: '#ea580c', bg: '#fff7ed', message: 'Intense rain — flooding is a real threat. Be ready for pre-emptive evacuation.' }
+  if (mm >= 7.5) return { level: 'Yellow', color: '#ca8a04', bg: '#fefce8', message: 'Heavy rain — flooding possible in low-lying areas. Monitor conditions closely.' }
+  return { level: 'None', color: '#16a34a', bg: '#f0fdf4', message: 'No heavy rainfall detected at this time.' }
+}
+
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors —
 // same palette as Hazard Map & Geofencing, matching the City of Gingoog CLUP
 // Landslide and Flood Susceptibility Map.
@@ -89,7 +102,13 @@ export default function FloodSimulationControl() {
       .finally(() => setLiveLoading(false))
   }
 
-  useEffect(() => { loadLiveData() }, [])
+  useEffect(() => {
+    loadLiveData()
+    // Auto-refresh so heavy rain gets tracked as it develops, without
+    // needing to manually press Refresh.
+    const interval = setInterval(loadLiveData, 5 * 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const load = () => {
     setLoading(true)
@@ -193,6 +212,22 @@ export default function FloodSimulationControl() {
           <p className="text-xs text-red-500">Could not load live data right now — try Refresh.</p>
         ) : (
           <>
+            {(() => {
+              const rainMm = liveWeather?.current?.rain
+              const warning = getRainfallWarning(rainMm)
+              if (!warning || warning.level === 'None') return null
+              return (
+                <div className="rounded-lg p-3 mb-3 flex items-start gap-2" style={{ backgroundColor: warning.bg, border: `1px solid ${warning.color}` }}>
+                  <AlertTriangle size={16} style={{ color: warning.color }} className="flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: warning.color }}>
+                      {warning.level} Rainfall Warning (auto-detected, PAGASA thresholds) — {rainMm} mm/hr
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">{warning.message} Consider reporting an updated flood water level below.</p>
+                  </div>
+                </div>
+              )
+            })()}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-blue-50 rounded-lg p-2 text-center">
                 <p className="text-lg font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
@@ -204,7 +239,7 @@ export default function FloodSimulationControl() {
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              Source: Open-Meteo (rainfall/temperature) and GloFAS/Open-Meteo Flood API (river discharge). River discharge is volume flow (m³/s), not water depth — use it as a reference trend, not a direct meters reading, when estimating the level below.
+              Source: Open-Meteo (rainfall/temperature) and GloFAS/Open-Meteo Flood API (river discharge). River discharge is volume flow (m³/s), not water depth — use it as a reference trend, not a direct meters reading, when estimating the level below. Rainfall warning levels follow PAGASA's official color-coded thresholds (Yellow 7.5-15mm/hr, Orange 15-30mm/hr, Red &gt;30mm/hr).
             </p>
           </>
         )}
