@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shield, ArrowLeft } from 'lucide-react'
-
-const STEPS = ['email', 'otp', 'reset', 'done']
+import { apiPost } from '../../utils/api'
 
 export default function ForgotPassword() {
   const [step, setStep] = useState('email')
@@ -12,28 +11,50 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const fakeAsync = (cb) => { setLoading(true); setTimeout(() => { setLoading(false); cb() }, 800) }
-
-  const sendOTP = (e) => {
+  const sendOTP = async (e) => {
     e.preventDefault()
     if (!email) { setError('Enter your email address.'); return }
     setError('')
-    fakeAsync(() => setStep('otp'))
+    setLoading(true)
+    try {
+      await apiPost('/auth/forgot-password', { email })
+      setStep('otp')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const verifyOTP = (e) => {
+  const verifyOTP = async (e) => {
     e.preventDefault()
     if (otp.length < 6) { setError('Enter the 6-digit OTP.'); return }
     setError('')
-    fakeAsync(() => setStep('reset'))
+    setLoading(true)
+    try {
+      await apiPost('/auth/verify-otp', { email, otp })
+      setStep('reset')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const resetPassword = (e) => {
+  const resetPassword = async (e) => {
     e.preventDefault()
     if (passwords.newPassword.length < 8) { setError('Password must be at least 8 characters.'); return }
     if (passwords.newPassword !== passwords.confirm) { setError('Passwords do not match.'); return }
     setError('')
-    fakeAsync(() => setStep('done'))
+    setLoading(true)
+    try {
+      await apiPost('/auth/reset-password', { email, otp, newPassword: passwords.newPassword })
+      setStep('done')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -73,7 +94,7 @@ export default function ForgotPassword() {
           {step === 'otp' && (
             <>
               <h2 className="text-xl font-semibold mb-1">Enter OTP</h2>
-              <p className="text-sm text-gray-500 mb-6">A 6-digit code was sent to <strong>{email}</strong>.</p>
+              <p className="text-sm text-gray-500 mb-6">A 6-digit code was sent to <strong>{email}</strong>. Check your inbox (and spam folder).</p>
               <form onSubmit={verifyOTP} className="space-y-4">
                 <div>
                   <label className="label">One-Time Password</label>
