@@ -64,9 +64,9 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Purok','Barangay','Flood Risk','Flood Threshold (m)','Landslide Risk','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Purok', ...(canAdd ? [] : ['Barangay']), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={6} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={canAdd ? 4 : 5} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -87,24 +87,26 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok','Barangay','Flood Risk','Flood Threshold (m)','Landslide Risk','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(canAdd ? [] : ['Barangay']), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{p.name}</td>
-                  <td className="table-cell">{p.barangay_name || '—'}</td>
+                  {!canAdd && <td className="table-cell">{p.barangay_name || '—'}</td>}
                   <td className="table-cell"><span className={RISK[p.flood_risk] || 'badge-gray'}>{p.flood_risk}</span></td>
                   <td className="table-cell text-center">{p.flood_threshold_m} m</td>
                   <td className="table-cell"><span className={RISK[p.landslide_risk] || 'badge-gray'}>{p.landslide_risk}</span></td>
-                  <td className="table-cell">
-                    <div className="flex gap-2">
-                      <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(p)}><Pencil size={15} /></button>
-                      <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(p.id)}><Trash2 size={15} /></button>
-                    </div>
-                  </td>
+                  {canAdd && (
+                    <td className="table-cell">
+                      <div className="flex gap-2">
+                        <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(p)}><Pencil size={15} /></button>
+                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(p.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={canAdd ? 4 : 5} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
             </tbody>
           </table>
         </div>
