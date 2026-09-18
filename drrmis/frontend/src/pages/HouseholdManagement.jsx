@@ -35,7 +35,7 @@ function FitToBarangayBoundary({ geojsonLayer, hasPin }) {
   return null
 }
 
-const emptyForm = { barangay_id: '', purok_id: '', head_family: '', contact: '', latitude: '', longitude: '' }
+const emptyForm = { barangay_id: '', purok_id: '', head_family: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
@@ -75,7 +75,7 @@ export default function HouseholdManagement({ currentUser }) {
     setEditing(h.id)
     setForm({
       barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_family: h.head_family || '',
-      contact: h.contact || '', latitude: h.latitude || '', longitude: h.longitude || '',
+      latitude: h.latitude || '', longitude: h.longitude || '',
     })
     setShowModal(true)
   }
@@ -107,7 +107,7 @@ export default function HouseholdManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Contact'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
           <tbody><SkeletonTableRows columns={canAdd ? 4 : 5} rows={5} /></tbody>
         </table>
@@ -132,7 +132,7 @@ export default function HouseholdManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Contact', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(h => (
@@ -144,7 +144,6 @@ export default function HouseholdManagement({ currentUser }) {
                     {h.in_flood_risk_zone && <span className="badge-red text-xs ml-2">High Risk</span>}
                   </td>
                   <td className="table-cell font-medium">{h.head_family}</td>
-                  <td className="table-cell">{h.contact}</td>
                   {canAdd && (
                     <td className="table-cell">
                       <div className="flex gap-2">
@@ -155,7 +154,7 @@ export default function HouseholdManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={5} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={4} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -185,9 +184,8 @@ export default function HouseholdManagement({ currentUser }) {
                 <div className="col-span-2">
                   <label className="label">Head of Family</label>
                   <input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} />
-                  <p className="text-xs text-gray-400 mt-1">Add the head's birthdate and other family members in Resident Management.</p>
+                  <p className="text-xs text-gray-400 mt-1">Add the head's birthdate, contact number, and other family members in Resident Management.</p>
                 </div>
-                <div><label className="label">Contact</label><input className="input" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} /></div>
                 <div className="col-span-2">
                   <label className="label flex items-center gap-1.5"><MapPin size={14} /> Household Location</label>
                   <p className="text-xs text-gray-400 mb-2">Click on the map below at exactly where this family lives.</p>

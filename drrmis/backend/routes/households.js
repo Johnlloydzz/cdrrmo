@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
 // POST /api/households
 router.post('/', async (req, res) => {
   try {
-    const { purok_id, head_family, latitude, longitude, contact } = req.body
+    const { purok_id, head_family, latitude, longitude } = req.body
     // Barangay Officials can only register households under their own barangay,
     // regardless of what barangay_id is sent in the request body.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.body.barangay_id
@@ -55,8 +55,8 @@ router.post('/', async (req, res) => {
     const count = await get('SELECT COUNT(*) as c FROM households')
     const household_id = `HH-${String((count?.c || 0) + 1).padStart(5, '0')}`
     const result = await run(
-      `INSERT INTO households (household_id, barangay_id, purok_id, head_family, latitude, longitude, contact) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [household_id, barangay_id, purok_id, head_family, latitude || null, longitude || null, contact || null]
+      `INSERT INTO households (household_id, barangay_id, purok_id, head_family, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)`,
+      [household_id, barangay_id, purok_id, head_family, latitude || null, longitude || null]
     )
     const newRow = await get('SELECT * FROM households WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -73,10 +73,10 @@ router.put('/:id', async (req, res) => {
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
     }
-    const { head_family, latitude, longitude, contact, purok_id } = req.body
+    const { head_family, latitude, longitude, purok_id } = req.body
     await run(
-      `UPDATE households SET head_family=?, latitude=?, longitude=?, contact=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [head_family, latitude, longitude, contact, purok_id, req.params.id]
+      `UPDATE households SET head_family=?, latitude=?, longitude=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+      [head_family, latitude, longitude, purok_id, req.params.id]
     )
     const updated = await get('SELECT * FROM households WHERE id = ?', [req.params.id])
     res.json(updated)
