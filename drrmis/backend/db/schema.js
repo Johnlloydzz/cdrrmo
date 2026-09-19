@@ -107,6 +107,23 @@ const tables = [
     created_at  TEXT    DEFAULT (datetime('now', '+8 hours')),
     updated_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
+
+  // ── Password Reset Requests (User Management Module) — a manual fallback
+  // for "Forgot Password" when a Barangay Official can't rely on the OTP
+  // email (e.g. before a verified sending domain is in place). CDRRMO
+  // Personnel reviews these in User Management and resets the account's
+  // password themselves, then relays the new password to the official
+  // outside the system (call, text, in person). This table never stores
+  // the new password itself.
+  `CREATE TABLE IF NOT EXISTS password_reset_requests (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message     TEXT,
+    status      TEXT    NOT NULL DEFAULT 'Pending',   -- Pending / Resolved
+    reviewed_by INTEGER REFERENCES users(id),
+    created_at  TEXT    DEFAULT (datetime('now', '+8 hours')),
+    updated_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
+  )`,
 ]
 
 module.exports = tables

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
 
@@ -11,6 +11,7 @@ export default function UserManagement() {
   const [users, setUsers] = useState([])
   const [barangays, setBarangays] = useState([])
   const [requests, setRequests] = useState([])
+  const [pwRequests, setPwRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -20,16 +21,19 @@ export default function UserManagement() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [fromRequestId, setFromRequestId] = useState(null)
+  const [fromPwRequestId, setFromPwRequestId] = useState(null)
 
   const load = () => { setLoading(true); apiGet('/users').then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false)) }
   const loadRequests = () => apiGet('/account-requests?status=Pending').then(setRequests).catch(() => {})
+  const loadPwRequests = () => apiGet('/password-reset-requests?status=Pending').then(setPwRequests).catch(() => {})
   useEffect(() => {
     load()
     loadRequests()
+    loadPwRequests()
     apiGet('/barangays').then(setBarangays).catch(() => {})
     // Poll for live online/offline status — no manual refresh needed while
     // this page stays open, e.g. during a live demo.
-    const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}); loadRequests() }, 15000)
+    const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}); loadRequests(); loadPwRequests() }, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -38,6 +42,7 @@ export default function UserManagement() {
   const openFromRequest = (r) => {
     setEditing(null)
     setFromRequestId(r.id)
+    setFromPwRequestId(null)
     setForm({ ...emptyForm, name: r.name, email: r.email, role: 'Barangay Official', barangay_id: r.barangay_id })
     setShowModal(true)
   }
@@ -55,18 +60,41 @@ export default function UserManagement() {
     try { await apiPut(`/account-requests/${id}/reject`, {}); loadRequests() } catch (err) { alert(err.message) }
   }
 
+  // A "can't receive OTP" request, opened straight into Edit User with the
+  // password field ready — CDRRMO types the new password by hand, then
+  // relays it to the official outside the system (call, text, in person).
+  const openResetPassword = (r) => {
+    setFromRequestId(null)
+    setFromPwRequestId(r.id)
+    setEditing(r.user_id)
+    setForm({
+      name: r.user_name, username: r.username, email: r.email, password: '',
+      role: r.role, barangay_id: '', status: 'Active',
+    })
+    apiGet(`/users/${r.user_id}`).then(u => setForm(f => ({ ...f, barangay_id: u.barangay_id || '', status: u.status }))).catch(() => {})
+    setShowModal(true)
+  }
+
+  const dismissPwRequest = async (id) => {
+    if (!window.confirm('Dismiss this request without resetting the password?')) return
+    try { await apiPut(`/password-reset-requests/${id}/resolve`, {}); loadPwRequests() } catch (err) { alert(err.message) }
+  }
+
   const filtered = users.filter(u =>
     ((u.name || '').toLowerCase().includes(search.toLowerCase()) || (u.username || '').toLowerCase().includes(search.toLowerCase())) &&
     (filterRole === 'All' || u.role === filterRole)
   )
 
-  const openAdd = () => { setEditing(null); setFromRequestId(null); setForm(emptyForm); setShowModal(true) }
-  const openEdit = (u) => { setEditing(u.id); setForm({ ...u, barangay_id: u.barangay_id || '', password: '' }); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setFromRequestId(null); setFromPwRequestId(null); setForm(emptyForm); setShowModal(true) }
+  const openEdit = (u) => { setEditing(u.id); setFromRequestId(null); setFromPwRequestId(null); setForm({ ...u, barangay_id: u.barangay_id || '', password: '' }); setShowModal(true) }
   const handleDelete = async (id) => { if (!window.confirm('Delete this user account?')) return; try { await apiDelete(`/users/${id}`); load() } catch (err) { alert(err.message) } }
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.username.trim() || !form.email.trim() || (!editing && !form.password.trim())) {
       alert('Name, username, email, and password are required.'); return
+    }
+    if (fromPwRequestId && !form.password.trim()) {
+      alert('Enter a new password for this account.'); return
     }
     if (form.role === 'Barangay Official' && !form.barangay_id) {
       alert('Barangay Officials must be assigned to a barangay.'); return
@@ -74,13 +102,18 @@ export default function UserManagement() {
     setSaving(true)
     try {
       if (editing) {
-        await apiPut(`/users/${editing}`, { name: form.name, email: form.email, role: form.role, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null, status: form.status })
+        const payload = { name: form.name, email: form.email, role: form.role, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null, status: form.status }
+        if (form.password.trim()) payload.password = form.password
+        await apiPut(`/users/${editing}`, payload)
+        if (fromPwRequestId) await apiPut(`/password-reset-requests/${fromPwRequestId}/resolve`, {})
       } else {
         await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
       }
       setShowModal(false)
       setFromRequestId(null)
+      setFromPwRequestId(null)
       load()
+      loadPwRequests()
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
@@ -125,6 +158,34 @@ export default function UserManagement() {
                   </button>
                   <button className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5" onClick={() => approveRequest(r)}>
                     <Check size={13} /> Approve &amp; Create Account
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pwRequests.length > 0 && (
+        <div className="card p-0 overflow-hidden border-amber-200">
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+            <KeyRound size={15} className="text-amber-600" />
+            <h3 className="text-sm font-semibold text-amber-800">Password Reset Requests ({pwRequests.length})</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {pwRequests.map(r => (
+              <div key={r.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{r.user_name} <span className="text-gray-400 font-normal">— {r.barangay_name || r.role}</span></p>
+                  <p className="text-xs text-gray-500 font-mono">{r.username} · {r.email}</p>
+                  {r.message && <p className="text-xs text-gray-400 mt-0.5 italic">"{r.message}"</p>}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button className="btn-secondary text-xs flex items-center gap-1 px-3 py-1.5" onClick={() => dismissPwRequest(r.id)}>
+                    <X size={13} /> Dismiss
+                  </button>
+                  <button className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5" onClick={() => openResetPassword(r)}>
+                    <KeyRound size={13} /> Reset Password
                   </button>
                 </div>
               </div>
@@ -201,12 +262,18 @@ export default function UserManagement() {
             {fromRequestId && !editing && (
               <p className="text-xs text-primary-600 mb-4">Prefilled from an approved account request. Set a username and password to finish.</p>
             )}
-            {!fromRequestId && <div className="mb-5" />}
+            {fromPwRequestId && (
+              <p className="text-xs text-primary-600 mb-4">Resetting this account's password. Type a new one below, then relay it to the official yourself.</p>
+            )}
+            {!fromRequestId && !fromPwRequestId && <div className="mb-5" />}
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">Full Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
               <div><label className="label">Username</label><input className="input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} disabled={!!editing} /></div>
               <div className="col-span-2"><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-              {!editing && (<div className="col-span-2"><label className="label">Password</label><input className="input" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} /></div>)}
+              <div className="col-span-2">
+                <label className="label">{editing ? 'New Password' : 'Password'} {editing && !fromPwRequestId && <span className="text-gray-400 font-normal">(leave blank to keep current)</span>}</label>
+                <input className="input" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder={editing ? 'Leave blank to keep current password' : ''} />
+              </div>
               <div><label className="label">Role</label><select className="input" value={form.role} onChange={e => setForm({...form, role: e.target.value})}>{ROLES.map(r => <option key={r}>{r}</option>)}</select></div>
               <div>
                 <label className="label">Barangay {form.role === 'Barangay Official' && <span className="text-red-500">*</span>}</label>
@@ -218,7 +285,7 @@ export default function UserManagement() {
               <div className="col-span-2"><label className="label">Status</label><select className="input" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>{['Active','Inactive','Suspended'].map(s => <option key={s}>{s}</option>)}</select></div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button className="btn-secondary" onClick={() => { setShowModal(false); setFromRequestId(null) }} disabled={saving}>Cancel</button>
+              <button className="btn-secondary" onClick={() => { setShowModal(false); setFromRequestId(null); setFromPwRequestId(null) }} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add User')}</button>
             </div>
           </div>

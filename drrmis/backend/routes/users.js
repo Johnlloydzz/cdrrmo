@@ -47,11 +47,19 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
 
 router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
-    const { name, email, role, barangay_id, status } = req.body
-    await run(
-      `UPDATE users SET name=?, email=?, role=?, barangay_id=?, status=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [name, email, role, barangay_id, status, req.params.id]
-    )
+    const { name, email, role, barangay_id, status, password } = req.body
+    if (password && password.trim()) {
+      const hash = await bcrypt.hash(password, 12)
+      await run(
+        `UPDATE users SET name=?, email=?, role=?, barangay_id=?, status=?, password_hash=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+        [name, email, role, barangay_id, status, hash, req.params.id]
+      )
+    } else {
+      await run(
+        `UPDATE users SET name=?, email=?, role=?, barangay_id=?, status=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+        [name, email, role, barangay_id, status, req.params.id]
+      )
+    }
     res.json(await get('SELECT id, name, username, email, role, barangay_id, status FROM users WHERE id = ?', [req.params.id]))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

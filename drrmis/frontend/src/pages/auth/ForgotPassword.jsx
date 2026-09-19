@@ -88,6 +88,9 @@ export default function ForgotPassword() {
                 </div>
                 <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Sending…' : 'Send OTP'}</button>
               </form>
+              <p className="text-center text-xs text-gray-500 mt-4">
+                Can't receive the code? <Link to="/request-password-reset" className="text-primary-600 font-medium hover:text-primary-800">Request a manual reset</Link>
+              </p>
             </>
           )}
 
