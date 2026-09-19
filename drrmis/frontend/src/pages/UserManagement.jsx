@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound, Copy } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
 
@@ -22,6 +22,8 @@ export default function UserManagement() {
   const [form, setForm] = useState(emptyForm)
   const [fromRequestId, setFromRequestId] = useState(null)
   const [fromPwRequestId, setFromPwRequestId] = useState(null)
+  const [resetSuccess, setResetSuccess] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   const load = () => { setLoading(true); apiGet('/users').then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false)) }
   const loadRequests = () => apiGet('/account-requests?status=Pending').then(setRequests).catch(() => {})
@@ -105,7 +107,13 @@ export default function UserManagement() {
         const payload = { name: form.name, email: form.email, role: form.role, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null, status: form.status }
         if (form.password.trim()) payload.password = form.password
         await apiPut(`/users/${editing}`, payload)
-        if (fromPwRequestId) await apiPut(`/password-reset-requests/${fromPwRequestId}/resolve`, {})
+        if (fromPwRequestId) {
+          await apiPut(`/password-reset-requests/${fromPwRequestId}/resolve`, {})
+          // Show the new password on screen so CDRRMO can relay it to the
+          // official themselves (call, text, Viber, in person) — nothing
+          // else in this flow ever displays it again after this.
+          setResetSuccess({ name: form.name, username: form.username, password: form.password })
+        }
       } else {
         await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
       }
@@ -288,6 +296,39 @@ export default function UserManagement() {
               <button className="btn-secondary" onClick={() => { setShowModal(false); setFromRequestId(null); setFromPwRequestId(null) }} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add User')}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {resetSuccess && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <KeyRound size={18} className="text-primary-600" />
+              <h3 className="text-lg font-semibold">Password Reset</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Send this new password to <strong>{resetSuccess.name}</strong> yourself — call, text, Viber, or in person. This is the only time it will be shown.
+            </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
+              <p className="text-xs text-gray-500 mb-1">Username</p>
+              <p className="font-mono text-sm text-gray-800">{resetSuccess.username}</p>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">New Password</p>
+                <p className="font-mono text-lg font-semibold text-gray-900 tracking-wide">{resetSuccess.password}</p>
+              </div>
+              <button
+                type="button"
+                className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 flex-shrink-0"
+                onClick={() => { navigator.clipboard.writeText(resetSuccess.password); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+                title="Copy password"
+              >
+                {copied ? <Check size={17} className="text-green-600" /> : <Copy size={17} />}
+              </button>
+            </div>
+            <button className="btn-primary w-full mt-5" onClick={() => { setResetSuccess(null); setCopied(false) }}>Done</button>
           </div>
         </div>
       )}
