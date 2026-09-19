@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2, UserCog } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
 
@@ -10,6 +10,7 @@ const emptyForm = { name: '', username: '', email: '', password: '', role: 'CDRR
 export default function UserManagement() {
   const [users, setUsers] = useState([])
   const [barangays, setBarangays] = useState([])
+  const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -18,23 +19,48 @@ export default function UserManagement() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [fromRequestId, setFromRequestId] = useState(null)
 
   const load = () => { setLoading(true); apiGet('/users').then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false)) }
+  const loadRequests = () => apiGet('/account-requests?status=Pending').then(setRequests).catch(() => {})
   useEffect(() => {
     load()
+    loadRequests()
     apiGet('/barangays').then(setBarangays).catch(() => {})
     // Poll for live online/offline status — no manual refresh needed while
     // this page stays open, e.g. during a live demo.
-    const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}) }, 15000)
+    const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}); loadRequests() }, 15000)
     return () => clearInterval(interval)
   }, [])
+
+  // A Barangay Official's account request, approved into a prefilled Add
+  // User form — CDRRMO still picks the username/password by hand.
+  const openFromRequest = (r) => {
+    setEditing(null)
+    setFromRequestId(r.id)
+    setForm({ ...emptyForm, name: r.name, email: r.email, role: 'Barangay Official', barangay_id: r.barangay_id })
+    setShowModal(true)
+  }
+
+  const approveRequest = async (r) => {
+    try {
+      await apiPut(`/account-requests/${r.id}/approve`, {})
+      loadRequests()
+      openFromRequest(r)
+    } catch (err) { alert(err.message) }
+  }
+
+  const rejectRequest = async (id) => {
+    if (!window.confirm('Reject this account request?')) return
+    try { await apiPut(`/account-requests/${id}/reject`, {}); loadRequests() } catch (err) { alert(err.message) }
+  }
 
   const filtered = users.filter(u =>
     ((u.name || '').toLowerCase().includes(search.toLowerCase()) || (u.username || '').toLowerCase().includes(search.toLowerCase())) &&
     (filterRole === 'All' || u.role === filterRole)
   )
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setFromRequestId(null); setForm(emptyForm); setShowModal(true) }
   const openEdit = (u) => { setEditing(u.id); setForm({ ...u, barangay_id: u.barangay_id || '', password: '' }); setShowModal(true) }
   const handleDelete = async (id) => { if (!window.confirm('Delete this user account?')) return; try { await apiDelete(`/users/${id}`); load() } catch (err) { alert(err.message) } }
 
@@ -53,6 +79,7 @@ export default function UserManagement() {
         await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
       }
       setShowModal(false)
+      setFromRequestId(null)
       load()
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
@@ -78,6 +105,34 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-4">
+      {requests.length > 0 && (
+        <div className="card p-0 overflow-hidden border-amber-200">
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
+            <Inbox size={15} className="text-amber-600" />
+            <h3 className="text-sm font-semibold text-amber-800">Pending Account Requests ({requests.length})</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {requests.map(r => (
+              <div key={r.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{r.name} <span className="text-gray-400 font-normal">— {r.barangay_name}</span></p>
+                  <p className="text-xs text-gray-500">{r.email}{r.contact ? ` · ${r.contact}` : ''}{r.position ? ` · ${r.position}` : ''}</p>
+                  {r.message && <p className="text-xs text-gray-400 mt-0.5 italic">"{r.message}"</p>}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button className="btn-secondary text-xs flex items-center gap-1 px-3 py-1.5" onClick={() => rejectRequest(r.id)}>
+                    <X size={13} /> Reject
+                  </button>
+                  <button className="btn-primary text-xs flex items-center gap-1 px-3 py-1.5" onClick={() => approveRequest(r)}>
+                    <Check size={13} /> Approve &amp; Create Account
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card p-4 flex flex-wrap gap-3 items-center justify-between">
         <div className="flex gap-3 flex-wrap flex-1">
           <div className="relative flex-1 min-w-48">
@@ -142,7 +197,11 @@ export default function UserManagement() {
       {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit User' : 'Add User'}</h3>
+            <h3 className="text-lg font-semibold mb-1">{editing ? 'Edit User' : 'Add User'}</h3>
+            {fromRequestId && !editing && (
+              <p className="text-xs text-primary-600 mb-4">Prefilled from an approved account request. Set a username and password to finish.</p>
+            )}
+            {!fromRequestId && <div className="mb-5" />}
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">Full Name</label><input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
               <div><label className="label">Username</label><input className="input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} disabled={!!editing} /></div>
@@ -159,7 +218,7 @@ export default function UserManagement() {
               <div className="col-span-2"><label className="label">Status</label><select className="input" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>{['Active','Inactive','Suspended'].map(s => <option key={s}>{s}</option>)}</select></div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
+              <button className="btn-secondary" onClick={() => { setShowModal(false); setFromRequestId(null) }} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save Changes' : 'Add User')}</button>
             </div>
           </div>

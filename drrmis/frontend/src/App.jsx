@@ -4,6 +4,7 @@ import { Suspense, lazy, useMemo, useState } from 'react'
 import MainLayout        from './layouts/MainLayout'
 import RoleGuard         from './components/RoleGuard'
 import Login             from './pages/auth/Login'
+import RequestAccount    from './pages/auth/RequestAccount'
 import ForgotPassword    from './pages/auth/ForgotPassword'
 import ChangePassword    from './pages/auth/ChangePassword'
 import Unauthorized      from './pages/Unauthorized'
@@ -60,6 +61,7 @@ function App() {
           element={currentUser ? <Navigate to={defaultRouteFor(currentUser)} replace /> : <Login onLogin={handleLogin} />}
         />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/request-account" element={<RequestAccount />} />
 
         {/* Fullscreen "big screen" display mode for the Flood Simulation
             Control — same page, same login/role requirement, but rendered

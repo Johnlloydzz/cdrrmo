@@ -1,0 +1,113 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { Shield, ArrowLeft } from 'lucide-react'
+import { apiGet, apiPost } from '../../utils/api'
+
+const emptyForm = { name: '', email: '', contact: '', barangay_id: '', position: '', message: '' }
+
+export default function RequestAccount() {
+  const [barangays, setBarangays] = useState([])
+  const [form, setForm] = useState(emptyForm)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  useEffect(() => { apiGet('/account-requests/barangays').then(setBarangays).catch(() => {}) }, [])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!form.name.trim() || !form.email.trim() || !form.barangay_id) {
+      setError('Name, email, and barangay are required.')
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      await apiPost('/account-requests', form)
+      setDone(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center p-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg mb-4">
+            <Shield size={32} className="text-primary-700" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">PDRA</h1>
+          <p className="text-blue-200 text-sm mt-1">Gingoog City CDRRMO</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          <Link to="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5">
+            <ArrowLeft size={14} /> Back to Login
+          </Link>
+
+          {!done ? (
+            <>
+              <h2 className="text-xl font-semibold mb-1">Request an Account</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                For Barangay Officials only. Fill this out and CDRRMO will create your account for your barangay.
+              </p>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+              )}
+
+              <form onSubmit={submit} className="space-y-4">
+                <div>
+                  <label className="label">Full Name</label>
+                  <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Juan Dela Cruz" />
+                </div>
+                <div>
+                  <label className="label">Email Address</label>
+                  <input className="input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
+                </div>
+                <div>
+                  <label className="label">Contact Number</label>
+                  <input className="input" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="09XXXXXXXXX" />
+                </div>
+                <div>
+                  <label className="label">Barangay</label>
+                  <select className="input" value={form.barangay_id} onChange={e => setForm({ ...form, barangay_id: e.target.value })}>
+                    <option value="">Select your barangay…</option>
+                    {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Position (optional)</label>
+                  <input className="input" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} placeholder="e.g. Barangay Secretary" />
+                </div>
+                <div>
+                  <label className="label">Message (optional)</label>
+                  <textarea className="input" rows={3} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Anything CDRRMO should know…" />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary w-full">
+                  {loading ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </form>
+            </>
+          ) : (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Request Sent!</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                CDRRMO will review your request and reach out to <strong>{form.email}</strong> once your account is ready.
+              </p>
+              <Link to="/login" className="btn-primary inline-block">Back to Login</Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

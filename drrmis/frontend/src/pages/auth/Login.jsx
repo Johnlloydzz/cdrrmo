@@ -249,7 +249,10 @@ export default function Login({ onLogin }) {
 
                 <div className="border-t border-gray-100 mt-6 pt-4 text-center">
                   <p className="text-sm text-gray-500">
-                    Don't have an account? <span className="text-primary-600 font-medium">Contact CDRRMO office</span>
+                    Don't have an account?{' '}
+                    <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800">
+                      Request one
+                    </Link>
                   </p>
                 </div>
               </>

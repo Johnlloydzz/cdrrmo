@@ -88,6 +88,25 @@ const tables = [
     used       INTEGER DEFAULT 0,
     created_at TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
+
+  // ── Account Requests (User Management Module) — a Barangay Official with
+  // no account yet submits this from the public "Request Account" page.
+  // CDRRMO Personnel review it in User Management and, on approval, manually
+  // create the actual account (username/password) using this info as
+  // reference — this table never stores login credentials itself.
+  `CREATE TABLE IF NOT EXISTS account_requests (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    email       TEXT    NOT NULL,
+    contact     TEXT,
+    barangay_id INTEGER NOT NULL REFERENCES barangays(id),
+    position    TEXT,
+    message     TEXT,
+    status      TEXT    NOT NULL DEFAULT 'Pending',   -- Pending / Approved / Rejected
+    reviewed_by INTEGER REFERENCES users(id),
+    created_at  TEXT    DEFAULT (datetime('now', '+8 hours')),
+    updated_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
+  )`,
 ]
 
 module.exports = tables
