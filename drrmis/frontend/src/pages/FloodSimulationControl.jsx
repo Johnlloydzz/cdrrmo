@@ -444,56 +444,6 @@ export default function FloodSimulationControl() {
           </MapContainer>
         </div>
       </div>
-
-      {/* At-risk households/residents list */}
-      <div className="card p-0 overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h3 className="font-semibold text-sm">Registered Households in High {isFlood ? 'Flood' : 'Landslide'}-Risk Zones ({atRiskHouseholds.length})</h3>
-        </div>
-        <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
-          {atRiskHouseholds.length === 0 ? (
-            <p className="text-center text-gray-400 py-8 text-sm">No households currently at risk for this hazard.</p>
-          ) : atRiskHouseholds.map(h => (
-            <div key={h.id}>
-              <button type="button" onClick={() => toggleFamily(h)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left">
-                <span>
-                  <span className="block font-medium text-gray-800 text-sm">{h.head_family}</span>
-                  <span className="block text-xs text-gray-400">{h.household_id} - {h.barangay_name || '—'} - {h.purok_name || '—'}</span>
-                </span>
-                <span className="text-xs text-primary-600 flex-shrink-0">{expanded === h.id ? 'Hide ▲' : 'Residents ▼'}</span>
-              </button>
-              {expanded === h.id && (
-                <div className="bg-gray-50 px-4 py-3">
-                  {residentsLoading ? (
-                    <p className="text-xs text-gray-400">Loading residents…</p>
-                  ) : residents.length === 0 ? (
-                    <p className="text-xs text-gray-400">No residents recorded yet.</p>
-                  ) : (
-                    <table className="w-full text-xs">
-                      <thead><tr className="text-gray-400"><th className="text-left font-medium py-1">Name</th><th className="text-left font-medium py-1">Relation</th><th className="text-left font-medium py-1">Birthdate</th></tr></thead>
-                      <tbody>
-                        {residents.map(r => (
-                          <tr key={r.id} className="border-t border-gray-200">
-                            <td className="py-1.5 text-gray-700">{r.name}</td>
-                            <td className="py-1.5 text-gray-500">{r.relation_to_head}</td>
-                            <td className="py-1.5 text-gray-500">{r.birthdate}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-xs text-gray-400">
-        {isFlood
-          ? <>Algorithm: for each purok, <code className="bg-gray-100 px-1 rounded">at_risk = reported_level_m &ge; purok.flood_threshold_m</code>.</>
-          : <>Algorithm: a household is at-risk when its purok's official landslide susceptibility classification is "High".</>}
-      </p>
     </div>
   )
 }
