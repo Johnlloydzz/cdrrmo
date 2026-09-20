@@ -45,7 +45,7 @@ export default function RequestPasswordReset() {
             <>
               <h2 className="text-base font-semibold mb-0.5">Request a Password Reset</h2>
               <p className="text-xs text-gray-500 mb-3">
-                Can't receive the OTP email? CDRRMO will reset your password directly and reach out to you.
+                CDRRMO will reset your password directly and reach out to you with the new one.
               </p>
 
               {error && (
