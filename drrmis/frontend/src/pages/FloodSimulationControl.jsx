@@ -235,115 +235,6 @@ export default function FloodSimulationControl() {
         </button>
       </div>
 
-      {/* Simulation controls — manual water level input and live weather/
-          river reference data. Collapsed by default so the map (with
-          affected barangays already color-coded) is what's seen first. */}
-      <div className="card p-0 overflow-hidden flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setShowControls(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-            <Settings2 size={15} className="text-gray-400" /> Simulation Controls & Live Data
-            {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m</span>}
-            {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
-          </span>
-          <ChevronDown size={16} className={`text-gray-400 transition-transform ${showControls ? 'rotate-180' : ''}`} />
-        </button>
-
-        {showControls && (
-          <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
-            {/* Live reference data for Gingoog City — real-time rainfall and
-                river discharge, fetched directly from Open-Meteo (free, no key). */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Live Reference — Gingoog City ({CENTER[0]}, {CENTER[1]})
-                </h3>
-                <button type="button" onClick={loadLiveData} className="text-xs text-primary-600 hover:text-primary-800">Refresh</button>
-              </div>
-              {liveLoading ? (
-                <p className="text-xs text-gray-400">Loading live data…</p>
-              ) : liveError ? (
-                <p className="text-xs text-red-500">Could not load live data right now — try Refresh.</p>
-              ) : (
-                <>
-                  {(() => {
-                    const rainMm = liveWeather?.current?.rain
-                    const warning = getRainfallWarning(rainMm)
-                    if (!warning || warning.level === 'None') return null
-                    return (
-                      <div className="rounded-lg p-3 mb-3 flex items-start gap-2" style={{ backgroundColor: warning.bg, border: `1px solid ${warning.color}` }}>
-                        <AlertTriangle size={16} style={{ color: warning.color }} className="flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: warning.color }}>
-                            {warning.level} Rainfall Warning (auto-detected, PAGASA thresholds) — {rainMm} mm/hr
-                          </p>
-                          <p className="text-xs text-gray-600 mt-0.5">{warning.message} Consider reporting an updated flood water level below.</p>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-blue-50 rounded-lg p-2 text-center">
-                      <p className="text-lg font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
-                      <p className="text-[10px] text-gray-500 uppercase">Current Rain</p>
-                    </div>
-                    <div className="bg-amber-50 rounded-lg p-2 text-center">
-                      <p className="text-lg font-bold text-amber-700">{liveFlood?.daily?.river_discharge?.[0] ?? '—'} m³/s</p>
-                      <p className="text-[10px] text-gray-500 uppercase">River Discharge Today</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Source: Open-Meteo (rainfall/temperature) and GloFAS/Open-Meteo Flood API (river discharge). River discharge is volume flow (m³/s), not water depth — use it as a reference trend, not a direct meters reading, when estimating the level below. Rainfall warning levels follow PAGASA's official color-coded thresholds (Yellow 7.5-15mm/hr, Orange 15-30mm/hr, Red &gt;30mm/hr).
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Flood-only manual water level input */}
-            {isFlood ? (
-              <div className="border-t border-gray-100 pt-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input type="number" step="0.1" min="0" className="input w-32" placeholder="0.0" value={input} onChange={e => setInput(e.target.value)} />
-                  <span className="text-sm text-gray-500">meters</span>
-                  <button className="btn-primary text-sm px-4 py-2" onClick={handleUpdate} disabled={saving}>{saving ? 'Updating…' : 'Update'}</button>
-                  {floodLevel > 0 && <button className="btn-secondary text-sm px-4 py-2" onClick={handleReset} disabled={saving}>Reset to Normal</button>}
-                </div>
-                {floodLevel > 0 ? (
-                  <p className="text-sm text-red-600 font-medium mt-3 flex items-start gap-2">
-                    <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-                    Manually-reported level: <strong className="mx-1">{floodLevel} m</strong>
-                    — puroks with a threshold at or below this are now at-risk citywide.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-500 mt-3">No manually-reported flood level — puroks fall back to auto-detect (below) or the official CDRA classification.</p>
-                )}
-                {updatedAt && <p className="text-xs text-gray-400 mt-1">Last updated: {updatedAt}</p>}
-
-                {autoFloodedBarangayNames.length > 0 && (
-                  <p className="text-sm text-red-600 font-medium mt-3 flex items-start gap-2 pt-3 border-t border-gray-100">
-                    <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-                    Auto-detected flooding in: <strong className="mx-1">{autoFloodedBarangayNames.join(', ')}</strong> — these barangays' at-risk puroks are flagged automatically; the rest of the city is unaffected.
-                  </p>
-                )}
-                <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
-                  <strong>Auto-detect:</strong> a scheduled server-side check (runs every ~10 minutes, even with this page closed) checks each barangay's own local rain AND the city's river discharge — only a barangay with sustained heavy rain (PAGASA Red, &gt;30mm/hr) while discharge is well above normal (50%+) gets automatically flagged, not the whole city at once. It never overrides a level you set by hand above.
-                </p>
-              </div>
-            ) : (
-              <div className="border-t border-gray-100 pt-4">
-                <p className="text-sm text-gray-500">
-                  Landslide risk has no continuously measured value like flood depth, so this view always shows the official CDRA landslide susceptibility classification (no manual input needed).
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
       <div className={`flex flex-col lg:flex-row gap-4 ${isDisplayMode ? 'flex-1 min-h-0' : 'lg:h-[520px]'}`}>
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto lg:order-2">
@@ -373,26 +264,119 @@ export default function FloodSimulationControl() {
             </div>
           </div>
 
-          <div className="card p-4">
-            <h3 className="font-semibold text-sm mb-3">Legend</h3>
-            <div className="space-y-2">
-              {isFlood ? (
-                <>
-                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: FLOOD_COLOR.High }} />High Susceptibility of Flooding</div>
-                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: FLOOD_COLOR.Low }} />Low Susceptibility of Flooding</div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: LANDSLIDE_COLOR.High }} />High Susceptibility to Landslide</div>
-                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: LANDSLIDE_COLOR.Moderate }} />Moderate Susceptibility to Landslide</div>
-                  <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: LANDSLIDE_COLOR.Low }} />Low Susceptibility to Landslide</div>
-                </>
-              )}
-              <div className="border-t border-gray-100 my-2" />
-              <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full flex-shrink-0 bg-red-600" />Household — High Risk Zone</div>
-              <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full flex-shrink-0 bg-blue-600" />Household — Outside High-Risk Zone</div>
-              <div className="flex items-center gap-2 text-xs"><span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#0ea5e9' }} />Selected Barangay Boundary</div>
-            </div>
+          {/* Simulation controls — manual water level input and live weather/
+              river reference data. Collapsed by default so the map (with
+              affected barangays already color-coded) is what's seen first.
+              Lives here in the sidebar instead of a full-width bar at the
+              top, so the map is what's immediately visible on page load. */}
+          <div className="card p-0 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowControls(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Settings2 size={15} className="text-gray-400 flex-shrink-0" />
+                <span>Simulation Controls</span>
+              </span>
+              <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${showControls ? 'rotate-180' : ''}`} />
+            </button>
+            {(floodLevel > 0 || autoFloodedIds.length > 0) && (
+              <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+                {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m</span>}
+                {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
+              </div>
+            )}
+
+            {showControls && (
+              <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-4">
+                {/* Live reference data for Gingoog City — real-time rainfall
+                    and river discharge, fetched directly from Open-Meteo. */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-xs flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                      Live Reference
+                    </h3>
+                    <button type="button" onClick={loadLiveData} className="text-xs text-primary-600 hover:text-primary-800">Refresh</button>
+                  </div>
+                  {liveLoading ? (
+                    <p className="text-xs text-gray-400">Loading live data…</p>
+                  ) : liveError ? (
+                    <p className="text-xs text-red-500">Could not load live data right now.</p>
+                  ) : (
+                    <>
+                      {(() => {
+                        const rainMm = liveWeather?.current?.rain
+                        const warning = getRainfallWarning(rainMm)
+                        if (!warning || warning.level === 'None') return null
+                        return (
+                          <div className="rounded-lg p-2 mb-2 flex items-start gap-2" style={{ backgroundColor: warning.bg, border: `1px solid ${warning.color}` }}>
+                            <AlertTriangle size={14} style={{ color: warning.color }} className="flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs font-semibold" style={{ color: warning.color }}>
+                                {warning.level} Rainfall Warning — {rainMm} mm/hr
+                              </p>
+                              <p className="text-[11px] text-gray-600 mt-0.5">{warning.message}</p>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
+                          <p className="text-[9px] text-gray-500 uppercase">Current Rain</p>
+                        </div>
+                        <div className="bg-amber-50 rounded-lg p-2 text-center">
+                          <p className="text-sm font-bold text-amber-700">{liveFlood?.daily?.river_discharge?.[0] ?? '—'} m³/s</p>
+                          <p className="text-[9px] text-gray-500 uppercase">Discharge</p>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-2">
+                        Source: Open-Meteo &amp; GloFAS. Discharge is volume flow, not water depth — a reference trend only.
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {/* Flood-only manual water level input */}
+                {isFlood ? (
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input type="number" step="0.1" min="0" className="input w-24 py-1.5 text-sm" placeholder="0.0" value={input} onChange={e => setInput(e.target.value)} />
+                      <span className="text-xs text-gray-500">meters</span>
+                      <button className="btn-primary text-xs px-3 py-1.5" onClick={handleUpdate} disabled={saving}>{saving ? 'Updating…' : 'Update'}</button>
+                    </div>
+                    {floodLevel > 0 && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving}>Reset to Normal</button>}
+                    {floodLevel > 0 ? (
+                      <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5">
+                        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+                        Manual level: <strong className="mx-1">{floodLevel} m</strong> — citywide.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-2">No manual level — using auto-detect or CDRA classification.</p>
+                    )}
+                    {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
+
+                    {autoFloodedBarangayNames.length > 0 && (
+                      <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
+                        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+                        Auto-detected in: <strong className="mx-1">{autoFloodedBarangayNames.join(', ')}</strong>
+                      </p>
+                    )}
+                    <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100">
+                      <strong>Auto-detect:</strong> server-side check every ~10 min — flags a barangay only when its own rain is PAGASA Red (&gt;30mm/hr) AND citywide river discharge is 50%+ above normal.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-xs text-gray-500">
+                      Landslide risk has no continuous measured value — this always uses the official CDRA classification.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
