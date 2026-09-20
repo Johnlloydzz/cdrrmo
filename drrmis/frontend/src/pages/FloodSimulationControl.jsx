@@ -89,6 +89,11 @@ export default function FloodSimulationControl() {
   const [showControls, setShowControls] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
 
+  const barangaysWithCentroid = useMemo(() => barangays.map(b => {
+    if (!b.boundary_geojson) return { ...b, centroid: null }
+    try { return { ...b, centroid: getCentroid(JSON.parse(b.boundary_geojson)) } } catch { return { ...b, centroid: null } }
+  }), [barangays])
+
   // Live reference data for Gingoog City — Open-Meteo's weather forecast
   // (current rainfall) and Global Flood API (GloFAS river discharge), both
   // free, no API key, CORS-enabled, and fetched directly from the browser.
@@ -97,31 +102,57 @@ export default function FloodSimulationControl() {
   const [liveLoading, setLiveLoading] = useState(true)
   const [liveError, setLiveError] = useState(false)
 
+  // Per-barangay current rainfall (mm), keyed by barangay id — fetched in
+  // one batched Open-Meteo call using every barangay's boundary centroid.
+  // This is what lets auto-detect flag only the specific barangay(s)
+  // actually getting heavy rain, instead of the whole city at once.
+  const [barangayRain, setBarangayRain] = useState({})
+  const [autoFloodedIds, setAutoFloodedIds] = useState([])
+
   const loadLiveData = () => {
     setLiveLoading(true)
     setLiveError(false)
+    const withCentroid = barangaysWithCentroid.filter(b => b.centroid)
+    const lats = withCentroid.map(b => b.centroid[0]).join(',')
+    const lngs = withCentroid.map(b => b.centroid[1]).join(',')
+
     Promise.all([
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&timezone=Asia%2FManila`).then(r => r.json()),
       // past_days=30 gives us a recent-normal baseline to compare today's
       // discharge against, since GloFAS discharge is river-specific — there's
       // no universal "high" number, only "high relative to this river lately."
       fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json()),
+      // One batched call for every barangay's current rainfall — Open-Meteo
+      // accepts comma-separated coordinates and returns one result per point,
+      // in the same order, instead of needing 40+ separate requests.
+      withCentroid.length > 0
+        ? fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=rain&timezone=Asia%2FManila`).then(r => r.json())
+        : Promise.resolve(null),
     ])
-      .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood) })
+      .then(([weather, flood, perBarangay]) => {
+        setLiveWeather(weather); setLiveFlood(flood)
+        if (Array.isArray(perBarangay)) {
+          const map = {}
+          withCentroid.forEach((b, i) => { map[b.id] = perBarangay[i]?.current?.rain ?? null })
+          setBarangayRain(map)
+        }
+      })
       .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false))
   }
 
   useEffect(() => {
+    if (barangaysWithCentroid.length === 0) return
     loadLiveData()
     // Auto-refresh so heavy rain gets tracked as it develops, without
     // needing to manually press Refresh.
     const interval = setInterval(loadLiveData, 5 * 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [barangaysWithCentroid.length])
 
   // Today's discharge vs. the last 30 days' average for this same river
-  // point — how many times "normal" it currently is.
+  // point — how many times "normal" it currently is. Used as a city-wide
+  // gate: the broader river system, not any one barangay's rainfall.
   const dischargeRatio = useMemo(() => {
     const daily = liveFlood?.daily?.river_discharge
     if (!daily || daily.length < 4) return null
@@ -132,36 +163,37 @@ export default function FloodSimulationControl() {
     return today / baseline
   }, [liveFlood])
 
-  // Conservative auto-detect: BOTH sustained heavy rain (PAGASA Red, >30mm/hr)
-  // AND river discharge well above its recent normal (50%+) must hold before
-  // the system reports a flood on its own — reduces false alarms compared to
-  // using either signal alone. This never overrides a level CDRRMO Personnel
-  // set by hand; it only raises the level from 0, and only ever lowers a
-  // level it raised itself once conditions clear.
+  // Conservative auto-detect, evaluated per barangay: a barangay only gets
+  // flagged when BOTH its own local rain crosses PAGASA Red (>30mm/hr) AND
+  // the city's river discharge is well above normal (50%+) at the same
+  // time — reduces false alarms vs. using either signal alone, and keeps
+  // the flag scoped to the specific area actually getting heavy rain rather
+  // than the whole city. This never touches a manually-reported level.
   useEffect(() => {
-    const rainMm = liveWeather?.current?.rain
-    const conditionsMet = rainMm != null && rainMm > 30 && dischargeRatio != null && dischargeRatio >= 1.5
-
-    if (conditionsMet && floodLevel === 0) {
-      apiPut('/settings/flood-level', { level_m: 1, source: 'auto' })
-        .then(() => { setFloodLevel(1); setFloodSource('auto'); setInput('1'); setUpdatedAt(new Date().toISOString()) })
-        .catch(() => {})
-    } else if (!conditionsMet && floodSource === 'auto' && floodLevel > 0) {
-      apiPut('/settings/flood-level', { level_m: 0, source: 'auto' })
-        .then(() => { setFloodLevel(0); setFloodSource('auto'); setInput('0'); setUpdatedAt(new Date().toISOString()) })
+    if (dischargeRatio == null || Object.keys(barangayRain).length === 0) return
+    const gateOpen = dischargeRatio >= 1.5
+    const qualifying = gateOpen
+      ? Object.entries(barangayRain).filter(([, mm]) => mm != null && mm > 30).map(([id]) => parseInt(id))
+      : []
+    const changed = qualifying.length !== autoFloodedIds.length || qualifying.some(id => !autoFloodedIds.includes(id))
+    if (changed) {
+      apiPut('/settings/auto-flood-barangays', { barangay_ids: qualifying })
+        .then(() => setAutoFloodedIds(qualifying))
         .catch(() => {})
     }
-  }, [liveWeather, dischargeRatio, floodLevel, floodSource])
+  }, [barangayRain, dischargeRatio])
 
   const load = () => {
     setLoading(true)
     Promise.all([
       apiGet('/settings/flood-level'),
+      apiGet('/settings/auto-flood-barangays'),
       apiGet('/barangays'),
       apiGet('/households'),
     ])
-      .then(([fl, b, h]) => {
+      .then(([fl, af, b, h]) => {
         setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
+        setAutoFloodedIds(af.barangay_ids || [])
         setBarangays(b); setHouseholds(h)
       })
       .finally(() => setLoading(false))
@@ -189,10 +221,7 @@ export default function FloodSimulationControl() {
   const susceptKey = isFlood ? 'flood_susceptibility' : 'landslide_susceptibility'
   const atRiskHouseholds = households.filter(h => h[atRiskKey])
 
-  const barangaysWithCentroid = useMemo(() => barangays.map(b => {
-    if (!b.boundary_geojson) return { ...b, centroid: null }
-    try { return { ...b, centroid: getCentroid(JSON.parse(b.boundary_geojson)) } } catch { return { ...b, centroid: null } }
-  }), [barangays])
+  const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name)
 
   const filteredBarangays = barangaysWithCentroid.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -250,7 +279,8 @@ export default function FloodSimulationControl() {
         >
           <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
             <Settings2 size={15} className="text-gray-400" /> Simulation Controls & Live Data
-            {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m{floodSource === 'auto' ? ' (auto)' : ''}</span>}
+            {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m</span>}
+            {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
           </span>
           <ChevronDown size={16} className={`text-gray-400 transition-transform ${showControls ? 'rotate-180' : ''}`} />
         </button>
@@ -318,16 +348,22 @@ export default function FloodSimulationControl() {
                 {floodLevel > 0 ? (
                   <p className="text-sm text-red-600 font-medium mt-3 flex items-start gap-2">
                     <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-                    Active simulation: reported level is <strong className="mx-1">{floodLevel} m</strong>
-                    {floodSource === 'auto' && <span className="badge-red text-[10px] mr-1 align-middle">Auto-detected</span>}
-                    — puroks with a threshold at or below this are now at-risk.
+                    Manually-reported level: <strong className="mx-1">{floodLevel} m</strong>
+                    — puroks with a threshold at or below this are now at-risk citywide.
                   </p>
                 ) : (
-                  <p className="text-sm text-gray-500 mt-3">No active flood event reported — using the official CDRA flood susceptibility classification.</p>
+                  <p className="text-sm text-gray-500 mt-3">No manually-reported flood level — puroks fall back to auto-detect (below) or the official CDRA classification.</p>
                 )}
                 {updatedAt && <p className="text-xs text-gray-400 mt-1">Last updated: {updatedAt}</p>}
+
+                {autoFloodedBarangayNames.length > 0 && (
+                  <p className="text-sm text-red-600 font-medium mt-3 flex items-start gap-2 pt-3 border-t border-gray-100">
+                    <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                    Auto-detected flooding in: <strong className="mx-1">{autoFloodedBarangayNames.join(', ')}</strong> — these barangays' at-risk puroks are flagged automatically; the rest of the city is unaffected.
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
-                  <strong>Auto-detect:</strong> the system automatically reports 1m and marks puroks at-risk when BOTH sustained heavy rain (PAGASA Red, &gt;30mm/hr) AND river discharge are well above normal (50%+) at the same time — a conservative check meant to reduce false alarms. It never overrides a level you set by hand.
+                  <strong>Auto-detect:</strong> for each barangay, the system checks its own local rain AND the city's river discharge — only a barangay with sustained heavy rain (PAGASA Red, &gt;30mm/hr) while discharge is well above normal (50%+) gets automatically flagged, not the whole city at once. It never overrides a level you set by hand above.
                 </p>
               </div>
             ) : (

@@ -15,13 +15,32 @@ router.use(authenticate)
 //   static official CDRA classification (flood_risk = 'High').
 router.get('/summary', async (req, res) => {
   try {
-    const levelRow = await get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m'])
+    const [levelRow, sourceRow, autoRow] = await Promise.all([
+      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
+      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
+      get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
+    ])
     const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
+    const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
+    let autoBarangayIds = []
+    try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
 
-    const atRiskCondition = floodLevel > 0
-      ? `? >= p.flood_threshold_m`
-      : `p.flood_risk = 'High'`
-    const atRiskParams = floodLevel > 0 ? [floodLevel] : []
+    // Same priority as /api/households: manual citywide level first, then
+    // auto-detect's per-barangay list (only those specific barangays get
+    // the dynamic 1m check — everyone else uses the static classification),
+    // then the static classification for everyone if neither is active.
+    let atRiskCondition, atRiskParams
+    if (manualActive) {
+      atRiskCondition = `? >= p.flood_threshold_m`
+      atRiskParams = [floodLevel]
+    } else if (autoBarangayIds.length > 0) {
+      const placeholders = autoBarangayIds.map(() => '?').join(',')
+      atRiskCondition = `(CASE WHEN b.id IN (${placeholders}) THEN 1 >= p.flood_threshold_m ELSE p.flood_risk = 'High' END)`
+      atRiskParams = [...autoBarangayIds]
+    } else {
+      atRiskCondition = `p.flood_risk = 'High'`
+      atRiskParams = []
+    }
 
     const rows = await all(`
       SELECT

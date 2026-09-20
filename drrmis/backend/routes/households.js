@@ -23,17 +23,31 @@ router.get('/', async (req, res) => {
     if (at_risk === '1') { sql += " AND p.flood_risk = 'High'" }
     const rows = await all(sql, params)
 
-    // Same dynamic-vs-static logic as /api/risk-assessment/summary: if a
-    // flood water level has been manually reported, use it to compute
-    // real-time at-risk status; otherwise fall back to the static CDRA
-    // classification (flood_risk = 'High').
-    const levelRow = await get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m'])
+    // Real-time at-risk status, in priority order:
+    //  1. A manually-reported citywide flood level (CDRRMO typed a number) —
+    //     applies everywhere, compared against each purok's own threshold.
+    //  2. Auto-detect's per-barangay list — only barangays where local rain
+    //     actually crossed PAGASA Red AND river discharge is elevated get
+    //     treated as a 1m flood event; every other barangay is unaffected by
+    //     auto-detect even while it's active elsewhere in the city.
+    //  3. Otherwise, fall back to the static CDRA susceptibility classification.
+    const [levelRow, sourceRow, autoRow] = await Promise.all([
+      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
+      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
+      get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
+    ])
     const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
+    const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
+    let autoBarangayIds = []
+    try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
+
     const withRisk = rows.map(h => ({
       ...h,
-      in_flood_risk_zone: floodLevel > 0
+      in_flood_risk_zone: manualActive
         ? floodLevel >= h.flood_threshold_m
-        : h.purok_flood_risk === 'High',
+        : autoBarangayIds.includes(h.barangay_id)
+          ? 1 >= h.flood_threshold_m
+          : h.purok_flood_risk === 'High',
       // Landslide has no continuous measured value like flood depth — it
       // always uses the static official CDRA classification.
       in_landslide_risk_zone: h.purok_landslide_risk === 'High',

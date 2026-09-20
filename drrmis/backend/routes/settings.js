@@ -52,4 +52,37 @@ router.put('/flood-level', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// GET /api/settings/auto-flood-barangays — the set of barangays the
+// per-barangay auto-detect currently considers flooded (each barangay's own
+// local rainfall crossed PAGASA Red AND the city's river discharge is well
+// above normal at the same time). Barangays NOT in this list fall back to
+// their static CDRA classification — auto-detect only marks the specific
+// area actually experiencing heavy rain, not the whole city at once.
+router.get('/auto-flood-barangays', async (req, res) => {
+  try {
+    const row = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids'])
+    let barangay_ids = []
+    try { barangay_ids = row ? JSON.parse(row.value) : [] } catch { barangay_ids = [] }
+    res.json({ barangay_ids })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// PUT /api/settings/auto-flood-barangays — replaces the whole list. Called
+// by the Flood Simulation Control page's own background check (running
+// under the signed-in CDRRMO Personnel's session), not typed by hand.
+router.put('/auto-flood-barangays', async (req, res) => {
+  try {
+    if (req.user.role !== 'CDRRMO Personnel') {
+      return res.status(403).json({ error: 'Only CDRRMO Personnel can update this.' })
+    }
+    const ids = Array.isArray(req.body.barangay_ids) ? req.body.barangay_ids.filter(n => Number.isInteger(n)) : []
+    await run(
+      `INSERT INTO system_settings (key, value, updated_at) VALUES ('auto_flooded_barangay_ids', ?, datetime('now', '+8 hours'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [JSON.stringify(ids)]
+    )
+    res.json({ barangay_ids: ids })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 module.exports = router
