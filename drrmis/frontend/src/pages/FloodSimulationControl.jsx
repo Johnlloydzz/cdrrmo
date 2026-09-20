@@ -179,7 +179,7 @@ export default function FloodSimulationControl() {
           <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>
         </div>
         <a
-          href="/flood-control/display" target="_blank" rel="noopener noreferrer"
+          href="/flood-control/display" target="pdra-bigscreen-display" rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
         >
           <ExternalLink size={13} /> Open Big-Screen Display Mode
