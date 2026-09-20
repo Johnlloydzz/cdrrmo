@@ -301,7 +301,7 @@ export default function FloodSimulationControl() {
 
       {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
       <div className="flex flex-col lg:flex-row gap-4 lg:h-[520px]">
-        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto">
+        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto lg:order-2">
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
@@ -351,7 +351,7 @@ export default function FloodSimulationControl() {
           </div>
         </div>
 
-        <div className="flood-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200">
+        <div className="flood-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 lg:order-1">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
