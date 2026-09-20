@@ -233,6 +233,12 @@ export default function FloodSimulationControl() {
         >
           <Mountain size={isDisplayMode ? 13 : 16} /> Landslide
         </button>
+        {isDisplayMode && (floodLevel > 0 || autoFloodedIds.length > 0) && (
+          <div className="flex items-center flex-wrap gap-1.5 ml-2">
+            {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m</span>}
+            {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
+          </div>
+        )}
       </div>
 
       {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
@@ -268,7 +274,13 @@ export default function FloodSimulationControl() {
               river reference data. Collapsed by default so the map (with
               affected barangays already color-coded) is what's seen first.
               Lives here in the sidebar instead of a full-width bar at the
-              top, so the map is what's immediately visible on page load. */}
+              top, so the map is what's immediately visible on page load.
+              Hidden entirely in Display Mode — that view is for passive
+              wall-mounted viewing, not editing, and this expandable panel
+              is tall enough (once opened) to make the sidebar scroll, which
+              a fixed wall display shouldn't do. The compact status badges
+              near the hazard toggle above cover what a viewer needs to see. */}
+          {!isDisplayMode && (
           <div className="card p-0 overflow-hidden">
             <button
               type="button"
@@ -378,6 +390,7 @@ export default function FloodSimulationControl() {
               </div>
             )}
           </div>
+          )}
         </div>
 
         <div className="flood-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 lg:order-1">
