@@ -276,7 +276,7 @@ export default function GISMap() {
   return (
     <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-140px)] lg:min-h-96">
       {/* Left panel */}
-      <div className="w-full lg:w-72 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto order-2 lg:order-1">
+      <div className="w-full lg:w-72 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto order-2 lg:order-2">
         {/* Search */}
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
@@ -515,7 +515,7 @@ export default function GISMap() {
       </div>
 
       {/* Map */}
-      <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-2">
+      <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-1">
         <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
           <TileLayer
             key={activeLayer}
