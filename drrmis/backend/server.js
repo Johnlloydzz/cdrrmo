@@ -13,6 +13,8 @@ const accountRequestRoutes = require('./routes/accountRequests')
 const passwordResetRequestRoutes = require('./routes/passwordResetRequests')
 const riskAssessmentRoutes = require('./routes/riskAssessment')
 const settingsRoutes       = require('./routes/settings')
+const internalRoutes       = require('./routes/internal')
+const cron                 = require('node-cron')
 
 const { initDb } = require('./db/database')
 
@@ -61,6 +63,7 @@ app.use('/api/account-requests', accountRequestRoutes)
 app.use('/api/password-reset-requests', passwordResetRequestRoutes)
 app.use('/api/risk-assessment', riskAssessmentRoutes)
 app.use('/api/settings',        settingsRoutes)
+app.use('/api/internal',        internalRoutes)
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
@@ -77,6 +80,17 @@ app.use((err, _req, res, _next) => {
 // ── Start ────────────────────────────────────────────────────────────────────
 initDb().then(() => {
   app.listen(PORT, () => console.log(`PDRA API running on http://localhost:${PORT}`))
+
+  // Pure-JS scheduled job (no external service, no YAML workflow) — runs
+  // the flood auto-detect check every 10 minutes for as long as this
+  // server process stays awake. Render's free tier can put the service to
+  // sleep after ~15 minutes with no incoming requests, in which case this
+  // simply pauses until the next real visitor wakes it back up.
+  cron.schedule('*/10 * * * *', () => {
+    internalRoutes.runFloodAutoDetectCheck()
+      .then(result => console.log('[flood-check]', JSON.stringify(result)))
+      .catch(err => console.error('[flood-check] failed:', err.message))
+  })
 }).catch(err => {
   console.error('Failed to initialize database:', err)
   process.exit(1)
