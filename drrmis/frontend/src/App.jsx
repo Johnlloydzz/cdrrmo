@@ -5,7 +5,6 @@ import MainLayout        from './layouts/MainLayout'
 import RoleGuard         from './components/RoleGuard'
 import Login             from './pages/auth/Login'
 import RequestAccount    from './pages/auth/RequestAccount'
-import ForgotPassword    from './pages/auth/ForgotPassword'
 import RequestPasswordReset from './pages/auth/RequestPasswordReset'
 import ChangePassword    from './pages/auth/ChangePassword'
 import Unauthorized      from './pages/Unauthorized'
@@ -61,7 +60,6 @@ function App() {
           path="/login"
           element={currentUser ? <Navigate to={defaultRouteFor(currentUser)} replace /> : <Login onLogin={handleLogin} />}
         />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/request-password-reset" element={<RequestPasswordReset />} />
         <Route path="/request-account" element={<RequestAccount />} />
 
