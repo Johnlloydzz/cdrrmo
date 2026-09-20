@@ -4,21 +4,32 @@ const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
 
-// GET /api/settings/flood-level — the current manually-reported flood water
-// level (meters). 0 means "no active flood event" — in that state, at-risk
-// status falls back to the official static CDRA classification instead.
+// GET /api/settings/flood-level — the current flood water level (meters).
+// 0 means "no active flood event" — falls back to the official static CDRA
+// classification. `source` says who set the active level: 'manual' (CDRRMO
+// typed it in) or 'auto' (the system's conservative auto-detect — sustained
+// heavy rainfall AND river discharge well above its recent normal — set it).
+// Auto-detect only ever raises a level from 0, and only ever lowers a level
+// it set itself; a manually-set level is never touched by auto-detect.
 router.get('/flood-level', async (req, res) => {
   try {
-    const row = await get('SELECT value, updated_at FROM system_settings WHERE key = ?', ['current_flood_level_m'])
-    res.json({ level_m: row ? parseFloat(row.value) : 0, updated_at: row?.updated_at || null })
+    const [levelRow, sourceRow] = await Promise.all([
+      get('SELECT value, updated_at FROM system_settings WHERE key = ?', ['current_flood_level_m']),
+      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
+    ])
+    res.json({
+      level_m: levelRow ? parseFloat(levelRow.value) : 0,
+      updated_at: levelRow?.updated_at || null,
+      source: sourceRow?.value || 'manual',
+    })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// PUT /api/settings/flood-level — CDRRMO Personnel only. They monitor
-// PAGASA's flood advisories / local river & rain gauges themselves (no
-// public real-time API exists for Gingoog City specifically) and report the
-// observed water level here, which immediately drives the Dashboard's
-// at-risk household/population figures.
+// PUT /api/settings/flood-level — body: { level_m, source? }. CDRRMO
+// Personnel only (this covers both the manual "Update" button, which omits
+// source and defaults to 'manual', and the page's own background
+// auto-detect check, which passes source: 'auto' while acting under the
+// signed-in CDRRMO Personnel's own session).
 router.put('/flood-level', async (req, res) => {
   try {
     if (req.user.role !== 'CDRRMO Personnel') {
@@ -26,12 +37,18 @@ router.put('/flood-level', async (req, res) => {
     }
     const level = parseFloat(req.body.level_m)
     if (isNaN(level) || level < 0) return res.status(400).json({ error: 'level_m must be a non-negative number' })
+    const source = req.body.source === 'auto' ? 'auto' : 'manual'
     await run(
       `INSERT INTO system_settings (key, value, updated_at) VALUES ('current_flood_level_m', ?, datetime('now', '+8 hours'))
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
       [String(level)]
     )
-    res.json({ level_m: level })
+    await run(
+      `INSERT INTO system_settings (key, value, updated_at) VALUES ('current_flood_level_source', ?, datetime('now', '+8 hours'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [source]
+    )
+    res.json({ level_m: level, source })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

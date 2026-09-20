@@ -68,6 +68,7 @@ export default function FloodSimulationControl() {
   const [hazard, setHazard] = useState('flood') // 'flood' | 'landslide'
 
   const [floodLevel, setFloodLevel] = useState(0)
+  const [floodSource, setFloodSource] = useState('manual')
   const [input, setInput] = useState('')
   const [updatedAt, setUpdatedAt] = useState(null)
 
@@ -101,7 +102,10 @@ export default function FloodSimulationControl() {
     setLiveError(false)
     Promise.all([
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&timezone=Asia%2FManila`).then(r => r.json()),
-      fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3`).then(r => r.json()),
+      // past_days=30 gives us a recent-normal baseline to compare today's
+      // discharge against, since GloFAS discharge is river-specific — there's
+      // no universal "high" number, only "high relative to this river lately."
+      fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json()),
     ])
       .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood) })
       .catch(() => setLiveError(true))
@@ -116,6 +120,39 @@ export default function FloodSimulationControl() {
     return () => clearInterval(interval)
   }, [])
 
+  // Today's discharge vs. the last 30 days' average for this same river
+  // point — how many times "normal" it currently is.
+  const dischargeRatio = useMemo(() => {
+    const daily = liveFlood?.daily?.river_discharge
+    if (!daily || daily.length < 4) return null
+    const past = daily.slice(0, daily.length - 3) // exclude the 3 forecast days
+    const baseline = past.reduce((sum, v) => sum + (v ?? 0), 0) / past.length
+    const today = daily[past.length]
+    if (!baseline || today == null) return null
+    return today / baseline
+  }, [liveFlood])
+
+  // Conservative auto-detect: BOTH sustained heavy rain (PAGASA Red, >30mm/hr)
+  // AND river discharge well above its recent normal (50%+) must hold before
+  // the system reports a flood on its own — reduces false alarms compared to
+  // using either signal alone. This never overrides a level CDRRMO Personnel
+  // set by hand; it only raises the level from 0, and only ever lowers a
+  // level it raised itself once conditions clear.
+  useEffect(() => {
+    const rainMm = liveWeather?.current?.rain
+    const conditionsMet = rainMm != null && rainMm > 30 && dischargeRatio != null && dischargeRatio >= 1.5
+
+    if (conditionsMet && floodLevel === 0) {
+      apiPut('/settings/flood-level', { level_m: 1, source: 'auto' })
+        .then(() => { setFloodLevel(1); setFloodSource('auto'); setInput('1'); setUpdatedAt(new Date().toISOString()) })
+        .catch(() => {})
+    } else if (!conditionsMet && floodSource === 'auto' && floodLevel > 0) {
+      apiPut('/settings/flood-level', { level_m: 0, source: 'auto' })
+        .then(() => { setFloodLevel(0); setFloodSource('auto'); setInput('0'); setUpdatedAt(new Date().toISOString()) })
+        .catch(() => {})
+    }
+  }, [liveWeather, dischargeRatio, floodLevel, floodSource])
+
   const load = () => {
     setLoading(true)
     Promise.all([
@@ -124,7 +161,7 @@ export default function FloodSimulationControl() {
       apiGet('/households'),
     ])
       .then(([fl, b, h]) => {
-        setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at)
+        setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
         setBarangays(b); setHouseholds(h)
       })
       .finally(() => setLoading(false))
@@ -136,14 +173,14 @@ export default function FloodSimulationControl() {
     const level = parseFloat(input)
     if (isNaN(level) || level < 0) { alert('Enter a valid, non-negative number of meters.'); return }
     setSaving(true)
-    try { await apiPut('/settings/flood-level', { level_m: level }); load() }
+    try { await apiPut('/settings/flood-level', { level_m: level, source: 'manual' }); load() }
     catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
   const handleReset = async () => {
     if (!window.confirm('Reset to normal? This clears the active flood simulation and returns to the official CDRA classification.')) return
     setSaving(true)
-    try { await apiPut('/settings/flood-level', { level_m: 0 }); load() }
+    try { await apiPut('/settings/flood-level', { level_m: 0, source: 'manual' }); load() }
     catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
@@ -213,7 +250,7 @@ export default function FloodSimulationControl() {
         >
           <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
             <Settings2 size={15} className="text-gray-400" /> Simulation Controls & Live Data
-            {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m</span>}
+            {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m{floodSource === 'auto' ? ' (auto)' : ''}</span>}
           </span>
           <ChevronDown size={16} className={`text-gray-400 transition-transform ${showControls ? 'rotate-180' : ''}`} />
         </button>
@@ -281,12 +318,17 @@ export default function FloodSimulationControl() {
                 {floodLevel > 0 ? (
                   <p className="text-sm text-red-600 font-medium mt-3 flex items-start gap-2">
                     <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-                    Active simulation: reported level is <strong className="mx-1">{floodLevel} m</strong> — puroks with a threshold at or below this are now at-risk.
+                    Active simulation: reported level is <strong className="mx-1">{floodLevel} m</strong>
+                    {floodSource === 'auto' && <span className="badge-red text-[10px] mr-1 align-middle">Auto-detected</span>}
+                    — puroks with a threshold at or below this are now at-risk.
                   </p>
                 ) : (
                   <p className="text-sm text-gray-500 mt-3">No active flood event reported — using the official CDRA flood susceptibility classification.</p>
                 )}
                 {updatedAt && <p className="text-xs text-gray-400 mt-1">Last updated: {updatedAt}</p>}
+                <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100">
+                  <strong>Auto-detect:</strong> the system automatically reports 1m and marks puroks at-risk when BOTH sustained heavy rain (PAGASA Red, &gt;30mm/hr) AND river discharge are well above normal (50%+) at the same time — a conservative check meant to reduce false alarms. It never overrides a level you set by hand.
+                </p>
               </div>
             ) : (
               <div className="border-t border-gray-100 pt-4">
