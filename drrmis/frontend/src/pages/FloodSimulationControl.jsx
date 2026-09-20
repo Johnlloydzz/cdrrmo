@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2 } from 'lucide-react'
@@ -65,6 +66,7 @@ function FlyToBarangay({ target }) {
 }
 
 export default function FloodSimulationControl() {
+  const isDisplayMode = useLocation().pathname === '/flood-control/display'
   const [hazard, setHazard] = useState('flood') // 'flood' | 'landslide'
 
   const [floodLevel, setFloodLevel] = useState(0)
@@ -198,43 +200,45 @@ export default function FloodSimulationControl() {
   if (loading) return <div className="card p-10 text-center text-gray-400">Loading…</div>
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+    <div className={isDisplayMode ? 'h-screen w-full overflow-hidden flex flex-col p-3 gap-2' : 'space-y-4'}>
+      <div className="flex items-start justify-between gap-3 flex-wrap flex-shrink-0">
         <div>
-          <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-            {isFlood ? <Waves size={20} className="text-blue-500" /> : <Mountain size={20} className="text-amber-600" />}
+          <h1 className={`font-semibold text-gray-800 flex items-center gap-2 ${isDisplayMode ? 'text-base' : 'text-xl'}`}>
+            {isFlood ? <Waves size={isDisplayMode ? 16 : 20} className="text-blue-500" /> : <Mountain size={isDisplayMode ? 16 : 20} className="text-amber-600" />}
             Flood & Landslide Simulation Control
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>
+          {!isDisplayMode && <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>}
         </div>
-        <a
-          href="/flood-control/display" target="pdra-bigscreen-display" rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
-        >
-          <ExternalLink size={13} /> Open Big-Screen Display Mode
-        </a>
+        {!isDisplayMode && (
+          <a
+            href="/flood-control/display" target="pdra-bigscreen-display" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
+          >
+            <ExternalLink size={13} /> Open Big-Screen Display Mode
+          </a>
+        )}
       </div>
 
       {/* Hazard type toggle */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-shrink-0">
         <button
           type="button" onClick={() => setHazard('flood')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border ${isFlood ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          className={`flex items-center gap-2 rounded-lg font-medium border ${isDisplayMode ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} ${isFlood ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
         >
-          <Waves size={16} /> Flood
+          <Waves size={isDisplayMode ? 13 : 16} /> Flood
         </button>
         <button
           type="button" onClick={() => setHazard('landslide')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border ${!isFlood ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          className={`flex items-center gap-2 rounded-lg font-medium border ${isDisplayMode ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} ${!isFlood ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
         >
-          <Mountain size={16} /> Landslide
+          <Mountain size={isDisplayMode ? 13 : 16} /> Landslide
         </button>
       </div>
 
       {/* Simulation controls — manual water level input and live weather/
           river reference data. Collapsed by default so the map (with
           affected barangays already color-coded) is what's seen first. */}
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-hidden flex-shrink-0">
         <button
           type="button"
           onClick={() => setShowControls(v => !v)}
@@ -341,7 +345,7 @@ export default function FloodSimulationControl() {
       </div>
 
       {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
-      <div className="flex flex-col lg:flex-row gap-4 lg:h-[520px]">
+      <div className={`flex flex-col lg:flex-row gap-4 ${isDisplayMode ? 'flex-1 min-h-0' : 'lg:h-[520px]'}`}>
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto lg:order-2">
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
