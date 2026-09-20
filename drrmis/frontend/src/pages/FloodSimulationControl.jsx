@@ -201,23 +201,23 @@ export default function FloodSimulationControl() {
 
   return (
     <div className={isDisplayMode ? 'h-screen w-full overflow-hidden flex flex-col p-3 gap-2' : 'space-y-4'}>
+      {!isDisplayMode && (
       <div className="flex items-start justify-between gap-3 flex-wrap flex-shrink-0">
         <div>
-          <h1 className={`font-semibold text-gray-800 flex items-center gap-2 ${isDisplayMode ? 'text-base' : 'text-xl'}`}>
-            {isFlood ? <Waves size={isDisplayMode ? 16 : 20} className="text-blue-500" /> : <Mountain size={isDisplayMode ? 16 : 20} className="text-amber-600" />}
+          <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            {isFlood ? <Waves size={20} className="text-blue-500" /> : <Mountain size={20} className="text-amber-600" />}
             Flood & Landslide Simulation Control
           </h1>
-          {!isDisplayMode && <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>}
+          <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>
         </div>
-        {!isDisplayMode && (
-          <a
-            href="/flood-control/display" target="pdra-bigscreen-display" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
-          >
-            <ExternalLink size={13} /> Open Big-Screen Display Mode
-          </a>
-        )}
+        <a
+          href="/flood-control/display" target="pdra-bigscreen-display" rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
+        >
+          <ExternalLink size={13} /> Open Big-Screen Display Mode
+        </a>
       </div>
+      )}
 
       {/* Hazard type toggle */}
       <div className="flex gap-2 flex-shrink-0">
