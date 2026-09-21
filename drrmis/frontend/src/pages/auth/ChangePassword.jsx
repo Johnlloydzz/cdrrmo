@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Lock } from 'lucide-react'
+import { Eye, EyeOff, Lock, Check, AlertCircle } from 'lucide-react'
+import { apiPost } from '../../utils/api'
 
 export default function ChangePassword() {
   const [form, setForm] = useState({ current: '', newPw: '', confirm: '' })
@@ -8,17 +9,26 @@ export default function ChangePassword() {
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handle = (e) => { setForm({ ...form, [e.target.name]: e.target.value }); if (error) setError(''); if (success) setSuccess(false) }
   const toggleShow = (field) => setShow({ ...show, [field]: !show[field] })
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     setError('')
+    setSuccess(false)
     if (!form.current) { setError('Enter your current password.'); return }
     if (form.newPw.length < 8) { setError('New password must be at least 8 characters.'); return }
     if (form.newPw !== form.confirm) { setError('New passwords do not match.'); return }
     setLoading(true)
-    setTimeout(() => { setLoading(false); setSuccess(true); setForm({ current: '', newPw: '', confirm: '' }) }, 800)
+    try {
+      await apiPost('/auth/change-password', { currentPassword: form.current, newPassword: form.newPw })
+      setSuccess(true)
+      setForm({ current: '', newPw: '', confirm: '' })
+    } catch (err) {
+      setError(err.message || 'Could not update password. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const PwField = ({ name, label, placeholder }) => (
@@ -30,10 +40,17 @@ export default function ChangePassword() {
           type={show[name] ? 'text' : 'password'}
           value={form[name]}
           onChange={handle}
-          className="input pr-10"
+          disabled={loading}
+          className="input pr-10 transition-colors disabled:bg-gray-50 disabled:text-gray-400"
           placeholder={placeholder}
+          autoComplete={name === 'current' ? 'current-password' : 'new-password'}
         />
-        <button type="button" onClick={() => toggleShow(name)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+        <button
+          type="button"
+          onClick={() => toggleShow(name)}
+          tabIndex={-1}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+        >
           {show[name] ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
@@ -44,7 +61,7 @@ export default function ChangePassword() {
     <div className="max-w-lg mx-auto">
       <div className="card">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
             <Lock size={20} className="text-primary-600" />
           </div>
           <div>
@@ -53,17 +70,24 @@ export default function ChangePassword() {
           </div>
         </div>
 
-        {success && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Password changed successfully.
+        {/* Fixed-height wrapper with a smooth grid-rows transition so the
+            form below doesn't jump when a message appears or disappears. */}
+        <div className={`grid transition-all duration-300 ease-out ${(success || error) ? 'grid-rows-[1fr] opacity-100 mb-4' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="overflow-hidden">
+            {success && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 flex items-center gap-2">
+                <Check size={16} className="flex-shrink-0" />
+                Password changed successfully.
+              </div>
+            )}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                <AlertCircle size={16} className="flex-shrink-0" />
+                {error}
+              </div>
+            )}
           </div>
-        )}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-        )}
+        </div>
 
         <form onSubmit={submit} className="space-y-4">
           <PwField name="current" label="Current Password" placeholder="Enter current password" />
@@ -71,7 +95,8 @@ export default function ChangePassword() {
           <PwField name="confirm" label="Confirm New Password" placeholder="Repeat new password" />
 
           <div className="pt-2">
-            <button type="submit" disabled={loading} className="btn-primary w-full">
+            <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 transition-opacity">
+              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin flex-shrink-0" />}
               {loading ? 'Saving…' : 'Update Password'}
             </button>
           </div>
