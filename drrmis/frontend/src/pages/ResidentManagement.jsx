@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import BirthdateInput from '../components/BirthdateInput'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonStatCards, SkeletonTableRows } from '../components/Skeleton'
 
@@ -193,13 +194,16 @@ export default function ResidentManagement({ currentUser }) {
                       <option>Male</option><option>Female</option>
                     </select>
                   </div>
-                  <div><label className="label">Birthdate</label><input className="input" type="date" value={form.birthdate} onChange={e => setForm({...form, birthdate: e.target.value})} /></div>
                   <div>
                     <label className="label">Relation to Head</label>
                     <select className="input" value={form.relation_to_head} onChange={e => setForm({...form, relation_to_head: e.target.value})}>
                       <option value="">Select…</option>
                       {['Head','Spouse','Child','Parent','Sibling','Other'].map(r => <option key={r}>{r}</option>)}
                     </select>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="label">Birthdate</label>
+                    <BirthdateInput value={form.birthdate} onChange={v => setForm({...form, birthdate: v})} />
                   </div>
                 </div>
                 <p className="text-xs text-gray-400 mt-3">Age bracket is computed automatically from the birthdate.</p>
