@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves } from 'lucide-react'
@@ -426,7 +427,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
 
       {/* Total Households drill-down — docked to the right (away from the
           Dashboard's own Search/Barangays sidebar on the left), with a
-          smooth slide-in/out transition rather than appearing instantly. */}
+          smooth slide-in/out transition rather than appearing instantly.
+          Rendered via a portal straight into <body> so it always paints
+          above absolutely everything else on the page (sidebar included),
+          regardless of any ancestor's own stacking context. */}
+      {createPortal(
       <div
         className={`fixed inset-0 z-[100] bg-black/40 transition-opacity duration-300 ${showHouseholds ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setShowHouseholds(false)}
@@ -491,10 +496,14 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               )}
             </div>
         </div>
-      </div>
+      </div>,
+      document.body
+      )}
 
       {/* "Barangays in Risk Zone" card -> this list -> pick one to open its
-          at-risk households (same slide-in panel as above, filtered). */}
+          at-risk households (same slide-in panel as above, filtered).
+          Also portal-rendered for the same reason as the panel above. */}
+      {createPortal(
       <div
         className={`fixed inset-0 z-[100] bg-black/40 transition-opacity duration-300 ${showRiskBarangays ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setShowRiskBarangays(false)}
@@ -540,7 +549,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             )}
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
+      )}
     </div>
   )
 }
