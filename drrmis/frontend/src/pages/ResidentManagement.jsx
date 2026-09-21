@@ -171,17 +171,17 @@ export default function ResidentManagement({ currentUser }) {
               <h3 className="text-lg font-semibold text-gray-800">{editing ? 'Edit Resident' : 'Register Resident'}</h3>
             </div>
 
-            <div className="overflow-y-auto px-6 py-5 space-y-5">
-              <div>
-                <label className="label flex items-center gap-1.5"><Home size={13} className="text-gray-400" /> Household</label>
+            <div className="overflow-y-auto px-6 py-5 space-y-4 bg-gray-50/50">
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Home size={13} className="text-primary-500" /> Household</label>
                 <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
                   <option value="">Select household…</option>
                   {households.map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
                 </select>
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2 mb-3 border-b border-gray-100">Personal Information</p>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-3"><UserPlus size={13} className="text-primary-500" /> Personal Information</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div><label className="label">Last Name</label><input className="input" value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} /></div>
                   <div><label className="label">First Name</label><input className="input" value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} /></div>
@@ -202,16 +202,22 @@ export default function ResidentManagement({ currentUser }) {
                     </select>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">Age bracket is computed automatically from the birthdate.</p>
+                <p className="text-xs text-gray-400 mt-3">Age bracket is computed automatically from the birthdate.</p>
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2 mb-3 border-b border-gray-100 flex items-center gap-1.5"><Phone size={12} className="text-gray-400" /> Contact Information</p>
-                <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-3"><Phone size={13} className="text-primary-500" /> Contact Information</p>
+                <div>
+                  <label className="label">Contact Number</label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input className="input pl-9" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-white rounded-b-2xl">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </div>
