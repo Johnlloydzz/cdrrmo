@@ -428,7 +428,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           Dashboard's own Search/Barangays sidebar on the left), with a
           smooth slide-in/out transition rather than appearing instantly. */}
       <div
-        className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${showHouseholds ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[100] bg-black/40 transition-opacity duration-300 ${showHouseholds ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setShowHouseholds(false)}
       >
         <div
@@ -496,7 +496,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       {/* "Barangays in Risk Zone" card -> this list -> pick one to open its
           at-risk households (same slide-in panel as above, filtered). */}
       <div
-        className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${showRiskBarangays ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[100] bg-black/40 transition-opacity duration-300 ${showRiskBarangays ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setShowRiskBarangays(false)}
       >
         <div
