@@ -49,7 +49,14 @@ async function request(endpoint, options = {}, { onColdStart } = {}) {
     }
   }
 
-  if (res.status === 401) {
+  // A 401 means "your session is no longer valid" — but that only makes
+  // sense if there WAS a session (a token) to begin with. The login
+  // endpoint itself also returns 401 for a wrong username/password, and in
+  // that case there's no token yet, so it isn't a session expiring — it's
+  // just an incorrect-credentials response, and the caller (Login.jsx)
+  // should see the real "Invalid credentials." message from the server
+  // instead of a misleading "Session expired."
+  if (res.status === 401 && token) {
     handleSessionExpired()
     throw new Error('Session expired. Please log in again.')
   }
