@@ -71,7 +71,11 @@ export default function HouseholdManagement({ currentUser }) {
 
   const puroksForBarangay = (barangayId) => puroks.filter(p => String(p.barangay_id) === String(barangayId))
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
+  const openAdd = () => {
+    setEditing(null)
+    setForm(canAdd ? { ...emptyForm, barangay_id: currentUser?.barangay_id || '' } : emptyForm)
+    setShowModal(true)
+  }
   const openEdit = (h) => {
     setEditing(h.id)
     setForm({
@@ -170,7 +174,7 @@ export default function HouseholdManagement({ currentUser }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">Barangay</label>
-                  <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, purok_id: ''})} disabled={!!editing}>
+                  <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, purok_id: ''})} disabled={!!editing || canAdd}>
                     <option value="">Select barangay…</option>
                     {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
