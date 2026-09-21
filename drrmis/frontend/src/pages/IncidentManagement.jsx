@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Plus, Eye, Pencil, AlertTriangle, CheckCircle, MapPin } from 'lucide-react'
 import { ROLE_PERMISSIONS } from '../data/users'
 import { apiGet, apiPost, apiPut } from '../utils/api'
@@ -162,7 +163,7 @@ export default function IncidentManagement({ currentUser }) {
         <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">Showing {filtered.length} of {incidents.length} incidents</div>
       </div>
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-5">{selected ? 'Edit Incident' : 'Log Incident'}</h3>
@@ -201,9 +202,9 @@ export default function IncidentManagement({ currentUser }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {showStatusModal && (
+      {showStatusModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-1 flex items-center gap-2"><CheckCircle size={18} className="text-green-600" /> Update Incident Status</h3>
@@ -226,7 +227,7 @@ export default function IncidentManagement({ currentUser }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

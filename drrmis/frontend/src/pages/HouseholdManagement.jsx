@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, Marker, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Search, Plus, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
@@ -161,7 +162,7 @@ export default function HouseholdManagement({ currentUser }) {
         <div className="px-4 py-3 border-t text-xs text-gray-500">{filtered.length} of {households.length} households</div>
       </div>
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '90vh' }}>
             <h3 className="text-lg font-semibold px-6 pt-6 flex-shrink-0">{editing ? 'Edit Household' : 'Register Household'}</h3>
@@ -231,7 +232,7 @@ export default function HouseholdManagement({ currentUser }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

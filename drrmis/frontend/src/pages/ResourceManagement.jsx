@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Truck, Wrench, Users, Plus, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
@@ -132,7 +133,7 @@ export default function ResourceManagement() {
         </div>
       )}
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-5">Add {tab === 'personnel' ? 'Personnel' : tab === 'vehicles' ? 'Vehicle' : 'Equipment'}</h3>
@@ -163,7 +164,7 @@ export default function ResourceManagement() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

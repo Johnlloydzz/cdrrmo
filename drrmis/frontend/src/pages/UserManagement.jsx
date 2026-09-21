@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound, Copy } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
@@ -107,13 +108,13 @@ export default function UserManagement() {
         const payload = { name: form.name, email: form.email, role: form.role, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null, status: form.status }
         if (form.password.trim()) payload.password = form.password
         await apiPut(`/users/${editing}`, payload)
-        if (fromPwRequestId) {
-          await apiPut(`/password-reset-requests/${fromPwRequestId}/resolve`, {})
-          // Show the new password on screen so CDRRMO can relay it to the
-          // official themselves (call, text, Viber, in person) — nothing
-          // else in this flow ever displays it again after this.
-          setResetSuccess({ name: form.name, username: form.username, password: form.password })
-        }
+        if (fromPwRequestId) await apiPut(`/password-reset-requests/${fromPwRequestId}/resolve`, {})
+        // Any time a password was actually set here — whether from a
+        // Password Reset Request or a plain Edit User — show it on screen
+        // once so CDRRMO can relay it to the account holder themselves.
+        // Passwords are hashed in the database, so this is the only moment
+        // it's ever visible again.
+        if (form.password.trim()) setResetSuccess({ name: form.name, username: form.username, password: form.password })
       } else {
         await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
       }
@@ -263,7 +264,7 @@ export default function UserManagement() {
         <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">{filtered.length} of {users.length} accounts</div>
       </div>
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-1">{editing ? 'Edit User' : 'Add User'}</h3>
@@ -298,9 +299,9 @@ export default function UserManagement() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {resetSuccess && (
+      {resetSuccess && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center gap-2 mb-1">
@@ -331,7 +332,7 @@ export default function UserManagement() {
             <button className="btn-primary w-full mt-5" onClick={() => { setResetSuccess(null); setCopied(false) }}>Done</button>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

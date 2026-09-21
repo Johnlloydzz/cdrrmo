@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Pencil, Building2 } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
@@ -92,7 +93,7 @@ export default function BarangayManagement() {
         <div className="px-4 py-3 border-t text-xs text-gray-500">{filtered.length} of {barangays.length} barangays</div>
       </div>
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-5">Edit Barangay</h3>
@@ -119,7 +120,7 @@ export default function BarangayManagement() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

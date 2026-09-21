@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Plus, Eye, Pencil, Trash2, ShieldAlert } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 
@@ -130,7 +131,7 @@ export default function HazardManagement({ currentUser }) {
         </div>
       </div>
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Hazard' : 'Report Hazard'}</h3>
@@ -171,7 +172,7 @@ export default function HazardManagement({ currentUser }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }

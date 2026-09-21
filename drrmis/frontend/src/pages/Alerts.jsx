@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Bell, Plus, Send } from 'lucide-react'
 import { apiGet, apiPost } from '../utils/api'
 
@@ -63,7 +64,7 @@ export default function Alerts() {
         {alerts.length === 0 && <div className="card p-10 text-center text-gray-400">No alerts sent yet.</div>}
       </div>
 
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-5 flex items-center gap-2"><Send size={18} /> Send Alert</h3>
@@ -79,7 +80,7 @@ export default function Alerts() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   )
 }
