@@ -1,10 +1,10 @@
 ﻿import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone, ShieldPlus } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonStatCards, SkeletonTableRows } from '../components/Skeleton'
 
-const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
+const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '', is_pwd: false, is_pregnant_lactating: false }
 
 // Displays a stored YYYY-MM-DD birthdate as DD-MM-YYYY. The underlying value
 // and the date input field stay in YYYY-MM-DD — that's what HTML date
@@ -60,6 +60,7 @@ export default function ResidentManagement({ currentUser }) {
       household_id: r.household_id || '', last_name: r.last_name || '', first_name: r.first_name || '', middle_name: r.middle_name || '',
       birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '',
       sex: r.sex || '', contact_number: r.contact_number || '',
+      is_pwd: !!r.is_pwd, is_pregnant_lactating: !!r.is_pregnant_lactating,
     })
     setShowModal(true)
   }
@@ -98,9 +99,9 @@ export default function ResidentManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Vulnerable','Contact','Household','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={9} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={10} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -109,11 +110,13 @@ export default function ResidentManagement({ currentUser }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-800">{residents.length}</p><p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
         {['Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].map(b => (
           <div key={b} className="card p-4 text-center"><p className="text-2xl font-bold text-primary-700">{ageBracketCounts[b] || 0}</p><p className="text-xs text-gray-500 mt-1">{b}</p></div>
         ))}
+        <div className="card p-4 text-center"><p className="text-2xl font-bold text-amber-600">{residents.filter(r => r.is_pwd).length}</p><p className="text-xs text-gray-500 mt-1">PWD</p></div>
+        <div className="card p-4 text-center"><p className="text-2xl font-bold text-pink-600">{residents.filter(r => r.is_pregnant_lactating).length}</p><p className="text-xs text-gray-500 mt-1">Pregnant/Lactating</p></div>
       </div>
 
       <div className="card p-4 flex flex-wrap gap-3 items-center justify-between">
@@ -130,7 +133,7 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Vulnerable','Contact','Household','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
@@ -141,6 +144,13 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
                   <td className="table-cell">{computeAge(r.birthdate)}</td>
                   <td className="table-cell">{r.relation_to_head}</td>
+                  <td className="table-cell">
+                    <div className="flex gap-1 flex-wrap">
+                      {r.is_pwd && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">PWD</span>}
+                      {r.is_pregnant_lactating && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-pink-100 text-pink-700">Pregnant/Lactating</span>}
+                      {!r.is_pwd && !r.is_pregnant_lactating && '—'}
+                    </div>
+                  </td>
                   <td className="table-cell">{r.contact_number || '—'}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
@@ -154,7 +164,7 @@ export default function ResidentManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={canAdd ? 10 : 9} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={canAdd ? 11 : 10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -163,42 +173,70 @@ export default function ResidentManagement({ currentUser }) {
 
       {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Resident' : 'Register Resident'}</h3>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <UserPlus size={17} className="text-primary-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">{editing ? 'Edit Resident' : 'Register Resident'}</h3>
+            </div>
 
-            <label className="label">Household</label>
-            <select className="input mb-4" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
-              <option value="">Select household…</option>
-              {households.map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
-            </select>
-
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Personal Information</p>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div><label className="label">Last Name</label><input className="input" value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} /></div>
-              <div><label className="label">First Name</label><input className="input" value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} /></div>
-              <div><label className="label">Middle Name</label><input className="input" value={form.middle_name} onChange={e => setForm({...form, middle_name: e.target.value})} /></div>
+            <div className="overflow-y-auto px-6 py-5 space-y-5">
               <div>
-                <label className="label">Sex</label>
-                <select className="input" value={form.sex} onChange={e => setForm({...form, sex: e.target.value})}>
-                  <option value="">Select…</option>
-                  <option>Male</option><option>Female</option>
+                <label className="label flex items-center gap-1.5"><Home size={13} className="text-gray-400" /> Household</label>
+                <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
+                  <option value="">Select household…</option>
+                  {households.map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
                 </select>
               </div>
-              <div><label className="label">Birthdate</label><input className="input" type="date" value={form.birthdate} onChange={e => setForm({...form, birthdate: e.target.value})} /></div>
+
               <div>
-                <label className="label">Relation to Head</label>
-                <select className="input" value={form.relation_to_head} onChange={e => setForm({...form, relation_to_head: e.target.value})}>
-                  <option value="">Select…</option>
-                  {['Head','Spouse','Child','Parent','Sibling','Other'].map(r => <option key={r}>{r}</option>)}
-                </select>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2 mb-3 border-b border-gray-100">Personal Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div><label className="label">Last Name</label><input className="input" value={form.last_name} onChange={e => setForm({...form, last_name: e.target.value})} /></div>
+                  <div><label className="label">First Name</label><input className="input" value={form.first_name} onChange={e => setForm({...form, first_name: e.target.value})} /></div>
+                  <div><label className="label">Middle Name</label><input className="input" value={form.middle_name} onChange={e => setForm({...form, middle_name: e.target.value})} /></div>
+                  <div>
+                    <label className="label">Sex</label>
+                    <select className="input" value={form.sex} onChange={e => setForm({...form, sex: e.target.value})}>
+                      <option value="">Select…</option>
+                      <option>Male</option><option>Female</option>
+                    </select>
+                  </div>
+                  <div><label className="label">Birthdate</label><input className="input" type="date" value={form.birthdate} onChange={e => setForm({...form, birthdate: e.target.value})} /></div>
+                  <div>
+                    <label className="label">Relation to Head</label>
+                    <select className="input" value={form.relation_to_head} onChange={e => setForm({...form, relation_to_head: e.target.value})}>
+                      <option value="">Select…</option>
+                      {['Head','Spouse','Child','Parent','Sibling','Other'].map(r => <option key={r}>{r}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Age bracket is computed automatically from the birthdate.</p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2 mb-3 border-b border-gray-100 flex items-center gap-1.5"><Phone size={12} className="text-gray-400" /> Contact Information</p>
+                <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pb-2 mb-1 border-b border-gray-100 flex items-center gap-1.5"><ShieldPlus size={12} className="text-gray-400" /> Vulnerable Population Indicators</p>
+                <p className="text-xs text-gray-400 mb-3">Used to prioritize assistance and evacuation during disaster response.</p>
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[200px]">
+                    <input type="checkbox" className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500" checked={form.is_pwd} onChange={e => setForm({...form, is_pwd: e.target.checked})} />
+                    <span className="text-sm text-gray-700">Person with Disability (PWD)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[200px]">
+                    <input type="checkbox" className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500" checked={form.is_pregnant_lactating} onChange={e => setForm({...form, is_pregnant_lactating: e.target.checked})} />
+                    <span className="text-sm text-gray-700">Pregnant / Lactating Mother</span>
+                  </label>
+                </div>
               </div>
             </div>
 
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact Information</p>
-            <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
-
-            <p className="text-xs text-gray-400 mt-3">Age bracket is computed automatically from the birthdate.</p>
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </div>
