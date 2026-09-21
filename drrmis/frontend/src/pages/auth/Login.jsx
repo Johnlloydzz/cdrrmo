@@ -26,8 +26,10 @@ export default function Login({ onLogin }) {
     }
   }, [sessionExpired])
 
-  const handle = (e) =>
+  const handle = (e) => {
     setForm({ ...form, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value })
+    if (error) setError('')
+  }
 
   const fillAccount = (user) => {
     setForm({ username: user.username, password: user.password, remember: false })
@@ -58,12 +60,12 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className="h-screen flex flex-col md:flex-row overflow-hidden">
       {/* Left — branding panel */}
-      <div className="relative md:w-[46%] min-h-[280px] md:min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 overflow-hidden flex flex-col items-center justify-center px-8 py-12 text-center">
+      <div className="relative md:w-[42%] min-h-[180px] md:h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 overflow-hidden flex flex-col items-center justify-center px-6 py-4 text-center">
         {/* Ambient mountain/city silhouette */}
         <svg
-          className="absolute bottom-0 left-0 w-full h-40 md:h-56 opacity-90"
+          className="absolute bottom-0 left-0 w-full h-24 md:h-40 opacity-90"
           viewBox="0 0 800 220"
           preserveAspectRatio="none"
           aria-hidden="true"
@@ -73,68 +75,68 @@ export default function Login({ onLogin }) {
         </svg>
 
         <div className="relative z-10 flex flex-col items-center">
-          <img src="/cdrrmo-logo.png" alt="Gingoog City CDRRMO" className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg mb-6" />
+          <img src="/cdrrmo-logo.png" alt="Gingoog City CDRRMO" className="w-14 h-14 md:w-16 md:h-16 object-contain drop-shadow-lg mb-2" />
 
-          <h1 className="text-white text-xl md:text-2xl font-bold leading-snug max-w-sm">
+          <h1 className="text-white text-base md:text-lg font-bold leading-snug max-w-sm">
             PDRA — Pre-Disaster Risk Assessment for Gingoog City
           </h1>
 
-          <p className="text-blue-200 text-sm mt-6 max-w-xs leading-relaxed">
+          <p className="text-blue-200 text-xs mt-2 max-w-xs leading-relaxed hidden md:block">
             <span className="font-semibold text-white">Assessing Risk. Protecting Lives.</span><br />
             A centralized platform for identifying at-risk households and assessing disaster risk before it happens in Gingoog City.
           </p>
 
-          <div className="flex items-center gap-4 mt-8">
+          <div className="flex items-center gap-3 mt-3">
             {HAZARDS.map(({ icon: Icon, label, bg }) => (
-              <div key={label} className="flex flex-col items-center gap-1.5">
-                <div className={`w-11 h-11 rounded-full ${bg} flex items-center justify-center shadow-md`}>
-                  <Icon size={18} className="text-white" />
+              <div key={label} className="flex flex-col items-center gap-1">
+                <div className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center shadow-md`}>
+                  <Icon size={14} className="text-white" />
                 </div>
-                <span className="text-[10px] font-semibold tracking-wide text-blue-100">{label}</span>
+                <span className="text-[9px] font-semibold tracking-wide text-blue-100">{label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center gap-1 text-blue-300 text-xs mt-10">
-          <MapPin size={12} />
+        <div className="relative z-10 items-center gap-1 text-blue-300 text-[10px] mt-3 hidden md:flex">
+          <MapPin size={11} />
           Gingoog City, Misamis Oriental, Philippines
         </div>
       </div>
 
       {/* Right — sign-in card */}
-      <div className="flex-1 bg-gray-50 flex items-center justify-center p-4 py-10">
+      <div className="flex-1 bg-gray-50 flex items-center justify-center p-3 overflow-y-auto">
         <div className="w-full max-w-sm">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-5">
             {!showAccounts ? (
               <div className="flex flex-col items-center text-center">
-                <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-16 h-16 object-contain mb-3" />
+                <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-11 h-11 object-contain mb-1.5" />
                 <div className="flex items-center justify-between w-full">
                   <div className="w-6" />
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Sign In</h2>
-                    <p className="text-sm text-gray-400 mt-1">Continue to your account.</p>
+                    <h2 className="text-base font-bold text-gray-900">Sign In</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Continue to your account.</p>
                   </div>
                   <div className="w-6" />
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAccounts(true)}
-                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-2.5 py-1.5 hover:bg-primary-50 transition-colors mt-4"
+                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-2.5 py-1 hover:bg-primary-50 transition-colors mt-2"
                 >
-                  <Users size={13} />
+                  <Users size={12} />
                   Demo Accounts
                 </button>
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">Sign In</h2>
+                <h2 className="text-base font-bold text-gray-900">Sign In</h2>
                 <button
                   type="button"
                   onClick={() => setShowAccounts(false)}
-                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-2.5 py-1.5 hover:bg-primary-50 transition-colors flex-shrink-0"
+                  className="flex items-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-2.5 py-1 hover:bg-primary-50 transition-colors flex-shrink-0"
                 >
-                  <Users size={13} />
+                  <Users size={12} />
                   Demo Accounts
                 </button>
               </div>
@@ -142,17 +144,17 @@ export default function Login({ onLogin }) {
 
             {/* Demo accounts panel */}
             {showAccounts && (
-              <div className="mt-3 mb-2 p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Click to fill credentials</p>
+              <div className="mt-2 mb-1.5 p-2 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5 max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Click to fill credentials</p>
                 {DEMO_USERS.map((u) => (
                   <button
                     key={u.id}
                     type="button"
                     onClick={() => fillAccount(u)}
-                    className="w-full flex items-center justify-between gap-3 p-2.5 rounded-lg bg-white border border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-colors text-left"
+                    className="w-full flex items-center justify-between gap-3 p-2 rounded-lg bg-white border border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-colors text-left"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                         <span className="text-primary-700 text-xs font-bold">{u.avatar}</span>
                       </div>
                       <div>
@@ -169,29 +171,23 @@ export default function Login({ onLogin }) {
             )}
 
             {sessionExpired && !error && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-center gap-2">
                 <span className="text-amber-500">⏱</span> Your session expired. Please sign in again.
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-                <span className="text-red-500">⚠</span> {error}
               </div>
             )}
 
             {!showAccounts && (
               <>
-                <form onSubmit={submit} className="space-y-5 mt-6">
+                <form onSubmit={submit} className="space-y-2.5 mt-3">
                   <div>
-                    <label className="label">Username</label>
+                    <label className="label text-xs">Username</label>
                     <div className="relative">
-                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
                         name="username"
                         value={form.username}
                         onChange={handle}
-                        className="input pl-9"
+                        className="input pl-8 py-1.5 text-sm"
                         placeholder="Enter your username"
                         autoComplete="username"
                       />
@@ -199,15 +195,15 @@ export default function Login({ onLogin }) {
                   </div>
 
                   <div>
-                    <label className="label">Password</label>
+                    <label className="label text-xs">Password</label>
                     <div className="relative">
-                      <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <Lock size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${error ? 'text-red-400' : 'text-gray-400'}`} />
                       <input
                         name="password"
                         type={showPw ? 'text' : 'password'}
                         value={form.password}
                         onChange={handle}
-                        className="input pl-9 pr-10"
+                        className={`input pl-8 pr-9 py-1.5 text-sm ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`}
                         placeholder="Enter your password"
                         autoComplete="current-password"
                       />
@@ -216,23 +212,28 @@ export default function Login({ onLogin }) {
                         onClick={() => setShowPw(!showPw)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       >
-                        {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
+                    {error && (
+                      <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
+                        <span className="text-red-500">⚠</span> {error}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         name="remember"
                         checked={form.remember}
                         onChange={handle}
-                        className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                        className="w-3.5 h-3.5 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
                       />
-                      <span className="text-sm text-gray-600">Remember me</span>
+                      <span className="text-xs text-gray-600">Remember me</span>
                     </label>
-                    <Link to="/request-password-reset" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                    <Link to="/request-password-reset" className="text-xs text-primary-600 hover:text-primary-700 font-medium">
                       Forgot password?
                     </Link>
                   </div>
@@ -240,15 +241,15 @@ export default function Login({ onLogin }) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="btn-primary w-full flex items-center justify-center gap-2"
+                    className="btn-primary w-full py-2 text-sm flex items-center justify-center gap-2"
                   >
                     {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                     {loading ? 'Signing in…' : 'Sign in'}
                   </button>
                 </form>
 
-                <div className="border-t border-gray-100 mt-6 pt-4 text-center">
-                  <p className="text-sm text-gray-500">
+                <div className="border-t border-gray-100 mt-3 pt-2 text-center">
+                  <p className="text-xs text-gray-500">
                     Don't have an account?{' '}
                     <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800">
                       Request one
@@ -259,7 +260,7 @@ export default function Login({ onLogin }) {
             )}
           </div>
 
-          <p className="text-center text-gray-400 text-xs mt-6">
+          <p className="text-center text-gray-400 text-[10px] mt-2">
             © {new Date().getFullYear()} Gingoog City CDRRMO. All rights reserved.
           </p>
         </div>
