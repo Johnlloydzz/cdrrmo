@@ -71,12 +71,17 @@ export default function RiskAssessmentDashboard({ currentUser }) {
 
   // Drill-down: Total Households card -> household list -> that household's residents
   const [showHouseholds, setShowHouseholds] = useState(false)
+  const [filterAtRiskOnly, setFilterAtRiskOnly] = useState(false)
   const [expandedHousehold, setExpandedHousehold] = useState(null)
   const [residents, setResidents] = useState([])
   const [residentsLoading, setResidentsLoading] = useState(false)
   const [flyTarget, setFlyTarget] = useState(null)
   const [focusedHousehold, setFocusedHousehold] = useState(null)
   const [floodLevel, setFloodLevel] = useState(0)
+
+  // "Barangays in Risk Zone" card -> list of at-risk barangays -> pick one
+  // to see its at-risk households -> pick a household to see its family.
+  const [showRiskBarangays, setShowRiskBarangays] = useState(false)
 
   const loadDashboardData = () =>
     Promise.all([
@@ -147,13 +152,39 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     atRiskPopulation: selectedStats.at_risk_population || 0,
   } : totals
 
-  const householdsToList = selectedBarangay
+  const householdsToList = (selectedBarangay
     ? visibleHouseholds.filter(h => h.barangay_name === selectedBarangay.name)
     : visibleHouseholds
+  ).filter(h => !filterAtRiskOnly || h.in_flood_risk_zone)
 
   const openHouseholdList = () => {
+    setFilterAtRiskOnly(false)
     setShowHouseholds(true)
     setExpandedHousehold(null)
+  }
+
+  // Groups a household's residents into the shape CDRRMO actually wants to
+  // see: Husband / Wife (keyed off relation_to_head + sex, falling back to
+  // Head/Spouse order when sex wasn't recorded), Child, and Other (parents,
+  // siblings, or any other relative living in that same house).
+  const groupFamily = (list) => {
+    const head = list.find(r => r.relation_to_head === 'Head') || null
+    const spouse = list.find(r => r.relation_to_head === 'Spouse') || null
+    let husband = null, wife = null
+    ;[head, spouse].forEach(r => {
+      if (!r) return
+      if (r.sex === 'Male' && !husband) husband = r
+      else if (r.sex === 'Female' && !wife) wife = r
+    })
+    if (!husband && !wife) { husband = head; wife = spouse }
+    else {
+      if (!husband && spouse && spouse !== wife) husband = spouse
+      if (!wife && head && head !== husband) wife = head
+    }
+    const children = list.filter(r => r.relation_to_head === 'Child')
+    const assignedIds = new Set([husband, wife, ...children].filter(Boolean).map(r => r.id))
+    const others = list.filter(r => !assignedIds.has(r.id))
+    return { husband, wife, children, others }
   }
 
   const flyToHousehold = (h) => {
@@ -221,7 +252,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button type="button" onClick={scrollToMap} className="card p-4 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
+        <button type="button" onClick={() => setShowRiskBarangays(true)} className="card p-4 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
           <Waves size={20} className="mx-auto mb-1 text-blue-500" />
           <p className="text-2xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
           <p className="text-xs text-gray-500 mt-1">Barangays in Risk Zone {floodLevel > 0 ? '(live)' : ''}</p>
@@ -407,13 +438,13 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
               <h3 className="font-semibold text-gray-800 text-sm">
-                {selectedBarangay ? `${selectedBarangay.name} Households` : 'Registered Households'} ({householdsToList.length})
+                {selectedBarangay ? selectedBarangay.name : 'All Barangays'}{filterAtRiskOnly ? ' — At-Risk Households' : ' Households'} ({householdsToList.length})
               </h3>
               <button onClick={() => setShowHouseholds(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="overflow-y-auto flex-1">
               {householdsToList.length === 0 ? (
-                <p className="text-center text-gray-400 py-8 text-sm">No households registered yet.</p>
+                <p className="text-center text-gray-400 py-8 text-sm">{filterAtRiskOnly ? 'No at-risk households here.' : 'No households registered yet.'}</p>
               ) : (
                 <div className="divide-y divide-gray-100">
                   {householdsToList.map(h => (
@@ -436,25 +467,78 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                         <p className="text-xs text-gray-400">Loading family members…</p>
                       ) : residents.length === 0 ? (
                         <p className="text-xs text-gray-400">No family members recorded yet.</p>
-                      ) : (
-                        <table className="w-full text-xs">
-                          <thead><tr className="text-gray-400"><th className="text-left font-medium py-1">Name</th><th className="text-left font-medium py-1">Relation</th><th className="text-left font-medium py-1">Birthdate</th></tr></thead>
-                          <tbody>
-                            {residents.map(r => (
-                              <tr key={r.id} className="border-t border-gray-200">
-                                <td className="py-1.5 text-gray-700">{r.name}</td>
-                                <td className="py-1.5 text-gray-500">{r.relation_to_head}</td>
-                                <td className="py-1.5 text-gray-500">{r.birthdate}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
+                      ) : (() => {
+                        const { husband, wife, children, others } = groupFamily(residents)
+                        const Row = ({ label, value }) => (
+                          <div className="flex gap-2 py-1 border-t border-gray-200 first:border-t-0">
+                            <span className="text-gray-500 font-medium w-14 flex-shrink-0">{label}:</span>
+                            <span className="text-gray-700">{value}</span>
+                          </div>
+                        )
+                        return (
+                          <div className="text-xs">
+                            <p className="font-semibold text-gray-700 mb-1">Family</p>
+                            <Row label="Husband" value={husband ? husband.name : '—'} />
+                            <Row label="Wife" value={wife ? wife.name : '—'} />
+                            <Row label="Child" value={children.length ? children.map(c => c.name).join(', ') : '—'} />
+                            <Row label="Other" value={others.length ? others.map(o => `${o.name} (${o.relation_to_head})`).join(', ') : '—'} />
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>
               )}
             </div>
+        </div>
+      </div>
+
+      {/* "Barangays in Risk Zone" card -> this list -> pick one to open its
+          at-risk households (same slide-in panel as above, filtered). */}
+      <div
+        className={`fixed inset-0 z-50 bg-black/40 transition-opacity duration-300 ${showRiskBarangays ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setShowRiskBarangays(false)}
+      >
+        <div
+          className={`absolute top-0 right-0 h-full w-full sm:w-72 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${showRiskBarangays ? 'translate-x-0' : 'translate-x-full'}`}
+          style={{ maxHeight: '100vh' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+            <h3 className="font-semibold text-gray-800 text-sm">Barangays in Risk Zone ({barangaysInRiskZoneCount})</h3>
+            <button onClick={() => setShowRiskBarangays(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {barangaysInRiskZoneCount === 0 ? (
+              <p className="text-center text-gray-400 py-8 text-sm">No barangays currently in a risk zone.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {visible.filter(s => (s.at_risk_households || 0) > 0).map(s => {
+                  const b = barangays.find(bb => bb.id === s.barangay_id)
+                  return (
+                    <button
+                      key={s.barangay_id}
+                      type="button"
+                      onClick={() => {
+                        if (b) setSelectedBarangay(b)
+                        setFilterAtRiskOnly(true)
+                        setShowRiskBarangays(false)
+                        setShowHouseholds(true)
+                        setExpandedHousehold(null)
+                      }}
+                      className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 text-left"
+                    >
+                      <span>
+                        <span className="block font-medium text-gray-800 text-sm">{s.barangay_name}</span>
+                        <span className="block text-xs text-gray-400">{s.at_risk_households} at-risk household{s.at_risk_households === 1 ? '' : 's'}</span>
+                      </span>
+                      <AlertTriangle size={15} className="text-red-500 flex-shrink-0" />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
