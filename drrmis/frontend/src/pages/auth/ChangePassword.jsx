@@ -2,6 +2,39 @@ import { useState } from 'react'
 import { Eye, EyeOff, Lock, Check, AlertCircle } from 'lucide-react'
 import { apiPost } from '../../utils/api'
 
+// Defined OUTSIDE the page component on purpose — if this lived inside
+// ChangePassword's function body, React would treat it as a brand-new
+// component type on every re-render (which happens on every keystroke,
+// since typing updates state), remounting the <input> and dropping focus
+// after each character. Declaring it here once avoids that entirely.
+function PwField({ name, label, placeholder, value, show, loading, onChange, onToggleShow }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="relative">
+        <input
+          name={name}
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={onChange}
+          disabled={loading}
+          className="input pr-10 transition-colors disabled:bg-gray-50 disabled:text-gray-400"
+          placeholder={placeholder}
+          autoComplete={name === 'current' ? 'current-password' : 'new-password'}
+        />
+        <button
+          type="button"
+          onClick={onToggleShow}
+          tabIndex={-1}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function ChangePassword() {
   const [form, setForm] = useState({ current: '', newPw: '', confirm: '' })
   const [show, setShow] = useState({ current: false, newPw: false, confirm: false })
@@ -30,32 +63,6 @@ export default function ChangePassword() {
       setLoading(false)
     }
   }
-
-  const PwField = ({ name, label, placeholder }) => (
-    <div>
-      <label className="label">{label}</label>
-      <div className="relative">
-        <input
-          name={name}
-          type={show[name] ? 'text' : 'password'}
-          value={form[name]}
-          onChange={handle}
-          disabled={loading}
-          className="input pr-10 transition-colors disabled:bg-gray-50 disabled:text-gray-400"
-          placeholder={placeholder}
-          autoComplete={name === 'current' ? 'current-password' : 'new-password'}
-        />
-        <button
-          type="button"
-          onClick={() => toggleShow(name)}
-          tabIndex={-1}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          {show[name] ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-      </div>
-    </div>
-  )
 
   return (
     <div className="max-w-lg mx-auto">
@@ -90,9 +97,21 @@ export default function ChangePassword() {
         </div>
 
         <form onSubmit={submit} className="space-y-4">
-          <PwField name="current" label="Current Password" placeholder="Enter current password" />
-          <PwField name="newPw" label="New Password" placeholder="Min. 8 characters" />
-          <PwField name="confirm" label="Confirm New Password" placeholder="Repeat new password" />
+          <PwField
+            name="current" label="Current Password" placeholder="Enter current password"
+            value={form.current} show={show.current} loading={loading}
+            onChange={handle} onToggleShow={() => toggleShow('current')}
+          />
+          <PwField
+            name="newPw" label="New Password" placeholder="Min. 8 characters"
+            value={form.newPw} show={show.newPw} loading={loading}
+            onChange={handle} onToggleShow={() => toggleShow('newPw')}
+          />
+          <PwField
+            name="confirm" label="Confirm New Password" placeholder="Repeat new password"
+            value={form.confirm} show={show.confirm} loading={loading}
+            onChange={handle} onToggleShow={() => toggleShow('confirm')}
+          />
 
           <div className="pt-2">
             <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 transition-opacity">
