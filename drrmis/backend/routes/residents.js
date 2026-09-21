@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
 // POST /api/residents
 router.post('/', async (req, res) => {
   try {
-    const { household_id, last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
+    const { household_id, last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number, is_pwd, is_pregnant_lactating } = req.body
     if (!household_id || !last_name?.trim() || !first_name?.trim() || !birthdate) {
       return res.status(400).json({ error: 'household_id, last name, first name, and birthdate are required' })
     }
@@ -56,9 +56,9 @@ router.post('/', async (req, res) => {
     const age_bracket = computeAgeBracket(birthdate)
     const name = [first_name, middle_name, last_name].filter(Boolean).join(' ')
     const result = await run(
-      `INSERT INTO residents (resident_id, household_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [resident_id, household_id, name, last_name, first_name, middle_name || null, birthdate, age_bracket, relation_to_head || null, sex || null, contact_number || null]
+      `INSERT INTO residents (resident_id, household_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number, is_pwd, is_pregnant_lactating)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [resident_id, household_id, name, last_name, first_name, middle_name || null, birthdate, age_bracket, relation_to_head || null, sex || null, contact_number || null, is_pwd ? 1 : 0, is_pregnant_lactating ? 1 : 0]
     )
     const newRow = await get('SELECT * FROM residents WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -78,12 +78,12 @@ router.put('/:id', async (req, res) => {
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
     }
-    const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
+    const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number, is_pwd, is_pregnant_lactating } = req.body
     const age_bracket = computeAgeBracket(birthdate)
     const name = [first_name, middle_name, last_name].filter(Boolean).join(' ')
     await run(
-      `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=? WHERE id=?`,
-      [name, last_name, first_name, middle_name || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, req.params.id]
+      `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=?, is_pwd=?, is_pregnant_lactating=? WHERE id=?`,
+      [name, last_name, first_name, middle_name || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, is_pwd ? 1 : 0, is_pregnant_lactating ? 1 : 0, req.params.id]
     )
     const updated = await get('SELECT * FROM residents WHERE id = ?', [req.params.id])
     res.json(updated)

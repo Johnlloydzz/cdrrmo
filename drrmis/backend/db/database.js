@@ -52,6 +52,7 @@ const EXPECTED_COLUMNS = {
     resident_id: `TEXT`, age_bracket: `TEXT`, relation_to_head: `TEXT`, created_at: `TEXT`,
     last_name: `TEXT`, first_name: `TEXT`, middle_name: `TEXT`,
     sex: `TEXT`, contact_number: `TEXT`,
+    is_pwd: `INTEGER DEFAULT 0`, is_pregnant_lactating: `INTEGER DEFAULT 0`,
   },
 }
 

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonStatCards, SkeletonTableRows } from '../components/Skeleton'
 
-const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
+const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '', is_pwd: false, is_pregnant_lactating: false }
 
 // Displays a stored YYYY-MM-DD birthdate as DD-MM-YYYY. The underlying value
 // and the date input field stay in YYYY-MM-DD — that's what HTML date
@@ -60,6 +60,7 @@ export default function ResidentManagement({ currentUser }) {
       household_id: r.household_id || '', last_name: r.last_name || '', first_name: r.first_name || '', middle_name: r.middle_name || '',
       birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '',
       sex: r.sex || '', contact_number: r.contact_number || '',
+      is_pwd: !!r.is_pwd, is_pregnant_lactating: !!r.is_pregnant_lactating,
     })
     setShowModal(true)
   }
@@ -98,9 +99,9 @@ export default function ResidentManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Vulnerable','Contact','Household','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={9} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={10} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -109,11 +110,13 @@ export default function ResidentManagement({ currentUser }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
         <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-800">{residents.length}</p><p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
         {['Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].map(b => (
           <div key={b} className="card p-4 text-center"><p className="text-2xl font-bold text-primary-700">{ageBracketCounts[b] || 0}</p><p className="text-xs text-gray-500 mt-1">{b}</p></div>
         ))}
+        <div className="card p-4 text-center"><p className="text-2xl font-bold text-amber-600">{residents.filter(r => r.is_pwd).length}</p><p className="text-xs text-gray-500 mt-1">PWD</p></div>
+        <div className="card p-4 text-center"><p className="text-2xl font-bold text-pink-600">{residents.filter(r => r.is_pregnant_lactating).length}</p><p className="text-xs text-gray-500 mt-1">Pregnant/Lactating</p></div>
       </div>
 
       <div className="card p-4 flex flex-wrap gap-3 items-center justify-between">
@@ -130,7 +133,7 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Vulnerable','Contact','Household','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
@@ -141,6 +144,13 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
                   <td className="table-cell">{computeAge(r.birthdate)}</td>
                   <td className="table-cell">{r.relation_to_head}</td>
+                  <td className="table-cell">
+                    <div className="flex gap-1 flex-wrap">
+                      {r.is_pwd && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">PWD</span>}
+                      {r.is_pregnant_lactating && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-pink-100 text-pink-700">Pregnant/Lactating</span>}
+                      {!r.is_pwd && !r.is_pregnant_lactating && '—'}
+                    </div>
+                  </td>
                   <td className="table-cell">{r.contact_number || '—'}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
@@ -154,7 +164,7 @@ export default function ResidentManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={canAdd ? 10 : 9} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={canAdd ? 11 : 10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -196,6 +206,19 @@ export default function ResidentManagement({ currentUser }) {
 
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact Information</p>
             <div><label className="label">Contact Number</label><input className="input" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} /></div>
+
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 mt-4">Vulnerable Population Indicators</p>
+            <p className="text-xs text-gray-400 mb-2">Used to prioritize assistance and evacuation during disaster response.</p>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500" checked={form.is_pwd} onChange={e => setForm({...form, is_pwd: e.target.checked})} />
+                <span className="text-sm text-gray-700">Person with Disability (PWD)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500" checked={form.is_pregnant_lactating} onChange={e => setForm({...form, is_pregnant_lactating: e.target.checked})} />
+                <span className="text-sm text-gray-700">Pregnant / Lactating Mother</span>
+              </label>
+            </div>
 
             <p className="text-xs text-gray-400 mt-3">Age bracket is computed automatically from the birthdate.</p>
             <div className="flex justify-end gap-3 mt-6">
