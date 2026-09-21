@@ -8,7 +8,8 @@ const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
 const emptyForm = { barangay_id: '', name: '', flood_risk: 'Low', flood_threshold_m: '1.0', landslide_risk: 'Low' }
 
 export default function PurokManagement({ currentUser }) {
-  const canAdd = currentUser?.role === 'Barangay Official'
+  const canAdd = currentUser?.role === 'Barangay Official' || currentUser?.role === 'CDRRMO Personnel'
+  const isCdrrmo = currentUser?.role === 'CDRRMO Personnel'
   const [puroks, setPuroks] = useState([])
   const [barangays, setBarangays] = useState([])
   const [barangaysError, setBarangaysError] = useState('')
@@ -33,7 +34,12 @@ export default function PurokManagement({ currentUser }) {
 
   const filtered = puroks.filter(p => (p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.barangay_name || '').toLowerCase().includes(search.toLowerCase()))
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setAddingNew(false); setShowModal(true) }
+  const openAdd = () => {
+    setEditing(null)
+    setForm(isCdrrmo ? emptyForm : { ...emptyForm, barangay_id: currentUser?.barangay_id || '' })
+    setAddingNew(false)
+    setShowModal(true)
+  }
   const openEdit = (p) => {
     setEditing(p.id)
     setForm({ barangay_id: p.barangay_id || '', name: p.name || '', flood_risk: p.flood_risk || 'Low', flood_threshold_m: String(p.flood_threshold_m ?? '1.0'), landslide_risk: p.landslide_risk || 'Low' })
@@ -65,9 +71,9 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Purok', ...(canAdd ? [] : ['Barangay']), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={canAdd ? 4 : 5} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={isCdrrmo ? 5 : (canAdd ? 4 : 5)} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -88,12 +94,12 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(canAdd ? [] : ['Barangay']), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{p.name}</td>
-                  {!canAdd && <td className="table-cell">{p.barangay_name || '—'}</td>}
+                  {isCdrrmo && <td className="table-cell">{p.barangay_name || '—'}</td>}
                   <td className="table-cell"><span className={RISK[p.flood_risk] || 'badge-gray'}>{p.flood_risk}</span></td>
                   <td className="table-cell text-center">{p.flood_threshold_m} m</td>
                   <td className="table-cell"><span className={RISK[p.landslide_risk] || 'badge-gray'}>{p.landslide_risk}</span></td>
@@ -107,7 +113,7 @@ export default function PurokManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={canAdd ? 4 : 5} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={isCdrrmo ? 5 : (canAdd ? 4 : 5)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -120,7 +126,7 @@ export default function PurokManagement({ currentUser }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Barangay</label>
-                <select className="input" value={form.barangay_id} onChange={e => { setForm({...form, barangay_id: e.target.value, name: ''}); setAddingNew(false) }} disabled={!!editing}>
+                <select className="input" value={form.barangay_id} onChange={e => { setForm({...form, barangay_id: e.target.value, name: ''}); setAddingNew(false) }} disabled={!!editing || !isCdrrmo}>
                   <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
                 {barangaysError && <p className="text-xs text-red-600 mt-1">Could not load barangay list: {barangaysError}</p>}

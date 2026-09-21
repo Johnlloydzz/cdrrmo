@@ -21,12 +21,17 @@ router.get('/', async (req, res) => {
 // POST /api/puroks
 router.post('/', async (req, res) => {
   try {
-    if (req.user.role !== 'Barangay Official') {
-      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to purok records.' })
+    // CDRRMO Personnel can add a purok for any barangay (they select which
+    // one in the form). A Barangay Official can only add puroks for their
+    // own barangay — enforced here regardless of what's sent in the body.
+    let barangay_id
+    if (req.user.role === 'CDRRMO Personnel') {
+      barangay_id = req.body.barangay_id
+    } else if (req.user.role === 'Barangay Official') {
+      barangay_id = req.user.barangay_id
+    } else {
+      return res.status(403).json({ error: 'You do not have permission to add puroks.' })
     }
-    // Barangay Officials can only add puroks under their own barangay,
-    // regardless of what barangay_id is sent in the request body.
-    const barangay_id = req.user.barangay_id
     const { name, flood_risk, flood_threshold_m, landslide_risk } = req.body
     if (!barangay_id || !name) return res.status(400).json({ error: 'barangay_id and name are required' })
     const result = await run(
@@ -41,12 +46,13 @@ router.post('/', async (req, res) => {
 // PUT /api/puroks/:id
 router.put('/:id', async (req, res) => {
   try {
-    if (req.user.role !== 'Barangay Official') {
-      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to purok records.' })
-    }
     const existing = await get('SELECT barangay_id FROM puroks WHERE id = ?', [req.params.id])
-    if (!existing || existing.barangay_id !== req.user.barangay_id) {
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    if (req.user.role === 'Barangay Official' && existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit puroks in your own barangay.' })
+    }
+    if (req.user.role !== 'CDRRMO Personnel' && req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'You do not have permission to edit puroks.' })
     }
     const { name, flood_risk, flood_threshold_m, landslide_risk } = req.body
     await run(
@@ -61,12 +67,13 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/puroks/:id
 router.delete('/:id', async (req, res) => {
   try {
-    if (req.user.role !== 'Barangay Official') {
-      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to purok records.' })
-    }
     const existing = await get('SELECT barangay_id FROM puroks WHERE id = ?', [req.params.id])
-    if (!existing || existing.barangay_id !== req.user.barangay_id) {
+    if (!existing) return res.status(404).json({ error: 'Not found' })
+    if (req.user.role === 'Barangay Official' && existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only delete puroks in your own barangay.' })
+    }
+    if (req.user.role !== 'CDRRMO Personnel' && req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'You do not have permission to delete puroks.' })
     }
     const result = await run('DELETE FROM puroks WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
