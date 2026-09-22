@@ -1,3 +1,5 @@
+import { getStoredToken, clearStoredToken, clearStoredUser } from './storage'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 // Render's free tier spins the backend down after ~15 min of inactivity.
@@ -8,13 +10,9 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const COLD_START_TIMEOUT_MS = 60000
 const RETRY_TIMEOUT_MS = 15000
 
-function getToken() {
-  return localStorage.getItem('drrmis_token')
-}
-
 function handleSessionExpired() {
-  localStorage.removeItem('drrmis_token')
-  localStorage.removeItem('drrmis_user')
+  clearStoredToken()
+  clearStoredUser()
   if (window.location.pathname !== '/login') {
     window.location.href = '/login?expired=1'
   }
@@ -27,7 +25,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 async function request(endpoint, options = {}, { onColdStart } = {}) {
-  const token = getToken()
+  const token = getStoredToken()
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
