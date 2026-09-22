@@ -261,11 +261,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         </div>
       )}
       <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0">
-        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3">
+        <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 order-2 lg:order-2">
           <div className="card p-3"><div className="h-9 bg-gray-100 rounded animate-pulse" /></div>
           <div className="card p-3"><SkeletonList rows={7} /></div>
         </div>
-        <div className="lg:flex-1 rounded-xl overflow-hidden">
+        <div className="lg:flex-1 rounded-xl overflow-hidden order-1 lg:order-1">
           <SkeletonBlock className="h-[50vh] lg:h-full w-full" />
         </div>
       </div>
