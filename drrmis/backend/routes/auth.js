@@ -7,11 +7,15 @@ const { sendOtpEmail } = require('../utils/mailer')
 
 const JWT_SECRET  = process.env.JWT_SECRET  || 'dev_secret'
 const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || '7d'
+// "Remember me" gets a much longer-lived token (like Facebook's persistent
+// login); unchecked gets a short one, closer to a plain browser session.
+const JWT_EXPIRES_REMEMBERED = process.env.JWT_EXPIRES_IN_REMEMBERED || '30d'
+const JWT_EXPIRES_UNREMEMBERED = process.env.JWT_EXPIRES_IN_UNREMEMBERED || '1d'
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body
+    const { username, password, remember } = req.body
     if (!username || !password)
       return res.status(400).json({ error: 'Username and password are required.' })
 
@@ -29,11 +33,12 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role, name: user.name, barangay_id: user.barangay_id },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: remember ? JWT_EXPIRES_REMEMBERED : JWT_EXPIRES_UNREMEMBERED }
     )
 
     res.json({
       token,
+      remember: !!remember,
       user: { id: user.id, name: user.name, username: user.username, role: user.role, barangay_id: user.barangay_id, barangay: user.barangay_name || 'All' }
     })
   } catch (err) {
@@ -154,4 +159,4 @@ router.post('/reset-password', async (req, res) => {
   }
 })
 
-module.exports = router
+module.exports = router 

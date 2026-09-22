@@ -38,8 +38,8 @@ function defaultRouteFor(user) {
 function App() {
   const [currentUser, setCurrentUser] = useState(() => getStoredUser())
 
-  const handleLogin = (user) => {
-    setStoredUser(user)
+  const handleLogin = (user, remember = true) => {
+    setStoredUser(user, remember)
     setCurrentUser(user)
   }
 

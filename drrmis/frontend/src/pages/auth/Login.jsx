@@ -49,9 +49,10 @@ export default function Login({ onLogin }) {
       const data = await apiPost('/auth/login', {
         username: form.username,
         password: form.password,
+        remember: form.remember,
       })
-      setStoredToken(data.token)
-      onLogin(data.user)
+      setStoredToken(data.token, form.remember)
+      onLogin(data.user, form.remember)
     } catch (err) {
       // The backend intentionally returns a generic "Invalid credentials."
       // for both an unknown username and a wrong password, so a bad actor
