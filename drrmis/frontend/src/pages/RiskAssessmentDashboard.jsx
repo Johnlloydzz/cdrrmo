@@ -442,6 +442,26 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               )
             })}
 
+            {/* Purok boundaries — real drawn polygons where a Barangay
+                Official has traced one, shown on top of the barangay
+                choropleth for reference. */}
+            {visibleBarangays.flatMap(b => (b.puroks || [])
+              .filter(p => p.boundary_geojson)
+              .map(p => {
+                let geo
+                try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
+                return (
+                  <GeoJSON
+                    key={`purok-${p.id}`}
+                    data={geo}
+                    pathOptions={{ color: '#2563eb', weight: 1.5, fillOpacity: 0, dashArray: '4, 3' }}
+                  >
+                    <Tooltip sticky>{p.name}</Tooltip>
+                  </GeoJSON>
+                )
+              })
+            )}
+
             {/* Selected barangay — highlighted outline, same style as Hazard Map & Geofencing */}
             {selectedGeojson && (
               <>

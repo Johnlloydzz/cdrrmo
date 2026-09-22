@@ -74,7 +74,16 @@ function MapResizeHandler() {
     const container = map.getContainer()
     const observer = new ResizeObserver(() => map.invalidateSize())
     observer.observe(container)
-    return () => observer.disconnect()
+    // Belt-and-suspenders: catches cases where the flex layout hadn't
+    // fully settled when Leaflet first measured its container, without
+    // needing an actual window resize (like pressing F11) to fix itself.
+    const raf = requestAnimationFrame(() => map.invalidateSize())
+    const timers = [100, 300, 600].map(ms => setTimeout(() => map.invalidateSize(), ms))
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(raf)
+      timers.forEach(clearTimeout)
+    }
   }, [map])
   return null
 }
@@ -416,6 +425,25 @@ export default function FloodSimulationControl() {
                 </GeoJSON>
               )
             })}
+
+            {/* Purok boundaries — real drawn polygons where a Barangay
+                Official has traced one. */}
+            {barangaysWithCentroid.flatMap(b => (b.puroks || [])
+              .filter(p => p.boundary_geojson)
+              .map(p => {
+                let geo
+                try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
+                return (
+                  <GeoJSON
+                    key={`purok-${p.id}`}
+                    data={geo}
+                    pathOptions={{ color: '#2563eb', weight: 1.5, fillOpacity: 0, dashArray: '4, 3' }}
+                  >
+                    <Tooltip sticky>{p.name}</Tooltip>
+                  </GeoJSON>
+                )
+              })
+            )}
 
             {barangaysWithCentroid.filter(b => b.centroid).map(b => (
               <Marker key={`brgy-${b.id}`} position={b.centroid} icon={barangayIcon} eventHandlers={{ click: () => setSelectedBarangay(b) }} />

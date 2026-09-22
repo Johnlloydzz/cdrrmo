@@ -151,7 +151,7 @@ function FocusRoute({ trigger, coords }) {
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('street')
   const [hazardLayer, setHazardLayer] = useState('landslide') // 'landslide' | 'flood' | 'none'
-  const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Household Locations'])
+  const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Household Locations','Purok Boundaries'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
   const [households, setHouseholds] = useState([])
