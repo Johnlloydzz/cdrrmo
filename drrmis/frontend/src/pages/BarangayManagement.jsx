@@ -9,7 +9,7 @@ import { SkeletonTableRows } from '../components/Skeleton'
 // Flood:     navy (Very High) → violet (High) → purple (Moderate) → blue (Low)
 const LANDSLIDE_BADGE = { 'Very High': 'badge-brown', High: 'badge-red', Moderate: 'badge-green', Low: 'badge-yellow' }
 const FLOOD_BADGE = { 'Very High': 'badge-navy', High: 'badge-violet', Moderate: 'badge-purple', Low: 'badge-blue' }
-const emptyForm = { name: '', captain_name: '', contact_number: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low' }
+const emptyForm = { name: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low' }
 
 export default function BarangayManagement() {
   const [barangays, setBarangays] = useState([])
@@ -29,7 +29,7 @@ export default function BarangayManagement() {
   const openEdit = (b) => {
     setEditing(b.id)
     setForm({
-      name: b.name || '', captain_name: b.captain_name || '', contact_number: b.contact_number || '',
+      name: b.name || '',
       flood_susceptibility: b.flood_susceptibility || 'Low',
       landslide_susceptibility: b.landslide_susceptibility || 'Low',
     })
@@ -101,14 +101,6 @@ export default function BarangayManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2"><label className="label">Barangay Name</label><input className="input bg-gray-50 text-gray-500" value={form.name} disabled /></div>
               <div>
-                <label className="label">Captain Name</label>
-                <input className="input" value={form.captain_name} onChange={e => setForm({...form, captain_name: e.target.value})} placeholder="e.g. Juan Dela Cruz" />
-              </div>
-              <div>
-                <label className="label">Emergency Contact Number</label>
-                <input className="input" type="tel" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} placeholder="09XXXXXXXXX" />
-              </div>
-              <div>
                 <label className="label">Flood Susceptibility (CDRA)</label>
                 <select className="input" value={form.flood_susceptibility} onChange={e => setForm({...form, flood_susceptibility: e.target.value})}>
                   <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
@@ -121,7 +113,7 @@ export default function BarangayManagement() {
                 </select>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-3">Population is computed live from registered residents — not editable here. Classification is manually encoded from the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) maps.</p>
+            <p className="text-xs text-gray-400 mt-3">Population is computed live from registered residents — not editable here. Captain name and contact number are set by the Barangay Official themselves, not editable here. Classification is manually encoded from the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) maps.</p>
             <div className="flex justify-end gap-3 mt-6">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>

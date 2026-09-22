@@ -78,8 +78,13 @@ router.put('/:id', async (req, res) => {
     const flood_susceptibility      = req.body.flood_susceptibility ?? current.flood_susceptibility
     const landslide_susceptibility  = req.body.landslide_susceptibility ?? current.landslide_susceptibility
     const boundary_geojson          = req.body.boundary_geojson ?? current.boundary_geojson
-    const captain_name              = req.body.captain_name ?? current.captain_name
-    const contact_number            = req.body.contact_number ?? current.contact_number
+    // Captain name / contact number are intentionally NOT editable here —
+    // only the Barangay Official themselves can set these, via the
+    // dedicated PUT /:id/contact route below. CDRRMO has no visibility
+    // into who the current captain is, so they shouldn't be the ones
+    // typing it in.
+    const captain_name              = current.captain_name
+    const contact_number            = current.contact_number
 
     await run(
       `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
@@ -91,17 +96,17 @@ router.put('/:id', async (req, res) => {
 })
 
 // PUT /api/barangays/:id/contact — Captain name + emergency contact number.
-// A Barangay Official can only set this for their own barangay; CDRRMO
-// Personnel can set it for any barangay. Kept separate from the general
-// PUT /:id (which handles CDRA classification/boundary edits) so a
-// Barangay Official's access stays limited to just this contact info.
+// Barangay Official ONLY, for their own barangay — CDRRMO has no way of
+// knowing who the current captain actually is, so they can't set this
+// (they can still see it, on the barangay info panel / table, once the
+// Barangay Official has filled it in themselves).
 router.put('/:id/contact', async (req, res) => {
   try {
-    if (req.user.role === 'Barangay Official' && req.user.barangay_id !== parseInt(req.params.id)) {
-      return res.status(403).json({ error: 'You can only update your own barangay\'s contact info.' })
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'Only a Barangay Official can update their own barangay\'s contact info.' })
     }
-    if (req.user.role !== 'CDRRMO Personnel' && req.user.role !== 'Barangay Official') {
-      return res.status(403).json({ error: 'You do not have permission to update this.' })
+    if (req.user.barangay_id !== parseInt(req.params.id)) {
+      return res.status(403).json({ error: 'You can only update your own barangay\'s contact info.' })
     }
     const current = await get('SELECT id FROM barangays WHERE id = ?', [req.params.id])
     if (!current) return res.status(404).json({ error: 'Not found' })
