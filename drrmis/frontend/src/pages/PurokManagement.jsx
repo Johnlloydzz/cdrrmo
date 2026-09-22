@@ -158,11 +158,21 @@ export default function PurokManagement({ currentUser }) {
                   </select>
                 ) : (
                   <div className="flex gap-2">
-                    <input className="input" autoFocus placeholder="Type new purok name…" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                    <button type="button" className="btn-secondary whitespace-nowrap" onClick={() => { setAddingNew(false); setForm({...form, name: ''}) }}>Back to list</button>
+                    <input
+                      className="input"
+                      autoFocus={!editing}
+                      disabled={!!editing && isCdrrmo}
+                      placeholder="Type new purok name…"
+                      value={form.name}
+                      onChange={e => setForm({...form, name: e.target.value})}
+                    />
+                    {!editing && <button type="button" className="btn-secondary whitespace-nowrap" onClick={() => { setAddingNew(false); setForm({...form, name: ''}) }}>Back to list</button>}
                   </div>
                 )}
               </div>
+              {editing && isCdrrmo && (
+                <p className="text-xs text-gray-400 -mt-2">Purok name is set by the Barangay Official — CDRRMO can only view it here.</p>
+              )}
               {isCdrrmo ? (
                 <>
                   <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>

@@ -63,8 +63,10 @@ router.put('/:id', async (req, res) => {
     }
     // Only CDRRMO Personnel can change the CDRA risk classification — a
     // Barangay Official's edit only ever touches the purok's name, keeping
-    // the existing risk data exactly as CDRRMO last set it.
-    const name = req.body.name ?? existing.name
+    // the existing risk data exactly as CDRRMO last set it. Conversely,
+    // only the Barangay Official can rename an existing purok — CDRRMO can
+    // view it but not rename it, since only the barangay knows its puroks.
+    const name = req.user.role === 'CDRRMO Personnel' ? existing.name : (req.body.name ?? existing.name)
     const flood_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_risk ?? existing.flood_risk) : existing.flood_risk
     const flood_threshold_m = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_threshold_m ?? existing.flood_threshold_m) : existing.flood_threshold_m
     const landslide_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.landslide_risk ?? existing.landslide_risk) : existing.landslide_risk
