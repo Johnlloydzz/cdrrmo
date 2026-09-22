@@ -367,8 +367,8 @@ export default function GISMap() {
                 onError={e => e.target.style.display = 'none'}
               />
             )}
-            <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain || '—'}</p>
-            <p className="text-xs text-gray-500">Population: {(selectedBarangay.population || 0).toLocaleString()}</p>
+            <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain_name || '—'}</p>
+            <p className="text-xs text-gray-500">Population: {(selectedBarangay.resident_count || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
             <div className="grid grid-cols-3 gap-2 mt-2 mb-1">
               <button
