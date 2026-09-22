@@ -45,15 +45,17 @@ function distanceKm([lat1, lng1], [lat2, lng2]) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-const MARKERS = [
-  { id: 5, type: 'Hazard', label: 'Flood Susceptibility Zone - San Juan', lat: 8.8180, lng: 125.1050, color: '#3b82f6', radius: 500 },
-]
-
 const LAYERS = [
   { id: 'street',    label: 'Street View',   url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
   { id: 'satellite', label: 'Satellite',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
 ]
+
+// Free, public, no-API-key overlay tiles (Esri's ArcGIS Online reference
+// layers, commonly used this way in Leaflet projects) for the "Roads" and
+// "Rivers" Map Layers toggles — real data, not placeholders.
+const ROADS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
+const RIVERS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Hydro_Reference_Overlay/MapServer/tile/{z}/{y}/{x}'
 
 const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Household Locations']
 
@@ -101,7 +103,16 @@ function MapResizeHandler() {
     const container = map.getContainer()
     const observer = new ResizeObserver(() => map.invalidateSize())
     observer.observe(container)
-    return () => observer.disconnect()
+    // Belt-and-suspenders: catches cases where the flex layout hadn't
+    // fully settled when Leaflet first measured its container, without
+    // needing an actual window resize (like pressing F11) to fix itself.
+    const raf = requestAnimationFrame(() => map.invalidateSize())
+    const timers = [100, 300, 600].map(ms => setTimeout(() => map.invalidateSize(), ms))
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(raf)
+      timers.forEach(clearTimeout)
+    }
   }, [map])
   return null
 }
@@ -140,7 +151,7 @@ function FocusRoute({ trigger, coords }) {
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('street')
   const [hazardLayer, setHazardLayer] = useState('landslide') // 'landslide' | 'flood' | 'none'
-  const [activeOverlays, setActiveOverlays] = useState(['Flood Zones','Household Locations'])
+  const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Household Locations'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
   const [households, setHouseholds] = useState([])
@@ -161,7 +172,23 @@ export default function GISMap() {
     apiGet('/households').then(setHouseholds).catch(() => {})
   }, [])
 
-  const toggleOverlay = (o) => setActiveOverlays(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o])
+  // "Flood Zones" and "Landslide Zones" drive the same underlying hazard
+  // choropleth (a barangay can only be filled with one hazard's color at a
+  // time), so checking one automatically unchecks the other — checking
+  // both together isn't a state the map can actually render.
+  const toggleOverlay = (o) => {
+    if (o === 'Flood Zones' || o === 'Landslide Zones') {
+      const turningOn = !activeOverlays.includes(o)
+      setHazardLayer(turningOn ? (o === 'Flood Zones' ? 'flood' : 'landslide') : 'none')
+      setActiveOverlays(prev => {
+        const other = o === 'Flood Zones' ? 'Landslide Zones' : 'Flood Zones'
+        const withoutBoth = prev.filter(x => x !== 'Flood Zones' && x !== 'Landslide Zones')
+        return turningOn ? [...withoutBoth, o] : withoutBoth
+      })
+      return
+    }
+    setActiveOverlays(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o])
+  }
 
   const layer = LAYERS.find(l => l.id === activeLayer)
 
@@ -449,23 +476,6 @@ export default function GISMap() {
           </div>
         )}
 
-        {/* CDRA Hazard Susceptibility Layer — matches the official CDRA maps */}
-        <div className="card p-4">
-          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><MapPin size={15} /> Hazard Susceptibility (CDRA)</h3>
-          <div className="space-y-1">
-            {[
-              { id: 'landslide', label: 'Landslide Susceptibility' },
-              { id: 'flood',     label: 'Flood Susceptibility' },
-              { id: 'none',      label: 'None' },
-            ].map(o => (
-              <label key={o.id} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
-                <input type="radio" name="hazardLayer" value={o.id} checked={hazardLayer === o.id} onChange={() => setHazardLayer(o.id)} className="text-primary-600" />
-                <span className="text-sm">{o.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
         {/* Base layers */}
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Layers size={15} /> Base Layer</h3>
@@ -541,6 +551,29 @@ export default function GISMap() {
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
           />
 
+          {/* Roads / Rivers reference overlays — free public Esri tiles, no
+              API key. Always mounted with opacity 0/1 (rather than
+              mounted/unmounted) so the CSS transition in index.css fades
+              them in/out smoothly instead of popping. */}
+          <TileLayer url={ROADS_OVERLAY_URL} opacity={activeOverlays.includes('Roads') ? 0.9 : 0} zIndex={5} />
+          <TileLayer url={RIVERS_OVERLAY_URL} opacity={activeOverlays.includes('Rivers') ? 0.9 : 0} zIndex={5} />
+
+          {/* Barangay Boundaries — plain outline, no fill, independent of
+              whichever hazard choropleth (or none) is currently showing, so
+              boundaries stay visible even with hazard layers off. */}
+          {activeOverlays.includes('Barangay Boundaries') && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+            return (
+              <GeoJSON
+                key={`outline-${b.id}`}
+                data={geo}
+                style={{ color: '#334155', weight: 1.5, fillOpacity: 0, opacity: 0.8 }}
+                eventHandlers={{ click: () => setSelectedBarangay(b) }}
+              />
+            )
+          })}
+
           {/* CDRA Hazard Susceptibility choropleth — all barangays, colored to match the official CDRA maps */}
           {hazardLayer !== 'none' && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
             let geo
@@ -607,13 +640,6 @@ export default function GISMap() {
               icon={barangayIcon}
               eventHandlers={{ click: () => setSelectedBarangay(b) }}
             />
-          ))}
-
-          {/* Flood zone circle */}
-          {activeOverlays.includes('Flood Zones') && MARKERS.filter(m => m.type === 'Hazard').map(m => (
-            <Circle key={m.id} center={[m.lat, m.lng]} radius={m.radius} pathOptions={{ color: m.color, fillColor: m.color, fillOpacity: 0.2 }}>
-              <Popup><strong>{m.label}</strong><br />Hazard Zone</Popup>
-            </Circle>
           ))}
 
           {/* Purok name labels — positioned at the average location of that purok's

@@ -72,6 +72,15 @@
   z-index: 0;
 }
 
+/* Smooth fade for map layer toggles (Map Layers panel: Barangay Boundaries,
+   Roads, Rivers, Hazard Zones) — Leaflet updates these via inline style/attr
+   changes, which this transition animates instead of an instant hard cut. */
+.leaflet-tile,
+.leaflet-interactive,
+.leaflet-overlay-pane path {
+  transition: opacity 300ms ease, fill-opacity 300ms ease;
+}
+
 /* Removes the default browser focus outline (shows as a black rectangle)
    that appears after clicking a polygon on the Risk Assessment Dashboard's
    or Flood Simulation Control's map specifically — scoped here so it does
