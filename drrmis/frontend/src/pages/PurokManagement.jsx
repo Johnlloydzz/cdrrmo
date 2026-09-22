@@ -171,7 +171,7 @@ export default function PurokManagement({ currentUser }) {
                 )}
               </div>
               {editing && isCdrrmo && (
-                <p className="text-xs text-gray-400 -mt-2">Purok name is set by the Barangay Official — CDRRMO can only view it here.</p>
+                <p className="text-xs text-gray-400 col-span-2 -mt-2">Purok name is set by the Barangay Official — view only here.</p>
               )}
               {isCdrrmo ? (
                 <>
