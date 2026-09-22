@@ -645,7 +645,8 @@ export default function GISMap() {
           {/* Purok boundaries — real drawn polygons where a Barangay Official
               has traced one; falls back to just a name label (at the
               average location of that purok's registered households) for
-              puroks that don't have a boundary on file yet. */}
+              puroks that don't have a boundary on file yet. Name shows as a
+              permanent label right on the shape; click it for population. */}
           {activeOverlays.includes('Purok Boundaries') && barangaysWithCentroid.flatMap(b => (b.puroks || [])
             .filter(p => p.boundary_geojson)
             .map(p => {
@@ -656,7 +657,15 @@ export default function GISMap() {
                   key={`purok-boundary-${p.id}`}
                   data={geo}
                   style={{ color: '#2563eb', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.08, dashArray: '4, 3' }}
-                />
+                >
+                  <Tooltip permanent direction="center" className="purok-name-label">{p.name}</Tooltip>
+                  <Popup>
+                    <strong>{p.name}</strong> — {b.name}<br />
+                    Households: {p.household_count ?? 0}<br />
+                    Population: {p.resident_count ?? 0}<br />
+                    Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}
+                  </Popup>
+                </GeoJSON>
               )
             })
           )}

@@ -51,7 +51,8 @@ export default function ResidentManagement({ currentUser }) {
 
   const filtered = residents.filter(r =>
     (r.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.barangay_name || '').toLowerCase().includes(search.toLowerCase())
+    (r.barangay_name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.purok_name || '').toLowerCase().includes(search.toLowerCase())
   )
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
@@ -99,9 +100,9 @@ export default function ResidentManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Purok','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={9} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={10} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -131,7 +132,7 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Purok','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
@@ -144,6 +145,7 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell">{r.contact_number || '—'}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code}</td>
+                  <td className="table-cell">{r.purok_name || '—'}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
                   {canAdd && (
                     <td className="table-cell">
@@ -155,7 +157,7 @@ export default function ResidentManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={canAdd ? 10 : 9} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={canAdd ? 11 : 10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>

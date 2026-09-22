@@ -10,7 +10,10 @@ router.get('/', async (req, res) => {
     // Barangay Officials only ever see their own barangay's puroks —
     // enforced server-side, not just hidden in the UI.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
-    let sql = `SELECT p.*, b.name as barangay_name FROM puroks p LEFT JOIN barangays b ON p.barangay_id = b.id WHERE 1=1`
+    let sql = `SELECT p.*, b.name as barangay_name,
+                 (SELECT COUNT(*) FROM households h WHERE h.purok_id = p.id) AS household_count,
+                 (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.purok_id = p.id) AS resident_count
+               FROM puroks p LEFT JOIN barangays b ON p.barangay_id = b.id WHERE 1=1`
     const params = []
     if (barangay_id) { sql += ' AND p.barangay_id = ?'; params.push(barangay_id) }
     sql += ' ORDER BY b.name, p.name'

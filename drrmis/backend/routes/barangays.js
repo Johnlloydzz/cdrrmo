@@ -22,11 +22,15 @@ router.get('/', async (req, res) => {
 
     // Attach each barangay's actual purok names (not just the count) in one
     // extra query, grouped in JS to avoid an N+1 query per barangay.
-    const allPuroks = await all('SELECT id, barangay_id, name, flood_risk, flood_threshold_m, landslide_risk, latitude, longitude, boundary_geojson FROM puroks ORDER BY name')
+    const allPuroks = await all(`
+      SELECT p.id, p.barangay_id, p.name, p.flood_risk, p.flood_threshold_m, p.landslide_risk, p.latitude, p.longitude, p.boundary_geojson,
+        (SELECT COUNT(*) FROM households h WHERE h.purok_id = p.id) AS household_count,
+        (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.purok_id = p.id) AS resident_count
+      FROM puroks p ORDER BY p.name`)
     const puroksByBarangay = {}
     for (const p of allPuroks) {
       if (!puroksByBarangay[p.barangay_id]) puroksByBarangay[p.barangay_id] = []
-      puroksByBarangay[p.barangay_id].push({ id: p.id, name: p.name, flood_risk: p.flood_risk, flood_threshold_m: p.flood_threshold_m, landslide_risk: p.landslide_risk, latitude: p.latitude, longitude: p.longitude, boundary_geojson: p.boundary_geojson })
+      puroksByBarangay[p.barangay_id].push({ id: p.id, name: p.name, flood_risk: p.flood_risk, flood_threshold_m: p.flood_threshold_m, landslide_risk: p.landslide_risk, latitude: p.latitude, longitude: p.longitude, boundary_geojson: p.boundary_geojson, household_count: p.household_count, resident_count: p.resident_count })
     }
     for (const b of barangays) { b.puroks = puroksByBarangay[b.id] || [] }
 

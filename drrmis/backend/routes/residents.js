@@ -29,10 +29,11 @@ function toProperCase(str) {
 router.get('/', async (req, res) => {
   try {
     const { household_id, search } = req.query
-    let sql = `SELECT r.*, h.household_id as hh_code, b.name as barangay_name
+    let sql = `SELECT r.*, h.household_id as hh_code, b.name as barangay_name, p.name as purok_name
                FROM residents r
                LEFT JOIN households h ON r.household_id = h.id
                LEFT JOIN barangays b ON h.barangay_id = b.id
+               LEFT JOIN puroks p ON h.purok_id = p.id
                WHERE 1=1`
     const params = []
     // Barangay Officials only ever see residents whose household belongs to

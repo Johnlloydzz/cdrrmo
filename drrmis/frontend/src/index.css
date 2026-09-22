@@ -81,6 +81,19 @@
   transition: opacity 300ms ease, fill-opacity 300ms ease;
 }
 
+/* Purok name label — small, no shadow-heavy default Leaflet tooltip box,
+   just clean text so it doesn't clutter the map. */
+.purok-name-label {
+  background: rgba(255,255,255,0.85);
+  border: none;
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: #1e3a8a;
+  padding: 1px 4px;
+}
+.purok-name-label::before { display: none; }
+
 /* Removes the default browser focus outline (shows as a black rectangle)
    that appears after clicking a polygon on the Risk Assessment Dashboard's
    or Flood Simulation Control's map specifically — scoped here so it does
