@@ -46,7 +46,7 @@ async function all(sql, params = []) {
 const EXPECTED_COLUMNS = {
   users: { name: `TEXT`, email: `TEXT`, barangay_id: `INTEGER REFERENCES barangays(id)`, status: `TEXT DEFAULT 'Active'`, last_login: `TEXT`, last_active: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
   barangays: { risk_level: `TEXT DEFAULT 'Low'`, flood_susceptibility: `TEXT DEFAULT 'Low'`, landslide_susceptibility: `TEXT DEFAULT 'Low'`, population: `INTEGER DEFAULT 0`, boundary_geojson: `TEXT`, created_at: `TEXT`, updated_at: `TEXT`, captain_name: `TEXT`, contact_number: `TEXT` },
-  puroks: { flood_risk: `TEXT DEFAULT 'Low'`, flood_threshold_m: `REAL DEFAULT 1.0`, landslide_risk: `TEXT DEFAULT 'Low'`, latitude: `REAL`, longitude: `REAL`, created_at: `TEXT` },
+  puroks: { flood_risk: `TEXT DEFAULT 'Low'`, flood_threshold_m: `REAL DEFAULT 1.0`, landslide_risk: `TEXT DEFAULT 'Low'`, latitude: `REAL`, longitude: `REAL`, created_at: `TEXT`, boundary_geojson: `TEXT` },
   households: { household_id: `TEXT`, purok_id: `INTEGER REFERENCES puroks(id)`, latitude: `REAL`, longitude: `REAL`, contact: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
   residents: {
     resident_id: `TEXT`, age_bracket: `TEXT`, relation_to_head: `TEXT`, created_at: `TEXT`,

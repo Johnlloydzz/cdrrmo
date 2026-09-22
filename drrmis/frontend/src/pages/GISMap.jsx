@@ -642,8 +642,24 @@ export default function GISMap() {
             />
           ))}
 
-          {/* Purok name labels — positioned at the average location of that purok's
-              registered households, since puroks have no boundary polygon of their own */}
+          {/* Purok boundaries — real drawn polygons where a Barangay Official
+              has traced one; falls back to just a name label (at the
+              average location of that purok's registered households) for
+              puroks that don't have a boundary on file yet. */}
+          {activeOverlays.includes('Purok Boundaries') && barangaysWithCentroid.flatMap(b => (b.puroks || [])
+            .filter(p => p.boundary_geojson)
+            .map(p => {
+              let geo
+              try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
+              return (
+                <GeoJSON
+                  key={`purok-boundary-${p.id}`}
+                  data={geo}
+                  style={{ color: '#2563eb', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.08, dashArray: '4, 3' }}
+                />
+              )
+            })
+          )}
           {activeOverlays.includes('Purok Boundaries') && purokLabelPositions.map(p => (
             <Marker
               key={`purok-label-${p.purokId}`}

@@ -32,7 +32,7 @@ router.post('/', async (req, res) => {
     } else {
       return res.status(403).json({ error: 'You do not have permission to add puroks.' })
     }
-    const { name } = req.body
+    const { name, boundary_geojson } = req.body
     if (!barangay_id || !name) return res.status(400).json({ error: 'barangay_id and name are required' })
     // Flood/landslide risk and threshold are official CDRA classifications —
     // only CDRRMO Personnel can set them. A Barangay Official adding a new
@@ -42,8 +42,8 @@ router.post('/', async (req, res) => {
     const flood_threshold_m = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_threshold_m || 1.0) : 1.0
     const landslide_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.landslide_risk || 'Low') : 'Low'
     const result = await run(
-      `INSERT INTO puroks (barangay_id, name, flood_risk, flood_threshold_m, landslide_risk) VALUES (?, ?, ?, ?, ?)`,
-      [barangay_id, name, flood_risk, flood_threshold_m, landslide_risk]
+      `INSERT INTO puroks (barangay_id, name, flood_risk, flood_threshold_m, landslide_risk, boundary_geojson) VALUES (?, ?, ?, ?, ?, ?)`,
+      [barangay_id, name, flood_risk, flood_threshold_m, landslide_risk, boundary_geojson || null]
     )
     const newRow = await get('SELECT * FROM puroks WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -62,17 +62,19 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You do not have permission to edit puroks.' })
     }
     // Only CDRRMO Personnel can change the CDRA risk classification — a
-    // Barangay Official's edit only ever touches the purok's name, keeping
-    // the existing risk data exactly as CDRRMO last set it. Conversely,
-    // only the Barangay Official can rename an existing purok — CDRRMO can
-    // view it but not rename it, since only the barangay knows its puroks.
+    // Barangay Official's edit only ever touches the purok's name and
+    // boundary, keeping the existing risk data exactly as CDRRMO last set
+    // it. Conversely, only the Barangay Official can rename or redraw the
+    // boundary of an existing purok — CDRRMO can view it but not touch it,
+    // since only the barangay actually knows its own puroks' boundaries.
     const name = req.user.role === 'CDRRMO Personnel' ? existing.name : (req.body.name ?? existing.name)
+    const boundary_geojson = req.user.role === 'CDRRMO Personnel' ? existing.boundary_geojson : (req.body.boundary_geojson ?? existing.boundary_geojson)
     const flood_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_risk ?? existing.flood_risk) : existing.flood_risk
     const flood_threshold_m = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_threshold_m ?? existing.flood_threshold_m) : existing.flood_threshold_m
     const landslide_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.landslide_risk ?? existing.landslide_risk) : existing.landslide_risk
     await run(
-      `UPDATE puroks SET name=?, flood_risk=?, flood_threshold_m=?, landslide_risk=? WHERE id=?`,
-      [name, flood_risk, flood_threshold_m, landslide_risk, req.params.id]
+      `UPDATE puroks SET name=?, flood_risk=?, flood_threshold_m=?, landslide_risk=?, boundary_geojson=? WHERE id=?`,
+      [name, flood_risk, flood_threshold_m, landslide_risk, boundary_geojson, req.params.id]
     )
     const updated = await get('SELECT * FROM puroks WHERE id = ?', [req.params.id])
     res.json(updated)

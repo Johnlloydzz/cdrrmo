@@ -1,11 +1,55 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
+import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
+import { Search, Plus, Pencil, Trash2, MapPin, Undo2, RotateCcw } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
 
 const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
+const GINGOOG_CENTER = [8.8231, 125.1109]
 const emptyForm = { barangay_id: '', name: '', flood_risk: 'Low', flood_threshold_m: '1.0', landslide_risk: 'Low' }
+
+// GeoJSON stores rings as [lng, lat]; Leaflet works in [lat, lng] — these
+// two helpers keep that conversion in one place instead of scattered
+// throughout the component.
+function geojsonToLatLngs(geojson) {
+  try {
+    const g = typeof geojson === 'string' ? JSON.parse(geojson) : geojson
+    const ring = g?.type === 'Polygon' ? g.coordinates?.[0] : null
+    if (!ring) return []
+    // Drop the closing point GeoJSON repeats at the end of the ring.
+    return ring.slice(0, -1).map(([lng, lat]) => [lat, lng])
+  } catch { return [] }
+}
+function latLngsToGeojson(points) {
+  if (points.length < 3) return null
+  const ring = points.map(([lat, lng]) => [lng, lat])
+  ring.push(ring[0]) // close the ring
+  return JSON.stringify({ type: 'Polygon', coordinates: [ring] })
+}
+
+// Captures clicks on the embedded map to add boundary vertices one at a
+// time — a Barangay Official traces their purok's boundary themselves,
+// since they're the only one who actually knows where it runs.
+function BoundaryClickCapture({ onAddPoint }) {
+  useMapEvents({ click(e) { onAddPoint([e.latlng.lat, e.latlng.lng]) } })
+  return null
+}
+
+// Centers the embedded map on the selected barangay's boundary (or its
+// centroid pin if no boundary is on file yet) — only on first load, so it
+// never yanks the view away while someone is mid-drawing.
+function FitToBarangay({ boundaryGeojson, centroid }) {
+  const map = useMap()
+  useEffect(() => {
+    if (boundaryGeojson) {
+      const pts = geojsonToLatLngs(boundaryGeojson)
+      if (pts.length >= 3) { map.fitBounds(pts, { padding: [30, 30] }); return }
+    }
+    if (centroid) map.setView(centroid, 15)
+  }, [boundaryGeojson, centroid, map])
+  return null
+}
 
 export default function PurokManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official' || currentUser?.role === 'CDRRMO Personnel'
@@ -21,6 +65,8 @@ export default function PurokManagement({ currentUser }) {
   const [editing, setEditing] = useState(null)
   const [addingNew, setAddingNew] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [boundaryPoints, setBoundaryPoints] = useState([]) // [[lat,lng], ...] while drawing
+  const [existingBoundary, setExistingBoundary] = useState(null) // untouched boundary_geojson, kept until re-drawn
 
   const load = () => {
     setLoading(true)
@@ -34,19 +80,44 @@ export default function PurokManagement({ currentUser }) {
 
   const filtered = puroks.filter(p => (p.name || '').toLowerCase().includes(search.toLowerCase()) || (p.barangay_name || '').toLowerCase().includes(search.toLowerCase()))
 
+  // Whether the boundary map is editable in this session — same rule as the
+  // purok name: a Barangay Official can always draw/redraw it; CDRRMO can
+  // only draw one when creating a brand-new purok (for a barangay with no
+  // official yet), never on an existing one.
+  const boundaryEditable = !(editing && isCdrrmo)
+
+  const selectedBarangay = useMemo(() => barangays.find(b => String(b.id) === String(form.barangay_id)), [barangays, form.barangay_id])
+  const barangayCentroid = useMemo(() => {
+    if (!selectedBarangay?.boundary_geojson) return null
+    const pts = geojsonToLatLngs(selectedBarangay.boundary_geojson)
+    if (!pts.length) return null
+    const lat = pts.reduce((s, p) => s + p[0], 0) / pts.length
+    const lng = pts.reduce((s, p) => s + p[1], 0) / pts.length
+    return [lat, lng]
+  }, [selectedBarangay])
+
   const openAdd = () => {
     setEditing(null)
     setForm(isCdrrmo ? emptyForm : { ...emptyForm, barangay_id: currentUser?.barangay_id || '' })
     setAddingNew(false)
+    setBoundaryPoints([])
+    setExistingBoundary(null)
     setShowModal(true)
   }
   const openEdit = (p) => {
     setEditing(p.id)
     setForm({ barangay_id: p.barangay_id || '', name: p.name || '', flood_risk: p.flood_risk || 'Low', flood_threshold_m: String(p.flood_threshold_m ?? '1.0'), landslide_risk: p.landslide_risk || 'Low' })
     setAddingNew(true) // editing always shows a free text name field for the existing purok
+    setBoundaryPoints(geojsonToLatLngs(p.boundary_geojson))
+    setExistingBoundary(p.boundary_geojson || null)
     setShowModal(true)
   }
   const handleDelete = async (id) => { if (!window.confirm('Delete this purok?')) return; try { await apiDelete(`/puroks/${id}`); load() } catch (err) { alert(err.message) } }
+
+  const addBoundaryPoint = (pt) => { setExistingBoundary(null); setBoundaryPoints(prev => [...prev, pt]) }
+  const undoBoundaryPoint = () => setBoundaryPoints(prev => prev.slice(0, -1))
+  const clearBoundary = () => { setBoundaryPoints([]); setExistingBoundary(null) }
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.barangay_id) { alert('Purok name and barangay are required.'); return }
     if (!editing) {
@@ -56,7 +127,8 @@ export default function PurokManagement({ currentUser }) {
     }
     setSaving(true)
     try {
-      const payload = { ...form, flood_threshold_m: parseFloat(form.flood_threshold_m) || 1.0 }
+      const boundary_geojson = boundaryEditable ? (latLngsToGeojson(boundaryPoints) ?? (boundaryPoints.length === 0 ? null : existingBoundary)) : undefined
+      const payload = { ...form, flood_threshold_m: parseFloat(form.flood_threshold_m) || 1.0, ...(boundary_geojson !== undefined ? { boundary_geojson } : {}) }
       if (editing) { await apiPut(`/puroks/${editing}`, payload) } else { await apiPost('/puroks', payload) }
       setShowModal(false); load()
     } catch (err) { alert(err.message) } finally { setSaving(false) }
@@ -94,7 +166,7 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Flood Risk','Flood Threshold (m)','Landslide Risk', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Flood Risk','Flood Threshold (m)','Landslide Risk','Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
@@ -103,6 +175,7 @@ export default function PurokManagement({ currentUser }) {
                   <td className="table-cell"><span className={RISK[p.flood_risk] || 'badge-gray'}>{p.flood_risk}</span></td>
                   <td className="table-cell text-center">{p.flood_threshold_m} m</td>
                   <td className="table-cell"><span className={RISK[p.landslide_risk] || 'badge-gray'}>{p.landslide_risk}</span></td>
+                  <td className="table-cell text-xs text-gray-400">{p.boundary_geojson ? '✓ Drawn' : 'None'}</td>
                   {canAdd && (
                     <td className="table-cell">
                       <div className="flex gap-2">
@@ -113,7 +186,7 @@ export default function PurokManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={isCdrrmo ? 5 : (canAdd ? 4 : 5)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={isCdrrmo ? 6 : (canAdd ? 5 : 6)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -121,81 +194,117 @@ export default function PurokManagement({ currentUser }) {
 
       {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-5">{editing ? 'Edit Purok' : 'Add Purok'}</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="label">Barangay</label>
-                <select className="input" value={form.barangay_id} onChange={e => { setForm({...form, barangay_id: e.target.value, name: ''}); setAddingNew(false) }} disabled={!!editing || !isCdrrmo}>
-                  <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-                {barangaysError && <p className="text-xs text-red-600 mt-1">Could not load barangay list: {barangaysError}</p>}
-              </div>
-              <div className="col-span-2">
-                <label className="label">Purok</label>
-                {!addingNew ? (
-                  <select
-                    className="input"
-                    disabled={!form.barangay_id}
-                    value={form.name}
-                    onChange={e => {
-                      if (e.target.value === '__new__') { setForm({...form, name: ''}); setAddingNew(true); return }
-                      const match = (barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || [])
-                        .find(p => p.name === e.target.value)
-                      setForm({
-                        ...form, name: e.target.value,
-                        flood_risk: match?.flood_risk || 'Low',
-                        flood_threshold_m: String(match?.flood_threshold_m ?? '1.0'),
-                        landslide_risk: match?.landslide_risk || 'Low',
-                      })
-                    }}
-                  >
-                    <option value="">{form.barangay_id ? 'Select a purok…' : 'Select a barangay first'}</option>
-                    {(barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || []).map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                    {form.barangay_id && <option value="__new__">+ Add new purok…</option>}
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <h3 className="text-lg font-semibold px-6 pt-6 pb-4 flex-shrink-0">{editing ? 'Edit Purok' : 'Add Purok'}</h3>
+
+            <div className="overflow-y-auto px-6 pb-2 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="label">Barangay</label>
+                  <select className="input" value={form.barangay_id} onChange={e => { setForm({...form, barangay_id: e.target.value, name: ''}); setAddingNew(false) }} disabled={!!editing || !isCdrrmo}>
+                    <option value="">Select barangay…</option>{barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
+                  {barangaysError && <p className="text-xs text-red-600 mt-1">Could not load barangay list: {barangaysError}</p>}
+                </div>
+                <div className="col-span-2">
+                  <label className="label">Purok</label>
+                  {!addingNew ? (
+                    <select
                       className="input"
-                      autoFocus={!editing}
-                      disabled={!!editing && isCdrrmo}
-                      placeholder="Type new purok name…"
+                      disabled={!form.barangay_id}
                       value={form.name}
-                      onChange={e => setForm({...form, name: e.target.value})}
-                    />
-                    {!editing && <button type="button" className="btn-secondary whitespace-nowrap" onClick={() => { setAddingNew(false); setForm({...form, name: ''}) }}>Back to list</button>}
+                      onChange={e => {
+                        if (e.target.value === '__new__') { setForm({...form, name: ''}); setAddingNew(true); return }
+                        const match = (barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || [])
+                          .find(p => p.name === e.target.value)
+                        setForm({
+                          ...form, name: e.target.value,
+                          flood_risk: match?.flood_risk || 'Low',
+                          flood_threshold_m: String(match?.flood_threshold_m ?? '1.0'),
+                          landslide_risk: match?.landslide_risk || 'Low',
+                        })
+                      }}
+                    >
+                      <option value="">{form.barangay_id ? 'Select a purok…' : 'Select a barangay first'}</option>
+                      {(barangays.find(b => String(b.id) === String(form.barangay_id))?.puroks || []).map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                      {form.barangay_id && <option value="__new__">+ Add new purok…</option>}
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        className="input"
+                        autoFocus={!editing}
+                        disabled={!!editing && isCdrrmo}
+                        placeholder="Type new purok name…"
+                        value={form.name}
+                        onChange={e => setForm({...form, name: e.target.value})}
+                      />
+                      {!editing && <button type="button" className="btn-secondary whitespace-nowrap" onClick={() => { setAddingNew(false); setForm({...form, name: ''}) }}>Back to list</button>}
+                    </div>
+                  )}
+                </div>
+                {editing && isCdrrmo && (
+                  <p className="text-xs text-gray-400 col-span-2 -mt-2">Purok name is set by the Barangay Official — view only here.</p>
+                )}
+                {isCdrrmo ? (
+                  <>
+                    <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
+                    <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
+                    <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
+                  </>
+                ) : (
+                  <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 mb-2">Flood/Landslide Risk (CDRA) — set by CDRRMO only:</p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className={RISK[form.flood_risk] || 'badge-gray'}>Flood: {form.flood_risk || 'Low'}</span>
+                      <span className="badge-gray">Threshold: {form.flood_threshold_m || 1} m</span>
+                      <span className={RISK[form.landslide_risk] || 'badge-gray'}>Landslide: {form.landslide_risk || 'Low'}</span>
+                    </div>
                   </div>
                 )}
               </div>
-              {editing && isCdrrmo && (
-                <p className="text-xs text-gray-400 col-span-2 -mt-2">Purok name is set by the Barangay Official — view only here.</p>
-              )}
-              {isCdrrmo ? (
-                <>
-                  <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
-                  <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
-                  <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
-                </>
-              ) : (
-                <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-2">Flood/Landslide Risk (CDRA) — set by CDRRMO only:</p>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className={RISK[form.flood_risk] || 'badge-gray'}>Flood: {form.flood_risk || 'Low'}</span>
-                    <span className="badge-gray">Threshold: {form.flood_threshold_m || 1} m</span>
-                    <span className={RISK[form.landslide_risk] || 'badge-gray'}>Landslide: {form.landslide_risk || 'Low'}</span>
+
+              {/* Boundary drawing map — only whoever can rename the purok
+                  (Barangay Official always; CDRRMO only for a brand-new one)
+                  can draw or redraw its boundary, for the same reason: only
+                  the barangay actually knows where their puroks are. */}
+              {boundaryEditable && form.barangay_id && (
+                <div>
+                  <label className="label flex items-center gap-1.5"><MapPin size={13} /> Purok Boundary</label>
+                  <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point. Needs at least 3 points.</p>
+                  <div className="h-56 rounded-lg overflow-hidden border border-gray-200 relative">
+                    <MapContainer center={barangayCentroid || GINGOOG_CENTER} zoom={14} className="w-full h-full">
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+                      <FitToBarangay boundaryGeojson={existingBoundary} centroid={barangayCentroid} />
+                      <BoundaryClickCapture onAddPoint={addBoundaryPoint} />
+                      {boundaryPoints.map((pt, i) => <CircleMarker key={i} center={pt} radius={4} pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 1 }} />)}
+                      {boundaryPoints.length >= 3
+                        ? <Polygon positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
+                        : boundaryPoints.length === 2
+                          ? <Polyline positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2 }} />
+                          : null}
+                    </MapContainer>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-400">{boundaryPoints.length} point{boundaryPoints.length === 1 ? '' : 's'} placed</span>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={undoBoundaryPoint} disabled={boundaryPoints.length === 0} className="btn-secondary text-xs px-2.5 py-1.5 flex items-center gap-1 disabled:opacity-40"><Undo2 size={12} /> Undo point</button>
+                      <button type="button" onClick={clearBoundary} disabled={boundaryPoints.length === 0} className="btn-secondary text-xs px-2.5 py-1.5 flex items-center gap-1 disabled:opacity-40"><RotateCcw size={12} /> Clear</button>
+                    </div>
                   </div>
                 </div>
               )}
+
+              <p className="text-xs text-gray-400">
+                {isCdrrmo
+                  ? 'Flood Risk and Threshold values are based on the CDRRMO\'s existing CDRA data and used for geofencing.'
+                  : 'You can add or rename puroks and draw their boundary — the risk classification above is set by CDRRMO based on official CDRA data.'}
+              </p>
             </div>
-            <p className="text-xs text-gray-400 mt-3">
-              {isCdrrmo
-                ? 'Flood Risk and Threshold values are based on the CDRRMO\'s existing CDRA data and used for geofencing.'
-                : 'You can add or rename puroks in your barangay — the risk classification above is set by CDRRMO based on official CDRA data.'}
-            </p>
-            <div className="flex justify-end gap-3 mt-6">
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save' : 'Add Purok')}</button>
             </div>
