@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from
 import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves } from 'lucide-react'
 import { apiGet } from '../utils/api'
-import { SkeletonStatCards, SkeletonList, SkeletonBlock } from '../components/Skeleton'
+import { Skeleton, SkeletonList, SkeletonBlock } from '../components/Skeleton'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -245,7 +245,15 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         <div className="h-5 w-64 bg-gray-100 rounded animate-pulse mb-2" />
         <div className="h-3.5 w-96 max-w-full bg-gray-100 rounded animate-pulse" />
       </div>
-      <div className="flex-shrink-0"><SkeletonStatCards count={4} /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="card p-4 text-center">
+            <Skeleton className="h-5 w-5 mx-auto mb-2 rounded-full" />
+            <Skeleton className="h-7 w-12 mx-auto mb-2" />
+            <Skeleton className="h-3 w-32 mx-auto" />
+          </div>
+        ))}
+      </div>
       {wakingUp && (
         <div className="card p-3 text-center text-xs text-gray-400 flex items-center justify-center gap-2 flex-shrink-0">
           <div className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
