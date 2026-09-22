@@ -47,12 +47,37 @@ function FlyToHandler({ target }) {
   return null
 }
 
+// Leaflet computes its size once, when the map first mounts. In a flexbox
+// layout like this page's (map container is flex-1, sized by its parent's
+// remaining space), that size isn't final yet at mount time — the browser
+// hasn't finished settling the flex layout — so Leaflet can end up zoomed
+// in on a container size that's wrong, without ever correcting itself
+// afterward (that's why resizing the window, e.g. via F11, "fixes" it: a
+// resize event is exactly what tells Leaflet to recalculate). A
+// ResizeObserver on the map's own container catches every future size
+// change — including the very first "settling" right after mount — and
+// calls invalidateSize() so this fixes itself without needing a real resize.
+function MapResizeHandler() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
+
 // Fits the map to the selected barangay's boundary — same click-to-zoom
 // behavior as the Hazard Map & Geofencing page.
 function FitToBoundary({ geojsonLayer }) {
   const map = useMap()
   useEffect(() => {
     if (!geojsonLayer) return
+    // Make sure Leaflet's idea of the container size is current before
+    // fitting bounds to it — otherwise it can fit against a stale (often
+    // zero or wrong) size from before the flex layout settled.
+    map.invalidateSize()
     const bounds = geojsonLayer.getBounds()
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] })
   }, [geojsonLayer, map])
@@ -374,6 +399,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         <div className="dashboard-map-container flex-1 min-h-[300px] lg:min-h-0 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-1 transition-shadow">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+            <MapResizeHandler />
             <FlyToHandler target={flyTarget} />
 
             {/* All barangays — colored by official CDRA flood susceptibility
@@ -561,4 +587,4 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       )}
     </div>
   )
-} 
+}

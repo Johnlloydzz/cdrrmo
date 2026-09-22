@@ -90,11 +90,28 @@ function getCentroid(geojson) {
   }
 }
 
+// Leaflet computes its size once at mount, which can be wrong in a flexbox
+// layout before the browser finishes settling the flex sizing — a
+// ResizeObserver on the container catches that (and any later resize) and
+// tells Leaflet to recalculate, so the map never needs an actual window
+// resize (e.g. pressing F11) to display correctly.
+function MapResizeHandler() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
+
 // Helper component: pans/zooms the map to fit the selected barangay's boundary
 // (fallbackCenter is optional — used to fly to a centroid point when there's no boundary polygon)
 function FlyToBoundary({ geojsonLayer, fallbackCenter }) {
   const map = useMap()
   useEffect(() => {
+    map.invalidateSize()
     if (geojsonLayer) {
       const bounds = geojsonLayer.getBounds()
       if (bounds.isValid()) {
@@ -517,6 +534,7 @@ export default function GISMap() {
       {/* Map */}
       <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-1">
         <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
+          <MapResizeHandler />
           <TileLayer
             key={activeLayer}
             url={layer.url}

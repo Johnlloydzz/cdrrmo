@@ -65,6 +65,20 @@ function FlyToBarangay({ target }) {
   return null
 }
 
+// Same fix as GISMap/RiskAssessmentDashboard — a ResizeObserver keeps
+// Leaflet's container size correct as the flex layout settles, so the map
+// never needs a real window resize (e.g. F11) to display correctly.
+function MapResizeHandler() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
+
 export default function FloodSimulationControl() {
   const isDisplayMode = useLocation().pathname === '/flood-control/display'
   const [hazard, setHazard] = useState('flood') // 'flood' | 'landslide'
@@ -383,6 +397,7 @@ export default function FloodSimulationControl() {
         <div className="flood-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 lg:order-1">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+            <MapResizeHandler />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
 
             {barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
