@@ -63,7 +63,19 @@ function MapResizeHandler() {
     const container = map.getContainer()
     const observer = new ResizeObserver(() => map.invalidateSize())
     observer.observe(container)
-    return () => observer.disconnect()
+    // Belt-and-suspenders: ResizeObserver alone wasn't catching every case
+    // where the flex layout hadn't fully settled when Leaflet first
+    // measured its container. Forcing a few more invalidateSize() calls
+    // right after mount — one on the very next paint, a couple more
+    // shortly after — catches those without needing an actual window
+    // resize (like pressing F11) to fix itself.
+    const raf = requestAnimationFrame(() => map.invalidateSize())
+    const timers = [100, 300, 600].map(ms => setTimeout(() => map.invalidateSize(), ms))
+    return () => {
+      observer.disconnect()
+      cancelAnimationFrame(raf)
+      timers.forEach(clearTimeout)
+    }
   }, [map])
   return null
 }
