@@ -85,4 +85,38 @@ router.put('/auto-flood-barangays', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// GET /api/settings/system-info — basic organization info shown in the app
+// (currently just this Settings page). Anyone signed in can view it.
+router.get('/system-info', async (req, res) => {
+  try {
+    const keys = ['system_name', 'system_address', 'system_contact', 'system_email']
+    const rows = await Promise.all(keys.map(k => get('SELECT value FROM system_settings WHERE key = ?', [k])))
+    res.json({
+      name: rows[0]?.value || 'PDRA - Gingoog City CDRRMO',
+      address: rows[1]?.value || 'Gingoog City, Misamis Oriental',
+      contact: rows[2]?.value || '',
+      email: rows[3]?.value || '',
+    })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// PUT /api/settings/system-info — CDRRMO Personnel only.
+router.put('/system-info', async (req, res) => {
+  try {
+    if (req.user.role !== 'CDRRMO Personnel') {
+      return res.status(403).json({ error: 'Only CDRRMO Personnel can update system information.' })
+    }
+    const { name, address, contact, email } = req.body
+    const entries = [['system_name', name], ['system_address', address], ['system_contact', contact], ['system_email', email]]
+    await Promise.all(entries.map(([key, value]) =>
+      run(
+        `INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now', '+8 hours'))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        [key, value || '']
+      )
+    ))
+    res.json({ name, address, contact, email })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 module.exports = router
