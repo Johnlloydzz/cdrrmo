@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { MapContainer, TileLayer, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
 import { Search, Plus, Pencil, Trash2, MapPin, Undo2, RotateCcw } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
@@ -36,18 +36,18 @@ function BoundaryClickCapture({ onAddPoint }) {
   return null
 }
 
-// Centers the embedded map on the selected barangay's boundary (or its
-// centroid pin if no boundary is on file yet) — only on first load, so it
-// never yanks the view away while someone is mid-drawing.
-function FitToBarangay({ boundaryGeojson, centroid }) {
+// Centers the embedded map on whichever boundary layer it's given — either
+// the purok's own boundary if one's already drawn, or (as a fallback,
+// falling all the way back to just the barangay's boundary) so the map is
+// never just sitting on the whole city by default. Only runs once per
+// layer, so it never yanks the view away while someone is mid-drawing.
+function FitToBoundary({ geojsonLayer }) {
   const map = useMap()
   useEffect(() => {
-    if (boundaryGeojson) {
-      const pts = geojsonToLatLngs(boundaryGeojson)
-      if (pts.length >= 3) { map.fitBounds(pts, { padding: [30, 30] }); return }
-    }
-    if (centroid) map.setView(centroid, 15)
-  }, [boundaryGeojson, centroid, map])
+    if (!geojsonLayer) return
+    const bounds = geojsonLayer.getBounds()
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] })
+  }, [geojsonLayer, map])
   return null
 }
 
@@ -67,6 +67,8 @@ export default function PurokManagement({ currentUser }) {
   const [form, setForm] = useState(emptyForm)
   const [boundaryPoints, setBoundaryPoints] = useState([]) // [[lat,lng], ...] while drawing
   const [existingBoundary, setExistingBoundary] = useState(null) // untouched boundary_geojson, kept until re-drawn
+  const [barangayBoundaryLayer, setBarangayBoundaryLayer] = useState(null) // ref to the background barangay outline, for fitBounds
+  const [purokBoundaryLayer, setPurokBoundaryLayer] = useState(null) // ref to the purok's own existing boundary, for fitBounds
 
   const load = () => {
     setLoading(true)
@@ -87,14 +89,6 @@ export default function PurokManagement({ currentUser }) {
   const boundaryEditable = !(editing && isCdrrmo)
 
   const selectedBarangay = useMemo(() => barangays.find(b => String(b.id) === String(form.barangay_id)), [barangays, form.barangay_id])
-  const barangayCentroid = useMemo(() => {
-    if (!selectedBarangay?.boundary_geojson) return null
-    const pts = geojsonToLatLngs(selectedBarangay.boundary_geojson)
-    if (!pts.length) return null
-    const lat = pts.reduce((s, p) => s + p[0], 0) / pts.length
-    const lng = pts.reduce((s, p) => s + p[1], 0) / pts.length
-    return [lat, lng]
-  }, [selectedBarangay])
 
   const openAdd = () => {
     setEditing(null)
@@ -102,6 +96,8 @@ export default function PurokManagement({ currentUser }) {
     setAddingNew(false)
     setBoundaryPoints([])
     setExistingBoundary(null)
+    setBarangayBoundaryLayer(null)
+    setPurokBoundaryLayer(null)
     setShowModal(true)
   }
   const openEdit = (p) => {
@@ -110,6 +106,8 @@ export default function PurokManagement({ currentUser }) {
     setAddingNew(true) // editing always shows a free text name field for the existing purok
     setBoundaryPoints(geojsonToLatLngs(p.boundary_geojson))
     setExistingBoundary(p.boundary_geojson || null)
+    setBarangayBoundaryLayer(null)
+    setPurokBoundaryLayer(null)
     setShowModal(true)
   }
   const handleDelete = async (id) => { if (!window.confirm('Delete this purok?')) return; try { await apiDelete(`/puroks/${id}`); load() } catch (err) { alert(err.message) } }
@@ -275,10 +273,43 @@ export default function PurokManagement({ currentUser }) {
                   <label className="label flex items-center gap-1.5"><MapPin size={13} /> Purok Boundary</label>
                   <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point. Needs at least 3 points.</p>
                   <div className="h-56 rounded-lg overflow-hidden border border-gray-200 relative">
-                    <MapContainer center={barangayCentroid || GINGOOG_CENTER} zoom={14} className="w-full h-full">
+                    <MapContainer center={GINGOOG_CENTER} zoom={13} className="w-full h-full">
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-                      <FitToBarangay boundaryGeojson={existingBoundary} centroid={barangayCentroid} />
                       <BoundaryClickCapture onAddPoint={addBoundaryPoint} />
+
+                      {/* Background reference: the barangay's own boundary
+                          (light blue) — same as the pin on Register
+                          Household, so it's immediately obvious this is the
+                          right area even without picking the barangay by
+                          name (it's already locked to their own). */}
+                      {selectedBarangay?.boundary_geojson && (() => {
+                        let geo
+                        try { geo = JSON.parse(selectedBarangay.boundary_geojson) } catch { return null }
+                        return (
+                          <GeoJSON
+                            key={`brgy-${selectedBarangay.id}`}
+                            data={geo}
+                            pathOptions={{ color: '#0ea5e9', weight: 2.5, fillColor: '#0ea5e9', fillOpacity: 0.06 }}
+                            ref={setBarangayBoundaryLayer}
+                          />
+                        )
+                      })()}
+
+                      {/* The purok's own existing boundary, if it already
+                          has one — shown only until the user starts
+                          re-drawing (existingBoundary clears on first
+                          click), at which point boundaryPoints takes over. */}
+                      {existingBoundary && boundaryPoints.length === 0 && (() => {
+                        let geo
+                        try { geo = JSON.parse(existingBoundary) } catch { return null }
+                        return <GeoJSON key="purok-existing" data={geo} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} ref={setPurokBoundaryLayer} />
+                      })()}
+
+                      {/* Fit to whichever boundary is available, preferring
+                          the purok's own (a tighter, more useful zoom) over
+                          the barangay's if both exist. */}
+                      <FitToBoundary geojsonLayer={purokBoundaryLayer || barangayBoundaryLayer} />
+
                       {boundaryPoints.map((pt, i) => <CircleMarker key={i} center={pt} radius={4} pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 1 }} />)}
                       {boundaryPoints.length >= 3
                         ? <Polygon positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
