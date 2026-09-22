@@ -203,25 +203,25 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   }
 
   if (loading) return (
-    <div className="space-y-4">
-      <div>
-        <div className="h-6 w-64 bg-gray-100 rounded animate-pulse mb-2" />
-        <div className="h-4 w-96 max-w-full bg-gray-100 rounded animate-pulse" />
+    <div className="h-full flex flex-col gap-3 overflow-hidden">
+      <div className="flex-shrink-0">
+        <div className="h-5 w-64 bg-gray-100 rounded animate-pulse mb-2" />
+        <div className="h-3.5 w-96 max-w-full bg-gray-100 rounded animate-pulse" />
       </div>
-      <SkeletonStatCards count={4} />
+      <div className="flex-shrink-0"><SkeletonStatCards count={4} /></div>
       {wakingUp && (
-        <div className="card p-3 text-center text-xs text-gray-400 flex items-center justify-center gap-2">
+        <div className="card p-3 text-center text-xs text-gray-400 flex items-center justify-center gap-2 flex-shrink-0">
           <div className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
           Waking up the server… (up to a minute after a period of inactivity)
         </div>
       )}
-      <div className="flex flex-col lg:flex-row gap-4 lg:h-[560px]">
+      <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0">
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3">
-          <div className="card p-4"><div className="h-9 bg-gray-100 rounded animate-pulse" /></div>
-          <div className="card p-4"><SkeletonList rows={7} /></div>
+          <div className="card p-3"><div className="h-9 bg-gray-100 rounded animate-pulse" /></div>
+          <div className="card p-3"><SkeletonList rows={7} /></div>
         </div>
         <div className="lg:flex-1 rounded-xl overflow-hidden">
-          <SkeletonBlock className="h-[70vh] lg:h-full w-full" />
+          <SkeletonBlock className="h-[50vh] lg:h-full w-full" />
         </div>
       </div>
     </div>
@@ -229,10 +229,10 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-800">Risk Assessment Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">
+    <div className="h-full flex flex-col gap-3 overflow-hidden">
+      <div className="flex-shrink-0">
+        <h1 className="text-lg font-semibold text-gray-800">Risk Assessment Dashboard</h1>
+        <p className="text-xs text-gray-500 mt-0.5">
           Projected households and population within high flood-risk zones, based on CDRA-aligned purok classification (geofencing).
         </p>
         {selectedBarangay && (
@@ -243,45 +243,52 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         )}
       </div>
 
-      {floodLevel > 0 && (
-        <div className="card p-3 bg-red-50 border border-red-200 flex items-center gap-2">
-          <Waves size={15} className="text-red-500 flex-shrink-0" />
-          <p className="text-xs text-red-700">
-            <strong>Active flood simulation:</strong> reported water level is {floodLevel} m — figures below reflect puroks whose flood threshold is at or below this level, overriding the static CDRA classification.
-          </p>
+      {/* Smooth grid-rows collapse/expand instead of the banner just
+          popping in or out when a flood simulation starts/ends. */}
+      <div className={`grid transition-all duration-300 ease-out flex-shrink-0 ${floodLevel > 0 ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="overflow-hidden">
+          <div className="card p-2.5 bg-red-50 border border-red-200 flex items-center gap-2">
+            <Waves size={14} className="text-red-500 flex-shrink-0" />
+            <p className="text-xs text-red-700">
+              <strong>Active flood simulation:</strong> reported water level is {floodLevel} m — figures below reflect puroks whose flood threshold is at or below this level, overriding the static CDRA classification.
+            </p>
+          </div>
         </div>
-      )}
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button type="button" onClick={() => setShowRiskBarangays(true)} className="card p-4 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
-          <Waves size={20} className="mx-auto mb-1 text-blue-500" />
-          <p className="text-2xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-1">Barangays in Risk Zone {floodLevel > 0 ? '(live)' : ''}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
+        <button type="button" onClick={() => setShowRiskBarangays(true)} className="card p-3 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
+          <Waves size={18} className="mx-auto mb-1 text-blue-500" />
+          <p className="text-xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Barangays in Risk Zone {floodLevel > 0 ? '(live)' : ''}</p>
         </button>
-        <div className="card p-4 text-center">
-          <AlertTriangle size={20} className="mx-auto mb-1 text-red-500" />
-          <p className="text-2xl font-bold text-red-600">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-1">Total Households in High-Risk Zones</p>
+        <div className="card p-3 text-center transition-all">
+          <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
+          <p className="text-xl font-bold text-red-600">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Total Households in High-Risk Zones</p>
         </div>
-        <div className="card p-4 text-center">
-          <AlertTriangle size={20} className="mx-auto mb-1 text-red-500" />
-          <p className="text-2xl font-bold text-red-600">{displayTotals.atRiskPopulation.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-1">Population in High-Risk Zones</p>
+        <div className="card p-3 text-center transition-all">
+          <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
+          <p className="text-xl font-bold text-red-600">{displayTotals.atRiskPopulation.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Population in High-Risk Zones</p>
         </div>
       </div>
 
       {/* Map section — same two-column layout as Hazard Map & Geofencing:
-          barangay list on the left, click one to zoom to its boundary. */}
-      <div id="dashboard-map-section" className="flex flex-col lg:flex-row gap-4 lg:h-[560px]">
+          barangay list on the left, click one to zoom to its boundary.
+          flex-1 min-h-0 so this fills whatever space is left instead of a
+          fixed height, keeping the whole page within the viewport with no
+          page-level scroll. */}
+      <div id="dashboard-map-section" className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0">
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto order-2 lg:order-2">
-          <div className="card p-4">
-            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Search size={15} /> Search</h3>
-            <input className="input text-sm" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="card p-3">
+            <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Search size={13} /> Search</h3>
+            <input className="input text-sm py-1.5" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
 
-          <div className="card p-4">
-            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
-            <div className="space-y-0.5 max-h-64 overflow-y-auto">
+          <div className="card p-3">
+            <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Building2 size={13} /> Barangays</h3>
+            <div className="space-y-0.5 max-h-52 overflow-y-auto">
               {filteredBarangays.map(b => {
                 const atRisk = (atRiskByBarangay[b.id]?.at_risk_households || 0) > 0
                 return (
@@ -302,19 +309,19 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           </div>
 
           {selectedBarangay && selectedStats && (
-            <div className="card p-4">
-              <h3 className="font-semibold text-sm mb-2 flex items-center gap-2"><ShieldAlert size={15} /> {selectedBarangay.name}</h3>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div className="bg-gray-50 rounded-lg py-2 text-center">
-                  <p className="text-lg font-bold text-gray-700">{selectedStats.total_households}</p>
+            <div className="card p-3 animate-[fadeIn_0.2s_ease-out]">
+              <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><ShieldAlert size={13} /> {selectedBarangay.name}</h3>
+              <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                <div className="bg-gray-50 rounded-lg py-1.5 text-center">
+                  <p className="text-base font-bold text-gray-700">{selectedStats.total_households}</p>
                   <p className="text-[10px] text-gray-500 uppercase">Households</p>
                 </div>
-                <div className="bg-red-50 rounded-lg py-2 text-center">
-                  <p className="text-lg font-bold text-red-600">{selectedStats.at_risk_households}</p>
+                <div className="bg-red-50 rounded-lg py-1.5 text-center">
+                  <p className="text-base font-bold text-red-600">{selectedStats.at_risk_households}</p>
                   <p className="text-[10px] text-gray-500 uppercase">At-Risk</p>
                 </div>
-                <div className="bg-gray-50 rounded-lg py-2 text-center">
-                  <p className="text-lg font-bold text-gray-700">
+                <div className="bg-gray-50 rounded-lg py-1.5 text-center">
+                  <p className="text-base font-bold text-gray-700">
                     {(() => {
                       const puroks = selectedBarangay.puroks || []
                       const atRisk = puroks.filter(p => floodLevel > 0 ? floodLevel >= p.flood_threshold_m : p.flood_risk === 'High').length
@@ -323,23 +330,23 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   </p>
                   <p className="text-[10px] text-gray-500 uppercase">Puroks At-Risk</p>
                 </div>
-                <div className="bg-red-50 rounded-lg py-2 text-center">
-                  <p className="text-lg font-bold text-red-600">{selectedStats.at_risk_population}</p>
+                <div className="bg-red-50 rounded-lg py-1.5 text-center">
+                  <p className="text-base font-bold text-red-600">{selectedStats.at_risk_population}</p>
                   <p className="text-[10px] text-gray-500 uppercase">At-Risk Pop.</p>
                 </div>
               </div>
               {!selectedBarangay.boundary_geojson && (
                 <p className="text-xs text-amber-600 mt-2">No boundary data uploaded for this barangay yet.</p>
               )}
-              <button type="button" onClick={openHouseholdList} className="text-xs text-primary-600 hover:text-primary-800 underline mt-3">
+              <button type="button" onClick={openHouseholdList} className="text-xs text-primary-600 hover:text-primary-800 underline mt-2">
                 View household list for {selectedBarangay.name}
               </button>
             </div>
           )}
 
-          <div className="card p-4">
-            <h3 className="font-semibold text-sm mb-3">Legend</h3>
-            <div className="space-y-2">
+          <div className="card p-3">
+            <h3 className="font-semibold text-xs mb-2">Legend</h3>
+            <div className="space-y-1.5">
               {[
                 { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
                 { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
@@ -349,7 +356,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   {l.label}
                 </div>
               ))}
-              <div className="border-t border-gray-100 my-2" />
+              <div className="border-t border-gray-100 my-1.5" />
               {[
                 { color: '#dc2626', label: 'Household — High Flood-Risk Zone' },
                 { color: '#3b82f6', label: 'Household — Outside High-Risk Zone' },
@@ -364,7 +371,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           </div>
         </div>
 
-        <div className="dashboard-map-container h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-1">
+        <div className="dashboard-map-container flex-1 min-h-[300px] lg:min-h-0 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-1 transition-shadow">
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <FlyToHandler target={flyTarget} />
@@ -421,8 +428,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 italic">
-        "At-risk" households/population are those located within puroks classified as High flood-risk, per the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) data. Red dot in the barangay list = has at-risk households.
+      <p className="text-[11px] text-gray-400 italic flex-shrink-0">
+        "At-risk" = within puroks classified High flood-risk (CDRRMO's CDRA data). Red dot in barangay list = has at-risk households.
       </p>
 
       {/* Total Households drill-down — docked to the right (away from the
@@ -554,4 +561,4 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       )}
     </div>
   )
-}
+} 
