@@ -163,11 +163,28 @@ export default function PurokManagement({ currentUser }) {
                   </div>
                 )}
               </div>
-              <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
-              <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
-              <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
+              {isCdrrmo ? (
+                <>
+                  <div><label className="label">Flood Risk (CDRA)</label><select className="input" value={form.flood_risk} onChange={e => setForm({...form, flood_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
+                  <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
+                  <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
+                </>
+              ) : (
+                <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-2">Flood/Landslide Risk (CDRA) — set by CDRRMO only:</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className={RISK[form.flood_risk] || 'badge-gray'}>Flood: {form.flood_risk || 'Low'}</span>
+                    <span className="badge-gray">Threshold: {form.flood_threshold_m || 1} m</span>
+                    <span className={RISK[form.landslide_risk] || 'badge-gray'}>Landslide: {form.landslide_risk || 'Low'}</span>
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-xs text-gray-400 mt-3">Flood Risk and Threshold values are based on the CDRRMO's existing CDRA data and used for geofencing.</p>
+            <p className="text-xs text-gray-400 mt-3">
+              {isCdrrmo
+                ? 'Flood Risk and Threshold values are based on the CDRRMO\'s existing CDRA data and used for geofencing.'
+                : 'You can add or rename puroks in your barangay — the risk classification above is set by CDRRMO based on official CDRA data.'}
+            </p>
             <div className="flex justify-end gap-3 mt-6">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : (editing ? 'Save' : 'Add Purok')}</button>

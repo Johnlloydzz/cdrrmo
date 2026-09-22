@@ -32,11 +32,18 @@ router.post('/', async (req, res) => {
     } else {
       return res.status(403).json({ error: 'You do not have permission to add puroks.' })
     }
-    const { name, flood_risk, flood_threshold_m, landslide_risk } = req.body
+    const { name } = req.body
     if (!barangay_id || !name) return res.status(400).json({ error: 'barangay_id and name are required' })
+    // Flood/landslide risk and threshold are official CDRA classifications —
+    // only CDRRMO Personnel can set them. A Barangay Official adding a new
+    // purok always gets the safe defaults here; a CDRRMO Personnel can set
+    // the real values right away.
+    const flood_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_risk || 'Low') : 'Low'
+    const flood_threshold_m = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_threshold_m || 1.0) : 1.0
+    const landslide_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.landslide_risk || 'Low') : 'Low'
     const result = await run(
       `INSERT INTO puroks (barangay_id, name, flood_risk, flood_threshold_m, landslide_risk) VALUES (?, ?, ?, ?, ?)`,
-      [barangay_id, name, flood_risk || 'Low', flood_threshold_m || 1.0, landslide_risk || 'Low']
+      [barangay_id, name, flood_risk, flood_threshold_m, landslide_risk]
     )
     const newRow = await get('SELECT * FROM puroks WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -46,7 +53,7 @@ router.post('/', async (req, res) => {
 // PUT /api/puroks/:id
 router.put('/:id', async (req, res) => {
   try {
-    const existing = await get('SELECT barangay_id FROM puroks WHERE id = ?', [req.params.id])
+    const existing = await get('SELECT * FROM puroks WHERE id = ?', [req.params.id])
     if (!existing) return res.status(404).json({ error: 'Not found' })
     if (req.user.role === 'Barangay Official' && existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit puroks in your own barangay.' })
@@ -54,7 +61,13 @@ router.put('/:id', async (req, res) => {
     if (req.user.role !== 'CDRRMO Personnel' && req.user.role !== 'Barangay Official') {
       return res.status(403).json({ error: 'You do not have permission to edit puroks.' })
     }
-    const { name, flood_risk, flood_threshold_m, landslide_risk } = req.body
+    // Only CDRRMO Personnel can change the CDRA risk classification — a
+    // Barangay Official's edit only ever touches the purok's name, keeping
+    // the existing risk data exactly as CDRRMO last set it.
+    const name = req.body.name ?? existing.name
+    const flood_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_risk ?? existing.flood_risk) : existing.flood_risk
+    const flood_threshold_m = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_threshold_m ?? existing.flood_threshold_m) : existing.flood_threshold_m
+    const landslide_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.landslide_risk ?? existing.landslide_risk) : existing.landslide_risk
     await run(
       `UPDATE puroks SET name=?, flood_risk=?, flood_threshold_m=?, landslide_risk=? WHERE id=?`,
       [name, flood_risk, flood_threshold_m, landslide_risk, req.params.id]
