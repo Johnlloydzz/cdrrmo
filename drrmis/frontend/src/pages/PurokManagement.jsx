@@ -107,7 +107,7 @@ export default function PurokManagement({ currentUser }) {
                     <td className="table-cell">
                       <div className="flex gap-2">
                         <button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(p)}><Pencil size={15} /></button>
-                        <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(p.id)}><Trash2 size={15} /></button>
+                        {!isCdrrmo && <button className="p-1.5 rounded hover:bg-red-50 text-red-600" onClick={() => handleDelete(p.id)}><Trash2 size={15} /></button>}
                       </div>
                     </td>
                   )}

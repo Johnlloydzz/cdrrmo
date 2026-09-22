@@ -64,16 +64,18 @@ router.put('/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-// DELETE /api/puroks/:id
+// DELETE /api/puroks/:id — Barangay Officials only (their own barangay).
+// CDRRMO Personnel can add/edit puroks for any barangay but intentionally
+// cannot delete them — deleting is left to the barangay that owns the data.
 router.delete('/:id', async (req, res) => {
   try {
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'Only Barangay Officials can delete puroks.' })
+    }
     const existing = await get('SELECT barangay_id FROM puroks WHERE id = ?', [req.params.id])
     if (!existing) return res.status(404).json({ error: 'Not found' })
-    if (req.user.role === 'Barangay Official' && existing.barangay_id !== req.user.barangay_id) {
+    if (existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only delete puroks in your own barangay.' })
-    }
-    if (req.user.role !== 'CDRRMO Personnel' && req.user.role !== 'Barangay Official') {
-      return res.status(403).json({ error: 'You do not have permission to delete puroks.' })
     }
     const result = await run('DELETE FROM puroks WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
