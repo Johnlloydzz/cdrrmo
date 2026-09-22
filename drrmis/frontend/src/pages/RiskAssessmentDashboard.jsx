@@ -254,15 +254,17 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
-    <div className="h-full flex flex-col gap-3 overflow-hidden">
-      <div className="flex-shrink-0">
-        <h1 className="text-lg font-semibold text-gray-800">Risk Assessment Dashboard</h1>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Projected households and population within high flood-risk zones, based on CDRA-aligned purok classification (geofencing).
-        </p>
+    <div className="h-full flex flex-col gap-2.5 overflow-hidden">
+      <div className="flex items-start justify-between gap-3 flex-shrink-0">
+        <div>
+          <h1 className="text-base font-semibold text-gray-800">Risk Assessment Dashboard</h1>
+          <p className="text-xs text-gray-400">
+            Projected households/population in high flood-risk zones, based on CDRA-aligned purok classification.
+          </p>
+        </div>
         {selectedBarangay && (
-          <p className="text-xs text-primary-700 font-medium mt-1 flex items-center gap-1">
-            <Building2 size={12} /> Showing figures for {selectedBarangay.name} only
+          <p className="text-xs text-primary-700 font-medium flex items-center gap-1 flex-shrink-0 pt-0.5">
+            <Building2 size={12} /> {selectedBarangay.name} only
             <button type="button" onClick={() => setSelectedBarangay(null)} className="text-gray-400 hover:text-gray-600 underline ml-1">clear</button>
           </p>
         )}
@@ -272,8 +274,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           popping in or out when a flood simulation starts/ends. */}
       <div className={`grid transition-all duration-300 ease-out flex-shrink-0 ${floodLevel > 0 ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
         <div className="overflow-hidden">
-          <div className="card p-2.5 bg-red-50 border border-red-200 flex items-center gap-2">
-            <Waves size={14} className="text-red-500 flex-shrink-0" />
+          <div className="card p-2 bg-red-50 border border-red-200 flex items-center gap-2">
+            <Waves size={13} className="text-red-500 flex-shrink-0" />
             <p className="text-xs text-red-700">
               <strong>Active flood simulation:</strong> reported water level is {floodLevel} m — figures below reflect puroks whose flood threshold is at or below this level, overriding the static CDRA classification.
             </p>
@@ -281,21 +283,35 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
-        <button type="button" onClick={() => setShowRiskBarangays(true)} className="card p-3 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
-          <Waves size={18} className="mx-auto mb-1 text-blue-500" />
-          <p className="text-xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Barangays in Risk Zone {floodLevel > 0 ? '(live)' : ''}</p>
-        </button>
-        <div className="card p-3 text-center transition-all">
-          <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
-          <p className="text-xl font-bold text-red-600">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Total Households in High-Risk Zones</p>
-        </div>
-        <div className="card p-3 text-center transition-all">
-          <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
-          <p className="text-xl font-bold text-red-600">{displayTotals.atRiskPopulation.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Population in High-Risk Zones</p>
+      <div className="card p-0 flex-shrink-0 overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+          <button type="button" onClick={() => setShowRiskBarangays(true)} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <Waves size={17} className="text-blue-500" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-gray-800 leading-tight">{barangaysInRiskZoneCount.toLocaleString()}</p>
+              <p className="text-[11px] text-gray-500">Barangays in Risk Zone {floodLevel > 0 ? '(live)' : ''}</p>
+            </div>
+          </button>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={17} className="text-red-500" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-red-600 leading-tight">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
+              <p className="text-[11px] text-gray-500">Households in High-Risk Zones</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle size={17} className="text-red-500" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-red-600 leading-tight">{displayTotals.atRiskPopulation.toLocaleString()}</p>
+              <p className="text-[11px] text-gray-500">Population in High-Risk Zones</p>
+            </div>
+          </div>
         </div>
       </div>
 
