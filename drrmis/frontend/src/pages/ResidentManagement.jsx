@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone, MapPin } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BirthdateInput from '../components/BirthdateInput'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
@@ -31,6 +31,8 @@ export default function ResidentManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [residents, setResidents] = useState([])
   const [households, setHouseholds] = useState([])
+  const [puroks, setPuroks] = useState([])
+  const [purokFilter, setPurokFilter] = useState('') // UI-only: narrows the Household list below
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -47,6 +49,10 @@ export default function ResidentManagement({ currentUser }) {
   useEffect(() => {
     load()
     apiGet('/households').then(setHouseholds).catch(() => {})
+    // Already scoped to the Barangay Official's own barangay server-side —
+    // this is exactly what they set up in Puroks, reused here instead of
+    // free-typing anything.
+    apiGet('/puroks').then(setPuroks).catch(() => {})
   }, [])
 
   const filtered = residents.filter(r =>
@@ -55,7 +61,7 @@ export default function ResidentManagement({ currentUser }) {
     (r.purok_name || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const openAdd = () => { setEditing(null); setForm(emptyForm); setShowModal(true) }
+  const openAdd = () => { setEditing(null); setForm(emptyForm); setPurokFilter(''); setShowModal(true) }
   const openEdit = (r) => {
     setEditing(r.id)
     setForm({
@@ -63,6 +69,10 @@ export default function ResidentManagement({ currentUser }) {
       birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '',
       sex: r.sex || '', contact_number: r.contact_number || '',
     })
+    // Pre-set the purok filter to match this resident's current household,
+    // so the Household dropdown below opens already narrowed down to it.
+    const hh = households.find(h => String(h.id) === String(r.household_id))
+    setPurokFilter(hh?.purok_id ? String(hh.purok_id) : '')
     setShowModal(true)
   }
 
@@ -100,7 +110,7 @@ export default function ResidentManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Purok','Barangay'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Res. ID','Barangay','Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
           <tbody><SkeletonTableRows columns={10} rows={5} /></tbody>
         </table>
@@ -132,21 +142,21 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Name','Sex','Birthdate','Age','Relation to Head','Contact','Household','Purok','Barangay', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID','Barangay','Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
+                  <td className="table-cell">{r.barangay_name || '—'}</td>
+                  <td className="table-cell">{r.purok_name || '—'}</td>
+                  <td className="table-cell font-mono text-xs">{r.hh_code}</td>
                   <td className="table-cell font-medium">{r.name}</td>
                   <td className="table-cell">{r.sex || '—'}</td>
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
                   <td className="table-cell">{computeAge(r.birthdate)}</td>
-                  <td className="table-cell">{r.relation_to_head}</td>
                   <td className="table-cell">{r.contact_number || '—'}</td>
-                  <td className="table-cell font-mono text-xs">{r.hh_code}</td>
-                  <td className="table-cell">{r.purok_name || '—'}</td>
-                  <td className="table-cell">{r.barangay_name || '—'}</td>
+                  <td className="table-cell">{r.relation_to_head}</td>
                   {canAdd && (
                     <td className="table-cell">
                       <div className="flex gap-2">
@@ -176,11 +186,21 @@ export default function ResidentManagement({ currentUser }) {
 
             <div className="overflow-y-auto px-6 py-5 space-y-4 bg-gray-50/50">
               <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><MapPin size={13} className="text-primary-500" /> Purok</label>
+                <select className="input mb-3" value={purokFilter} onChange={e => { setPurokFilter(e.target.value); setForm({...form, household_id: ''}) }} disabled={!!editing}>
+                  <option value="">All puroks — show every household</option>
+                  {puroks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mb-3 -mt-2">Uses the puroks you set up in Puroks — pick one to narrow down the household list below.</p>
+
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Home size={13} className="text-primary-500" /> Household</label>
                 <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
                   <option value="">Select household…</option>
-                  {households.map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
+                  {households.filter(h => !purokFilter || String(h.purok_id) === String(purokFilter)).map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
                 </select>
+                {purokFilter && households.filter(h => String(h.purok_id) === String(purokFilter)).length === 0 && (
+                  <p className="text-xs text-amber-600 mt-2">No households registered in this purok yet.</p>
+                )}
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-4">
