@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, Marker, useMap, useMapEvents } from 'react-leaflet'
+import L from 'leaflet'
 import { Search, Plus, Pencil, Trash2, MapPin, Undo2, RotateCcw } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
@@ -8,6 +9,16 @@ import { SkeletonTableRows } from '../components/Skeleton'
 const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
 const GINGOOG_CENTER = [8.8231, 125.1109]
 const emptyForm = { barangay_id: '', name: '', flood_risk: 'Low', flood_threshold_m: '1.0', landslide_risk: 'Low' }
+
+// A small round dot, draggable — used for each boundary vertex. Leaflet's
+// CircleMarker can't be dragged (only Marker supports that), so a plain
+// Marker with a tiny custom icon stands in for the dot look instead.
+const vertexIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid white;box-shadow:0 0 2px rgba(0,0,0,0.4);"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+})
 
 // GeoJSON stores rings as [lng, lat]; Leaflet works in [lat, lng] — these
 // two helpers keep that conversion in one place instead of scattered
@@ -113,6 +124,7 @@ export default function PurokManagement({ currentUser }) {
   const handleDelete = async (id) => { if (!window.confirm('Delete this purok?')) return; try { await apiDelete(`/puroks/${id}`); load() } catch (err) { alert(err.message) } }
 
   const addBoundaryPoint = (pt) => { setExistingBoundary(null); setBoundaryPoints(prev => [...prev, pt]) }
+  const updateBoundaryPoint = (index, newPt) => setBoundaryPoints(prev => prev.map((pt, i) => i === index ? newPt : pt))
   const undoBoundaryPoint = () => setBoundaryPoints(prev => prev.slice(0, -1))
   const clearBoundary = () => { setBoundaryPoints([]); setExistingBoundary(null) }
 
@@ -271,7 +283,7 @@ export default function PurokManagement({ currentUser }) {
               {boundaryEditable && form.barangay_id && (
                 <div>
                   <label className="label flex items-center gap-1.5"><MapPin size={13} /> Purok Boundary</label>
-                  <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point. Needs at least 3 points.</p>
+                  <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point (needs at least 3). Drag any point afterward to fine-tune it.</p>
                   <div className="h-56 rounded-lg overflow-hidden border border-gray-200 relative">
                     <MapContainer center={GINGOOG_CENTER} zoom={13} className="w-full h-full">
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
@@ -310,7 +322,15 @@ export default function PurokManagement({ currentUser }) {
                           the barangay's if both exist. */}
                       <FitToBoundary geojsonLayer={purokBoundaryLayer || barangayBoundaryLayer} />
 
-                      {boundaryPoints.map((pt, i) => <CircleMarker key={i} center={pt} radius={4} pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 1 }} />)}
+                      {boundaryPoints.map((pt, i) => (
+                        <Marker
+                          key={i}
+                          position={pt}
+                          icon={vertexIcon}
+                          draggable
+                          eventHandlers={{ dragend: (e) => updateBoundaryPoint(i, [e.target.getLatLng().lat, e.target.getLatLng().lng]) }}
+                        />
+                      ))}
                       {boundaryPoints.length >= 3
                         ? <Polygon positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
                         : boundaryPoints.length === 2
