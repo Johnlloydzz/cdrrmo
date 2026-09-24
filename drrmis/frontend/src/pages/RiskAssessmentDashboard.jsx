@@ -119,6 +119,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   // Barangays the server-side auto-detect currently flags as flooded (real
   // heavy rain + high river discharge right now) — empty when there's no flood.
   const [autoFloodedIds, setAutoFloodedIds] = useState([])
+  const [autoFloodReasons, setAutoFloodReasons] = useState({}) // barangay id -> why it was flagged
 
   // "Barangays in Risk Zone" card -> list of at-risk barangays -> pick one
   // to see its at-risk households -> pick a household to see its family.
@@ -130,7 +131,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       apiGet('/households'),
       apiGet('/settings/flood-level'),
       apiGet('/settings/auto-flood-barangays'),
-    ]).then(([s, h, fl, af]) => { setSummary(s); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []) })
+    ]).then(([s, h, fl, af]) => { setSummary(s); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []); setAutoFloodReasons(af.reasons || {}) })
 
   useEffect(() => {
     setLoading(true)
@@ -142,7 +143,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       apiGet('/settings/flood-level'),
       apiGet('/settings/auto-flood-barangays'),
     ])
-      .then(([s, b, h, fl, af]) => { setSummary(s); setBarangays(b); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []) })
+      .then(([s, b, h, fl, af]) => { setSummary(s); setBarangays(b); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []); setAutoFloodReasons(af.reasons || {}) })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
 
@@ -302,7 +303,10 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           <div className="card p-2.5 bg-red-50 border border-red-200 flex items-center gap-2">
             <Waves size={14} className="text-red-500 flex-shrink-0" />
             <p className="text-xs text-red-700">
-              <strong>LIVE flood alert:</strong> flooding detected in {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name).join(', ')} — based on real-time heavy rainfall and high river discharge. Puroks there with a flood threshold of 1 m or lower are flagged at-risk.
+              <strong>LIVE flood alert</strong> (real-time rainfall + river data) — puroks with a flood threshold of 1 m or lower are flagged at-risk:
+              {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => (
+                <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'flooding detected'}</span>
+              ))}
             </p>
           </div>
         </div>
@@ -491,6 +495,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       Households: {p.household_count ?? 0}<br />
                       Population: {p.resident_count ?? 0}<br />
                       Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}<br />
+                      {autoFlooded && autoFloodReasons[selectedBarangay.id] && <>Reason: {autoFloodReasons[selectedBarangay.id]}<br /></>}
                       {activeLevel === 0
                         ? <span style={{ color: '#16a34a' }}>No active flood right now</span>
                         : atRisk

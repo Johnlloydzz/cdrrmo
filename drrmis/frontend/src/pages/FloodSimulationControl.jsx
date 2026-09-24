@@ -396,7 +396,7 @@ export default function FloodSimulationControl() {
                       </p>
                     )}
                     <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100">
-                      <strong>Auto-detect:</strong> server-side check every ~10 min — flags a barangay only when its own rain is PAGASA Red (&gt;30mm/hr) AND citywide river discharge is 50%+ above normal.
+                      <strong>Auto-detect (live, every ~10 min)</strong> flags a barangay when ANY of these happen: (1) intense rain now &gt;30 mm/hr while the river is 50%+ above normal; (2) 100 mm+ of rain within 24 hours; or (3) prolonged rain — 150 mm+ over 3 days or 250 mm+ over 7 days — while the river is rising (20%+ above normal).
                     </p>
                   </div>
                 ) : (

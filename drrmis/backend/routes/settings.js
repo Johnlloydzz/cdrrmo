@@ -66,7 +66,12 @@ router.get('/auto-flood-barangays', async (req, res) => {
     const row = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids'])
     let barangay_ids = []
     try { barangay_ids = row ? JSON.parse(row.value) : [] } catch { barangay_ids = [] }
-    res.json({ barangay_ids })
+    // Why each barangay was flagged (intense / heavy 24h / prolonged rain),
+    // so CDRRMO can see the actual numbers behind the alert.
+    const reasonsRow = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flood_reasons'])
+    let reasons = {}
+    try { reasons = reasonsRow ? JSON.parse(reasonsRow.value) : {} } catch { reasons = {} }
+    res.json({ barangay_ids, reasons })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
