@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, Component } from 'react'
 import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, Marker, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -19,6 +19,26 @@ const vertexIcon = L.divIcon({
   iconSize: [12, 12],
   iconAnchor: [6, 6],
 })
+
+// Safety net: if anything inside the boundary map throws, only the map box
+// shows a message — the rest of the page (and the whole app) stays up
+// instead of going completely blank.
+class MapErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false } }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(err) { console.error('Boundary map error:', err) }
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center text-center p-4 bg-gray-50">
+          <p className="text-sm text-gray-600 mb-2">The map had a problem displaying.</p>
+          <button type="button" className="btn-secondary text-xs px-3 py-1.5" onClick={() => this.setState({ failed: false })}>Reload map</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // GeoJSON stores rings as [lng, lat]; Leaflet works in [lat, lng] — these
 // two helpers keep that conversion in one place instead of scattered
@@ -80,6 +100,7 @@ export default function PurokManagement({ currentUser }) {
   const [existingBoundary, setExistingBoundary] = useState(null) // untouched boundary_geojson, kept until re-drawn
   const [barangayBoundaryLayer, setBarangayBoundaryLayer] = useState(null) // ref to the background barangay outline, for fitBounds
   const [purokBoundaryLayer, setPurokBoundaryLayer] = useState(null) // ref to the purok's own existing boundary, for fitBounds
+  const shapeRef = useRef(null) // the live line/polygon being drawn — updated directly during drags
 
   const load = () => {
     setLoading(true)
@@ -285,6 +306,7 @@ export default function PurokManagement({ currentUser }) {
                   <label className="label flex items-center gap-1.5"><MapPin size={13} /> Purok Boundary</label>
                   <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point (needs at least 3). Drag any point afterward to fine-tune it.</p>
                   <div className="h-56 rounded-lg overflow-hidden border border-gray-200 relative">
+                    <MapErrorBoundary>
                     <MapContainer center={GINGOOG_CENTER} zoom={13} className="w-full h-full">
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
                       <BoundaryClickCapture onAddPoint={addBoundaryPoint} />
@@ -329,21 +351,28 @@ export default function PurokManagement({ currentUser }) {
                           icon={vertexIcon}
                           draggable
                           eventHandlers={{
-                            // 'drag' fires continuously while the point is
-                            // being moved, so the connected lines/polygon
-                            // follow it live instead of only snapping into
-                            // place after the mouse is released.
-                            drag: (e) => { const ll = e.target.getLatLng(); updateBoundaryPoint(i, [ll.lat, ll.lng]) },
+                            // While dragging: move the line/polygon directly
+                            // through Leaflet (no React re-render), so it
+                            // follows the point live without re-rendering the
+                            // whole map mid-drag — that re-rendering is what
+                            // was occasionally crashing the page blank.
+                            drag: (e) => {
+                              const ll = e.target.getLatLng()
+                              const pts = boundaryPoints.map((p, j) => j === i ? [ll.lat, ll.lng] : p)
+                              if (shapeRef.current) shapeRef.current.setLatLngs(pts)
+                            },
+                            // On release: save the final position to state once.
                             dragend: (e) => { const ll = e.target.getLatLng(); updateBoundaryPoint(i, [ll.lat, ll.lng]) },
                           }}
                         />
                       ))}
                       {boundaryPoints.length >= 3
-                        ? <Polygon positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
+                        ? <Polygon ref={shapeRef} positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
                         : boundaryPoints.length === 2
-                          ? <Polyline positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2 }} />
+                          ? <Polyline ref={shapeRef} positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2 }} />
                           : null}
                     </MapContainer>
+                    </MapErrorBoundary>
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-xs text-gray-400">{boundaryPoints.length} point{boundaryPoints.length === 1 ? '' : 's'} placed</span>
