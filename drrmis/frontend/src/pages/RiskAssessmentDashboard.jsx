@@ -442,26 +442,6 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               )
             })}
 
-            {/* Purok boundaries — real drawn polygons where a Barangay
-                Official has traced one, shown on top of the barangay
-                choropleth for reference. */}
-            {visibleBarangays.flatMap(b => (b.puroks || [])
-              .filter(p => p.boundary_geojson)
-              .map(p => {
-                let geo
-                try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
-                return (
-                  <GeoJSON
-                    key={`purok-${p.id}`}
-                    data={geo}
-                    pathOptions={{ color: '#2563eb', weight: 1.5, fillOpacity: 0, dashArray: '4, 3' }}
-                  >
-                    <Tooltip sticky>{p.name}</Tooltip>
-                  </GeoJSON>
-                )
-              })
-            )}
-
             {/* Selected barangay — highlighted outline, same style as Hazard Map & Geofencing */}
             {selectedGeojson && (
               <>
@@ -474,6 +454,36 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 <FitToBoundary geojsonLayer={selectedGeojsonLayer} />
               </>
             )}
+
+            {/* Purok boundaries — only for the selected barangay (not the
+                whole city at once), drawn ON TOP of the selected-barangay
+                outline so they stay clickable. Name shows right on the shape;
+                click it for households/population — same as GIS Map. */}
+            {selectedBarangay && (selectedBarangay.puroks || [])
+              .filter(p => p.boundary_geojson)
+              .map(p => {
+                let geo
+                try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
+                const atRisk = floodLevel > 0 ? floodLevel >= p.flood_threshold_m : p.flood_risk === 'High'
+                return (
+                  <GeoJSON
+                    key={`purok-${p.id}`}
+                    data={geo}
+                    pathOptions={{ color: atRisk ? '#dc2626' : '#2563eb', weight: 1.5, fillColor: atRisk ? '#dc2626' : '#2563eb', fillOpacity: 0.1, dashArray: '4, 3' }}
+                  >
+                    <Tooltip permanent direction="center" className="purok-name-label">{p.name}</Tooltip>
+                    <Popup>
+                      <strong>{p.name}</strong> — {selectedBarangay.name}<br />
+                      Households: {p.household_count ?? 0}<br />
+                      Population: {p.resident_count ?? 0}<br />
+                      Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}<br />
+                      {atRisk
+                        ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: At risk{floodLevel > 0 ? ` at ${floodLevel} m` : ''}</span>
+                        : <span style={{ color: '#16a34a' }}>Not currently at risk</span>}
+                    </Popup>
+                  </GeoJSON>
+                )
+              })}
 
             {/* Only the household most recently selected from the drill-down
                 list gets a pin — it moves when a different family is picked,
