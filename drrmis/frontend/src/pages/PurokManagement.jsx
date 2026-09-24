@@ -328,7 +328,14 @@ export default function PurokManagement({ currentUser }) {
                           position={pt}
                           icon={vertexIcon}
                           draggable
-                          eventHandlers={{ dragend: (e) => updateBoundaryPoint(i, [e.target.getLatLng().lat, e.target.getLatLng().lng]) }}
+                          eventHandlers={{
+                            // 'drag' fires continuously while the point is
+                            // being moved, so the connected lines/polygon
+                            // follow it live instead of only snapping into
+                            // place after the mouse is released.
+                            drag: (e) => { const ll = e.target.getLatLng(); updateBoundaryPoint(i, [ll.lat, ll.lng]) },
+                            dragend: (e) => { const ll = e.target.getLatLng(); updateBoundaryPoint(i, [ll.lat, ll.lng]) },
+                          }}
                         />
                       ))}
                       {boundaryPoints.length >= 3
