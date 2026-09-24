@@ -67,6 +67,30 @@ function BoundaryClickCapture({ onAddPoint }) {
   return null
 }
 
+// Inserts a new vertex into the edge it's closest to, instead of always
+// appending it at the end. Appending at the end means the new point always
+// connects back to the very first point (the polygon's closing edge),
+// which makes lines cross whenever someone adds a point "in between"
+// existing ones. This picks the edge where adding the point stretches the
+// outline the least — the same way Google My Maps inserts a vertex.
+function insertPointSmart(points, pt) {
+  if (points.length < 3) return [...points, pt]
+  // Scale longitude by cos(latitude) so distances are roughly true meters
+  // rather than raw degrees (a degree of longitude is shorter than a
+  // degree of latitude here).
+  const k = Math.cos((pt[0] * Math.PI) / 180)
+  const d = (a, b) => Math.hypot(a[0] - b[0], (a[1] - b[1]) * k)
+  let bestIndex = points.length
+  let bestCost = Infinity
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const cost = d(a, pt) + d(pt, b) - d(a, b)
+    if (cost < bestCost) { bestCost = cost; bestIndex = i + 1 }
+  }
+  return [...points.slice(0, bestIndex), pt, ...points.slice(bestIndex)]
+}
+
 // Centers the embedded map on whichever boundary layer it's given — either
 // the purok's own boundary if one's already drawn, or (as a fallback,
 // falling all the way back to just the barangay's boundary) so the map is
@@ -127,6 +151,7 @@ export default function PurokManagement({ currentUser }) {
     setForm(isCdrrmo ? emptyForm : { ...emptyForm, barangay_id: currentUser?.barangay_id || '' })
     setAddingNew(false)
     setBoundaryPoints([])
+    setPointsHistory([])
     setExistingBoundary(null)
     setBarangayBoundaryLayer(null)
     setPurokBoundaryLayer(null)
@@ -137,6 +162,7 @@ export default function PurokManagement({ currentUser }) {
     setForm({ barangay_id: p.barangay_id || '', name: p.name || '', flood_risk: p.flood_risk || 'Low', flood_threshold_m: String(p.flood_threshold_m ?? '1.0'), landslide_risk: p.landslide_risk || 'Low' })
     setAddingNew(true) // editing always shows a free text name field for the existing purok
     setBoundaryPoints(geojsonToLatLngs(p.boundary_geojson))
+    setPointsHistory([])
     setExistingBoundary(p.boundary_geojson || null)
     setBarangayBoundaryLayer(null)
     setPurokBoundaryLayer(null)
@@ -144,10 +170,33 @@ export default function PurokManagement({ currentUser }) {
   }
   const handleDelete = async (id) => { if (!window.confirm('Delete this purok?')) return; try { await apiDelete(`/puroks/${id}`); load() } catch (err) { alert(err.message) } }
 
-  const addBoundaryPoint = (pt) => { setExistingBoundary(null); setBoundaryPoints(prev => [...prev, pt]) }
-  const updateBoundaryPoint = (index, newPt) => setBoundaryPoints(prev => prev.map((pt, i) => i === index ? newPt : pt))
-  const undoBoundaryPoint = () => setBoundaryPoints(prev => prev.slice(0, -1))
-  const clearBoundary = () => { setBoundaryPoints([]); setExistingBoundary(null) }
+  // Undo history — each entry is the full list of points *before* a change,
+  // so Undo reverts the last action (an added point OR a drag), not just
+  // "remove the last item in the array" (which is wrong now that new points
+  // can be inserted in the middle).
+  const [pointsHistory, setPointsHistory] = useState([])
+  // Time of the last drag release — the mouse-up that ends a drag can also
+  // register as a map "click", which would drop an unwanted extra point
+  // right where the vertex was released. Clicks right after a drag are ignored.
+  const lastDragEndRef = useRef(0)
+
+  const addBoundaryPoint = (pt) => {
+    if (Date.now() - lastDragEndRef.current < 400) return
+    setExistingBoundary(null)
+    setPointsHistory(h => [...h, boundaryPoints])
+    setBoundaryPoints(prev => insertPointSmart(prev, pt))
+  }
+  const updateBoundaryPoint = (index, newPt) => {
+    lastDragEndRef.current = Date.now()
+    setPointsHistory(h => [...h, boundaryPoints])
+    setBoundaryPoints(prev => prev.map((pt, i) => i === index ? newPt : pt))
+  }
+  const undoBoundaryPoint = () => {
+    if (pointsHistory.length === 0) { setBoundaryPoints(prev => prev.slice(0, -1)); return }
+    setBoundaryPoints(pointsHistory[pointsHistory.length - 1])
+    setPointsHistory(h => h.slice(0, -1))
+  }
+  const clearBoundary = () => { setBoundaryPoints([]); setPointsHistory([]); setExistingBoundary(null) }
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.barangay_id) { alert('Purok name and barangay are required.'); return }
