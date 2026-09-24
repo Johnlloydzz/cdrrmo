@@ -1,4 +1,5 @@
 const router = require('express').Router()
+const { expireStaleFloodData } = require('../db/floodLevel')
 const { get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 
@@ -13,6 +14,7 @@ router.use(authenticate)
 // it set itself; a manually-set level is never touched by auto-detect.
 router.get('/flood-level', async (req, res) => {
   try {
+    await expireStaleFloodData()
     const [levelRow, sourceRow] = await Promise.all([
       get('SELECT value, updated_at FROM system_settings WHERE key = ?', ['current_flood_level_m']),
       get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
@@ -60,6 +62,7 @@ router.put('/flood-level', async (req, res) => {
 // area actually experiencing heavy rain, not the whole city at once.
 router.get('/auto-flood-barangays', async (req, res) => {
   try {
+    await expireStaleFloodData()
     const row = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids'])
     let barangay_ids = []
     try { barangay_ids = row ? JSON.parse(row.value) : [] } catch { barangay_ids = [] }

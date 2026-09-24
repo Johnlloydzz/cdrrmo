@@ -380,6 +380,7 @@ export default function FloodSimulationControl() {
                       <p className="text-xs text-gray-500 mt-2">No manual level — using auto-detect or CDRA classification.</p>
                     )}
                     {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
+                    <p className="text-[10px] text-gray-400 mt-1">A manual level automatically resets to normal after 12 hours with no update — re-enter it if the flood is still ongoing.</p>
 
                     {autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">

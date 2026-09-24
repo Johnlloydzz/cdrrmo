@@ -1,4 +1,5 @@
 const router = require('express').Router()
+const { expireStaleFloodData } = require('../db/floodLevel')
 const { all, get } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 
@@ -15,6 +16,7 @@ router.use(authenticate)
 //   static official CDRA classification (flood_risk = 'High').
 router.get('/summary', async (req, res) => {
   try {
+    await expireStaleFloodData()
     const [levelRow, sourceRow, autoRow] = await Promise.all([
       get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
       get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),

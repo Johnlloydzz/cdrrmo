@@ -116,6 +116,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const [flyTarget, setFlyTarget] = useState(null)
   const [focusedHousehold, setFocusedHousehold] = useState(null)
   const [floodLevel, setFloodLevel] = useState(0)
+  // Barangays the server-side auto-detect currently flags as flooded (real
+  // heavy rain + high river discharge right now) — empty when there's no flood.
+  const [autoFloodedIds, setAutoFloodedIds] = useState([])
 
   // "Barangays in Risk Zone" card -> list of at-risk barangays -> pick one
   // to see its at-risk households -> pick a household to see its family.
@@ -126,7 +129,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       apiGet('/risk-assessment/summary'),
       apiGet('/households'),
       apiGet('/settings/flood-level'),
-    ]).then(([s, h, fl]) => { setSummary(s); setHouseholds(h); setFloodLevel(fl.level_m) })
+      apiGet('/settings/auto-flood-barangays'),
+    ]).then(([s, h, fl, af]) => { setSummary(s); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []) })
 
   useEffect(() => {
     setLoading(true)
@@ -136,8 +140,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       apiGet('/barangays'),
       apiGet('/households'),
       apiGet('/settings/flood-level'),
+      apiGet('/settings/auto-flood-barangays'),
     ])
-      .then(([s, b, h, fl]) => { setSummary(s); setBarangays(b); setHouseholds(h); setFloodLevel(fl.level_m) })
+      .then(([s, b, h, fl, af]) => { setSummary(s); setBarangays(b); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []) })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
 
@@ -464,7 +469,14 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               .map(p => {
                 let geo
                 try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
-                const atRisk = floodLevel > 0 ? floodLevel >= p.flood_threshold_m : p.flood_risk === 'High'
+                // Real-time: a purok is only flagged when there's an ACTUAL
+                // flood event right now — a manually reported level, or this
+                // barangay being auto-detected (heavy rain + high river
+                // discharge). CDRA "High" alone is just susceptibility, not a
+                // warning, so with no active flood there's no warning.
+                const autoFlooded = autoFloodedIds.includes(selectedBarangay.id)
+                const activeLevel = floodLevel > 0 ? floodLevel : (autoFlooded ? 1 : 0)
+                const atRisk = activeLevel > 0 && activeLevel >= p.flood_threshold_m
                 return (
                   <GeoJSON
                     key={`purok-${p.id}`}
@@ -477,9 +489,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       Households: {p.household_count ?? 0}<br />
                       Population: {p.resident_count ?? 0}<br />
                       Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}<br />
-                      {atRisk
-                        ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: At risk{floodLevel > 0 ? ` at ${floodLevel} m` : ''}</span>
-                        : <span style={{ color: '#16a34a' }}>Not currently at risk</span>}
+                      {activeLevel === 0
+                        ? <span style={{ color: '#16a34a' }}>No active flood right now</span>
+                        : atRisk
+                          ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: Flooded at {activeLevel} m{floodLevel > 0 ? '' : ' (auto-detected)'}</span>
+                          : <span style={{ color: '#16a34a' }}>Above flood level ({activeLevel} m) — not at risk</span>}
                     </Popup>
                   </GeoJSON>
                 )

@@ -1,4 +1,5 @@
 const router = require('express').Router()
+const { expireStaleFloodData } = require('../db/floodLevel')
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 
@@ -31,6 +32,7 @@ router.get('/', async (req, res) => {
     //     treated as a 1m flood event; every other barangay is unaffected by
     //     auto-detect even while it's active elsewhere in the city.
     //  3. Otherwise, fall back to the static CDRA susceptibility classification.
+    await expireStaleFloodData()
     const [levelRow, sourceRow, autoRow] = await Promise.all([
       get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
       get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
