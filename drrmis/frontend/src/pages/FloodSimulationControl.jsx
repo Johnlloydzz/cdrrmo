@@ -207,7 +207,14 @@ export default function FloodSimulationControl() {
   const isFlood = hazard === 'flood'
   const atRiskKey = isFlood ? 'in_flood_risk_zone' : 'in_landslide_risk_zone'
   const susceptKey = isFlood ? 'flood_susceptibility' : 'landslide_susceptibility'
-  const atRiskHouseholds = households.filter(h => h[atRiskKey])
+  // A manually-entered level is a SIMULATION / drill that only affects
+  // this page — the server no longer applies it to real figures (Dashboard,
+  // GIS Map stay live). So while a simulation is running, the at-risk check
+  // for flood is computed right here: the simulated level vs. each
+  // household's purok threshold. Otherwise use the live server value.
+  const simulating = isFlood && floodLevel > 0
+  const isAtRisk = (h) => simulating ? floodLevel >= (h.flood_threshold_m ?? 1) : !!h[atRiskKey]
+  const atRiskHouseholds = households.filter(isAtRisk)
 
   const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name)
 
@@ -306,7 +313,7 @@ export default function FloodSimulationControl() {
             </button>
             {(floodLevel > 0 || autoFloodedIds.length > 0) && (
               <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-                {floodLevel > 0 && <span className="badge-red text-[10px]">Active: {floodLevel}m</span>}
+                {floodLevel > 0 && <span className="badge-red text-[10px]">Simulation: {floodLevel}m</span>}
                 {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
               </div>
             )}
@@ -374,10 +381,10 @@ export default function FloodSimulationControl() {
                     {floodLevel > 0 ? (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        Manual level: <strong className="mx-1">{floodLevel} m</strong> — citywide.
+                        SIMULATION: <strong className="mx-1">{floodLevel} m</strong> — drill only, shown on this page. Dashboard and GIS Map stay live.
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-2">No manual level — using auto-detect or CDRA classification.</p>
+                      <p className="text-xs text-gray-500 mt-2">No simulation running — map shows live data (auto-detect or CDRA classification). Enter meters above to run a drill.</p>
                     )}
                     {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
                     <p className="text-[10px] text-gray-400 mt-1">A manual level automatically resets to normal after 12 hours with no update — re-enter it if the flood is still ongoing.</p>
@@ -465,8 +472,8 @@ export default function FloodSimulationControl() {
             })()}
 
             {households.filter(h => h.latitude && h.longitude).map(h => (
-              <Marker key={h.id} position={[h.latitude, h.longitude]} icon={h[atRiskKey] ? redPin : bluePin}>
-                <Popup><strong>{h.household_id}</strong> - {h.head_family}<br />{h[atRiskKey] ? `WARNING: Within high ${hazard}-risk zone` : 'Outside high-risk zone'}</Popup>
+              <Marker key={h.id} position={[h.latitude, h.longitude]} icon={isAtRisk(h) ? redPin : bluePin}>
+                <Popup><strong>{h.household_id}</strong> - {h.head_family}<br />{isAtRisk(h) ? (simulating ? `SIMULATION: flooded at ${floodLevel} m` : `WARNING: Within high ${hazard}-risk zone`) : 'Outside high-risk zone'}</Popup>
               </Marker>
             ))}
           </MapContainer>

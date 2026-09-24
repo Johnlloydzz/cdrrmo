@@ -23,7 +23,12 @@ router.get('/summary', async (req, res) => {
       get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
     ])
     const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
-    const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
+    // The manually-typed flood level on Flood Simulation Control is now a
+    // SIMULATION / drill only — it never drives real figures here. Real
+    // at-risk status comes only from LIVE data: the server-side auto-detect
+    // (actual heavy rain + high river discharge, checked every ~10 min).
+    // With no live flood, it falls back to the static CDRA classification.
+    const manualActive = false
     let autoBarangayIds = []
     try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
 
