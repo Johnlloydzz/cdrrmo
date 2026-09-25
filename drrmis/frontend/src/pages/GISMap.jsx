@@ -592,7 +592,6 @@ export default function GISMap() {
                 {(() => {
               // CDRRMO-adjusted hazard area: only this shape gets the
               // susceptibility color; the rest of the barangay shows as Low.
-              const areaStr = areaStr
               if (!areaStr) return null
               let area
               try { area = JSON.parse(areaStr) } catch { return null }
