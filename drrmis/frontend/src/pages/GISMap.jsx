@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -578,16 +579,30 @@ export default function GISMap() {
           {hazardLayer !== 'none' && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
             let geo
             try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-            const color = hazardLayer === 'landslide'
-              ? (LANDSLIDE_COLOR[b.landslide_susceptibility] || LANDSLIDE_COLOR.Low)
-              : (FLOOD_COLOR[b.flood_susceptibility] || FLOOD_COLOR.Low)
+            const colors = hazardLayer === 'landslide' ? LANDSLIDE_COLOR : FLOOD_COLOR
+            const color = colors[hazardLayer === 'landslide' ? b.landslide_susceptibility : b.flood_susceptibility] || colors.Low
+            const areaStr = hazardLayer === 'landslide' ? b.landslide_area_geojson : b.flood_area_geojson
             return (
-              <GeoJSON
-                key={`hz-${hazardLayer}-${b.id}`}
-                data={geo}
-                style={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                eventHandlers={{ click: () => setSelectedBarangay(b) }}
-              />
+              <React.Fragment key={`hz-${hazardLayer}-${b.id}-${b.updated_at}`}>
+                <GeoJSON
+                  data={geo}
+                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? colors.Low : color, fillOpacity: 0.55 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                />
+                {(() => {
+              // CDRRMO-adjusted hazard area: only this shape gets the
+              // susceptibility color; the rest of the barangay shows as Low.
+              const areaStr = areaStr
+              if (!areaStr) return null
+              let area
+              try { area = JSON.parse(areaStr) } catch { return null }
+              return (
+                <GeoJSON key={`hz-area-${b.id}-${b.updated_at}`} data={area}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}></GeoJSON>
+              )
+            })()}
+              </React.Fragment>
             )
           })}
 

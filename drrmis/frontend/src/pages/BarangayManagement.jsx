@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, Pencil, Building2 } from 'lucide-react'
+import { GeoJSON } from 'react-leaflet'
+import { Search, Pencil, Building2, Waves, Mountain, RotateCcw } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
+import PolygonEditor, { geojsonToLatLngs, latLngsToGeojson, simplifyPoints } from '../components/editor'
 import { SkeletonTableRows } from '../components/Skeleton'
 
 // Badge colors matched to the official MGB Landslide and Flood Susceptibility Map legend.
@@ -10,6 +12,20 @@ import { SkeletonTableRows } from '../components/Skeleton'
 const LANDSLIDE_BADGE = { 'Very High': 'badge-brown', High: 'badge-red', Moderate: 'badge-green', Low: 'badge-yellow' }
 const FLOOD_BADGE = { 'Very High': 'badge-navy', High: 'badge-violet', Moderate: 'badge-purple', Low: 'badge-blue' }
 const emptyForm = { name: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low' }
+
+// Same map colors used for the choropleth on GIS Map / Dashboard, so the
+// area being adjusted here looks exactly like it will on those maps.
+const FLOOD_FILL = { 'Very High': '#1e3a8a', High: '#7c3aed', Moderate: '#a855f7', Low: '#d6c9a8' }
+const LANDSLIDE_FILL = { 'Very High': '#78350f', High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
+
+// Starting shape for a hazard area: the saved custom area if there is one,
+// otherwise the whole barangay boundary (simplified to a manageable number
+// of draggable points).
+function initialArea(b, key) {
+  const custom = b[`${key}_area_geojson`]
+  if (custom) return { points: geojsonToLatLngs(custom), custom: true }
+  return { points: simplifyPoints(geojsonToLatLngs(b.boundary_geojson), 60), custom: false }
+}
 
 export default function BarangayManagement() {
   const [barangays, setBarangays] = useState([])
@@ -20,6 +36,11 @@ export default function BarangayManagement() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [editingBarangay, setEditingBarangay] = useState(null)
+  const [areaTab, setAreaTab] = useState('flood')
+  // Per hazard: current points + whether it's been customized (false = the
+  // whole barangay, saved as null).
+  const [areas, setAreas] = useState({ flood: { points: [], custom: false }, landslide: { points: [], custom: false } })
 
   const load = () => { setLoading(true); apiGet('/barangays').then(setBarangays).catch(err => setError(err.message)).finally(() => setLoading(false)) }
   useEffect(() => { load() }, [])
@@ -28,18 +49,34 @@ export default function BarangayManagement() {
 
   const openEdit = (b) => {
     setEditing(b.id)
+    setEditingBarangay(b)
     setForm({
       name: b.name || '',
       flood_susceptibility: b.flood_susceptibility || 'Low',
       landslide_susceptibility: b.landslide_susceptibility || 'Low',
     })
+    setAreaTab('flood')
+    if (b.boundary_geojson) setAreas({ flood: initialArea(b, 'flood'), landslide: initialArea(b, 'landslide') })
     setShowModal(true)
   }
 
+  const setAreaPoints = (key, points) => setAreas(a => ({ ...a, [key]: { points, custom: true } }))
+  const resetArea = (key) => setAreas(a => ({ ...a, [key]: { points: simplifyPoints(geojsonToLatLngs(editingBarangay.boundary_geojson), 60), custom: false } }))
+
   const handleSave = async () => {
+    const payload = { ...form }
+    if (editingBarangay?.boundary_geojson) {
+      for (const key of ['flood', 'landslide']) {
+        const a = areas[key]
+        if (a.custom && a.points.length < 3) {
+          alert(`The ${key} area needs at least 3 points (or click "Use whole barangay").`); setAreaTab(key); return
+        }
+        payload[`${key}_area_geojson`] = a.custom ? latLngsToGeojson(a.points) : null
+      }
+    }
     setSaving(true)
     try {
-      await apiPut(`/barangays/${editing}`, form)
+      await apiPut(`/barangays/${editing}`, payload)
       setShowModal(false); load()
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
@@ -83,7 +120,12 @@ export default function BarangayManagement() {
                   <td className="table-cell">{(b.resident_count || 0).toLocaleString()}</td>
                   <td className="table-cell"><span className={FLOOD_BADGE[b.flood_susceptibility] || 'badge-gray'}>{b.flood_susceptibility}</span></td>
                   <td className="table-cell"><span className={LANDSLIDE_BADGE[b.landslide_susceptibility] || 'badge-gray'}>{b.landslide_susceptibility}</span></td>
-                  <td className="table-cell text-xs text-gray-400">{b.boundary_geojson ? '✓ Loaded' : 'None'}</td>
+                  <td className="table-cell text-xs text-gray-400">
+                    {b.boundary_geojson ? '✓ Loaded' : 'None'}
+                    {(b.flood_area_geojson || b.landslide_area_geojson) && (
+                      <span className="block text-primary-600">Adjusted: {[b.flood_area_geojson && 'flood', b.landslide_area_geojson && 'landslide'].filter(Boolean).join(', ')}</span>
+                    )}
+                  </td>
                   <td className="table-cell"><button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(b)}><Pencil size={15} /></button></td>
                 </tr>
               ))}
@@ -96,25 +138,71 @@ export default function BarangayManagement() {
 
       {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-5">Edit Barangay</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2"><label className="label">Barangay Name</label><input className="input bg-gray-50 text-gray-500" value={form.name} disabled /></div>
-              <div>
-                <label className="label">Flood Susceptibility (CDRA)</label>
-                <select className="input" value={form.flood_susceptibility} onChange={e => setForm({...form, flood_susceptibility: e.target.value})}>
-                  <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
-                </select>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+            <h3 className="text-lg font-semibold px-6 pt-6 pb-4 flex-shrink-0">Edit Barangay</h3>
+            <div className="overflow-y-auto px-6 pb-2 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div><label className="label">Barangay Name</label><input className="input bg-gray-50 text-gray-500" value={form.name} disabled /></div>
+                <div>
+                  <label className="label">Flood Susceptibility (CDRA)</label>
+                  <select className="input" value={form.flood_susceptibility} onChange={e => setForm({...form, flood_susceptibility: e.target.value})}>
+                    <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Landslide Susceptibility (CDRA)</label>
+                  <select className="input" value={form.landslide_susceptibility} onChange={e => setForm({...form, landslide_susceptibility: e.target.value})}>
+                    <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="label">Landslide Susceptibility (CDRA)</label>
-                <select className="input" value={form.landslide_susceptibility} onChange={e => setForm({...form, landslide_susceptibility: e.target.value})}>
-                  <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
-                </select>
-              </div>
+
+              {/* Hazard area — starts as the whole barangay; drag points to
+                  shrink it to the part that actually floods / slides, based
+                  on CDRRMO's hazard map. Only this shape gets colored on the
+                  maps. */}
+              {editingBarangay?.boundary_geojson ? (
+                <div>
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <label className="label mb-0">Hazard Area</label>
+                    <div className="flex gap-2">
+                      {[['flood', 'Flood', Waves], ['landslide', 'Landslide', Mountain]].map(([key, label, Icon]) => (
+                        <button key={key} type="button" onClick={() => setAreaTab(key)}
+                          className={`text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors ${areaTab === key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                          <Icon size={12} /> {label} {areas[key].custom ? '(adjusted)' : '(whole)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Starts as the whole barangay. Drag the points to cover only the part that is actually affected — click on the map to add a point. The dashed line is the full barangay boundary.
+                  </p>
+                  <PolygonEditor
+                    key={`${editing}-${areaTab}`}
+                    points={areas[areaTab].points}
+                    onChange={pts => setAreaPoints(areaTab, pts)}
+                    color={areaTab === 'flood' ? (FLOOD_FILL[form.flood_susceptibility] || '#7c3aed') : (LANDSLIDE_FILL[form.landslide_susceptibility] || '#dc2626')}
+                    heightClass="h-[42vh]"
+                  >
+                    {(() => {
+                      let geo
+                      try { geo = JSON.parse(editingBarangay.boundary_geojson) } catch { return null }
+                      return <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#475569', weight: 1.5, fillOpacity: 0, dashArray: '4, 4' }} />
+                    })()}
+                  </PolygonEditor>
+                  {areas[areaTab].custom && (
+                    <button type="button" onClick={() => resetArea(areaTab)} className="btn-secondary text-xs px-2.5 py-1.5 mt-2 flex items-center gap-1">
+                      <RotateCcw size={12} /> Use whole barangay
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-amber-600">This barangay has no boundary on file, so its hazard area can't be adjusted yet.</p>
+              )}
+
+              <p className="text-xs text-gray-400">Population is computed live from registered residents. Captain name and contact number are set by the Barangay Official. Classification is encoded from the CDRRMO's CDRA maps.</p>
             </div>
-            <p className="text-xs text-gray-400 mt-3">Population is computed live from registered residents — not editable here. Captain name and contact number are set by the Barangay Official themselves, not editable here. Classification is manually encoded from the CDRRMO's existing CDRA (Climate and Disaster Risk Assessment) maps.</p>
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
               <button className="btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
               <button className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
             </div>

@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
@@ -423,14 +424,30 @@ export default function FloodSimulationControl() {
               const colorMap = isFlood ? FLOOD_COLOR : LANDSLIDE_COLOR
               const level = b[susceptKey] || 'Low'
               const color = colorMap[level] || colorMap.Low
+              const areaStr = isFlood ? b.flood_area_geojson : b.landslide_area_geojson
               return (
-                <GeoJSON
-                  key={b.id} data={geo}
-                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
-                >
-                  <Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip>
-                </GeoJSON>
+                <React.Fragment key={`${b.id}-${b.updated_at}`}>
+                  <GeoJSON
+                    data={geo}
+                    pathOptions={{ color: '#555', weight: 0.5, fillColor: areaStr ? colorMap.Low : color, fillOpacity: 0.55 }}
+                    eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                  >
+                    <Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip>
+                  </GeoJSON>
+                  {(() => {
+              // CDRRMO-adjusted hazard area: only this shape gets the
+              // susceptibility color; the rest of the barangay shows as Low.
+              const areaStr = areaStr
+              if (!areaStr) return null
+              let area
+              try { area = JSON.parse(areaStr) } catch { return null }
+              return (
+                <GeoJSON key={`f-area-${b.id}-${b.updated_at}`} data={area}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip></GeoJSON>
+              )
+            })()}
+                </React.Fragment>
               )
             })}
 

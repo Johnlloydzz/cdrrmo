@@ -73,8 +73,26 @@ router.post('/', async (req, res) => {
 // (or any other field) that the edit form didn't include.
 router.put('/:id', async (req, res) => {
   try {
+    // CDRA classification, boundaries and hazard areas are CDRRMO's data —
+    // Barangay Officials edit only their own contact info (PUT /:id/contact).
+    if (req.user.role !== 'CDRRMO Personnel') {
+      return res.status(403).json({ error: 'Only CDRRMO Personnel can edit barangay classification and hazard areas.' })
+    }
     const current = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
     if (!current) return res.status(404).json({ error: 'Not found' })
+
+    // Flood / landslide AREA: the part of the barangay actually affected,
+    // adjusted by CDRRMO from the barangay's boundary. null = the whole
+    // barangay (default). Uses `in` so an explicit null can reset it.
+    const validArea = (v) => {
+      if (v === null) return true
+      try { const g = JSON.parse(v); return g?.type === 'Polygon' && g.coordinates?.[0]?.length >= 4 } catch { return false }
+    }
+    const flood_area_geojson = 'flood_area_geojson' in req.body ? req.body.flood_area_geojson : current.flood_area_geojson
+    const landslide_area_geojson = 'landslide_area_geojson' in req.body ? req.body.landslide_area_geojson : current.landslide_area_geojson
+    if (!validArea(flood_area_geojson ?? null) || !validArea(landslide_area_geojson ?? null)) {
+      return res.status(400).json({ error: 'A hazard area needs at least 3 points.' })
+    }
 
     const name                     = req.body.name ?? current.name
     const population                = req.body.population ?? current.population
@@ -91,8 +109,8 @@ router.put('/:id', async (req, res) => {
     const contact_number            = current.contact_number
 
     await run(
-      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, req.params.id]
+      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, flood_area_geojson=?, landslide_area_geojson=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, flood_area_geojson ?? null, landslide_area_geojson ?? null, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
     res.json(updated)

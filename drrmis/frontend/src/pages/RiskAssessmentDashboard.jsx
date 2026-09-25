@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
@@ -442,14 +443,28 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               const level = b.flood_susceptibility || 'Low'
               const color = FLOOD_COLOR[level] || FLOOD_COLOR.Low
               return (
-                <GeoJSON
-                  key={b.id}
-                  data={geo}
-                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
-                >
-                  <Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
-                </GeoJSON>
+                <React.Fragment key={`${b.id}-${b.updated_at}`}>
+                  <GeoJSON
+                    data={geo}
+                    pathOptions={{ color: '#555', weight: 0.5, fillColor: b.flood_area_geojson ? FLOOD_COLOR.Low : color, fillOpacity: 0.55 }}
+                    eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                  >
+                    <Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
+                  </GeoJSON>
+                  {(() => {
+              // CDRRMO-adjusted hazard area: only this shape gets the
+              // susceptibility color; the rest of the barangay shows as Low.
+              const areaStr = b.flood_area_geojson
+              if (!areaStr) return null
+              let area
+              try { area = JSON.parse(areaStr) } catch { return null }
+              return (
+                <GeoJSON key={`d-area-${b.id}-${b.updated_at}`} data={area}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip></GeoJSON>
+              )
+            })()}
+                </React.Fragment>
               )
             })}
 
