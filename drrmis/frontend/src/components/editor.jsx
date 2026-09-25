@@ -48,7 +48,15 @@ function FitOnce({ points }) {
   useEffect(() => {
     if (done.current) return
     done.current = true
-    if (points.length >= 3) map.fitBounds(points, { padding: [30, 30] })
+    if (points.length < 3) return
+    // Inside a modal the map's box isn't its final size on the first frame,
+    // so an immediate fitBounds zooms against the wrong size (the barangay
+    // ends up off in a corner). Re-measure and fit again once the modal
+    // has finished laying out.
+    const fit = () => { map.invalidateSize(); map.fitBounds(points, { padding: [30, 30] }) }
+    fit()
+    const timers = [150, 400].map(ms => setTimeout(fit, ms))
+    return () => timers.forEach(clearTimeout)
   }, [map, points])
   return null
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { GeoJSON } from 'react-leaflet'
 import { Search, Pencil, Building2, Waves, Mountain, RotateCcw } from 'lucide-react'
@@ -13,10 +13,12 @@ const LANDSLIDE_BADGE = { 'Very High': 'badge-brown', High: 'badge-red', Moderat
 const FLOOD_BADGE = { 'Very High': 'badge-navy', High: 'badge-violet', Moderate: 'badge-purple', Low: 'badge-blue' }
 const emptyForm = { name: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low' }
 
-// Same map colors used for the choropleth on GIS Map / Dashboard, so the
-// area being adjusted here looks exactly like it will on those maps.
-const FLOOD_FILL = { 'Very High': '#1e3a8a', High: '#7c3aed', Moderate: '#a855f7', Low: '#d6c9a8' }
-const LANDSLIDE_FILL = { 'Very High': '#78350f', High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
+// EXACT same colors and fallback as GIS Map / Flood Simulation Control /
+// Dashboard, so what you see while editing is exactly what those maps show.
+const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
+const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
+const hazardColors = (key) => key === 'flood' ? FLOOD_COLOR : LANDSLIDE_COLOR
+const levelColor = (key, level) => hazardColors(key)[level] || hazardColors(key).Low
 
 // Starting shape for a hazard area: the saved custom area if there is one,
 // otherwise the whole barangay boundary (simplified to a manageable number
@@ -181,15 +183,43 @@ export default function BarangayManagement() {
                     key={`${editing}-${areaTab}`}
                     points={areas[areaTab].points}
                     onChange={pts => setAreaPoints(areaTab, pts)}
-                    color={areaTab === 'flood' ? (FLOOD_FILL[form.flood_susceptibility] || '#7c3aed') : (LANDSLIDE_FILL[form.landslide_susceptibility] || '#dc2626')}
+                    color={levelColor(areaTab, areaTab === 'flood' ? form.flood_susceptibility : form.landslide_susceptibility)}
                     heightClass="h-[42vh]"
                   >
+                    {/* Every OTHER barangay, colored exactly like the GIS Map
+                        does for this hazard — including areas you've already
+                        adjusted — so you can see the whole picture while
+                        editing. Non-interactive, so clicks still add points. */}
+                    {barangays.filter(b => b.id !== editing && b.boundary_geojson).map(b => {
+                      let geo
+                      try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+                      const color = levelColor(areaTab, areaTab === 'flood' ? b.flood_susceptibility : b.landslide_susceptibility)
+                      const areaStr = areaTab === 'flood' ? b.flood_area_geojson : b.landslide_area_geojson
+                      let area = null
+                      if (areaStr) { try { area = JSON.parse(areaStr) } catch { area = null } }
+                      return (
+                        <Fragment key={`ref-${areaTab}-${b.id}`}>
+                          <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? hazardColors(areaTab).Low : color, fillOpacity: 0.55 }} />
+                          {area && <GeoJSON data={area} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }} />}
+                        </Fragment>
+                      )
+                    })}
+                    {/* This barangay: outside the adjusted area shows as Low
+                        (same as the maps); dashed line = its full boundary. */}
                     {(() => {
                       let geo
                       try { geo = JSON.parse(editingBarangay.boundary_geojson) } catch { return null }
-                      return <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#475569', weight: 1.5, fillOpacity: 0, dashArray: '4, 4' }} />
+                      return (
+                        <GeoJSON key={`self-${areaTab}-${areas[areaTab].custom}`} data={geo} interactive={false}
+                          pathOptions={{ color: '#1e293b', weight: 2, dashArray: '5, 4', fillColor: hazardColors(areaTab).Low, fillOpacity: areas[areaTab].custom ? 0.55 : 0 }} />
+                      )
                     })()}
                   </PolygonEditor>
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                    {Object.entries(hazardColors(areaTab)).map(([lvl, c]) => (
+                      <span key={lvl} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: c }} /> {lvl}</span>
+                    ))}
+                  </div>
                   {areas[areaTab].custom && (
                     <button type="button" onClick={() => resetArea(areaTab)} className="btn-secondary text-xs px-2.5 py-1.5 mt-2 flex items-center gap-1">
                       <RotateCcw size={12} /> Use whole barangay
