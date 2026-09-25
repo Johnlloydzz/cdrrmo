@@ -1,5 +1,53 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy, useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState, Component } from 'react'
+
+// After a new deploy, page files get new names (e.g. GISMap-5RWd.js), so a
+// tab that was already open before the deploy asks for old files that no
+// longer exist — the page then fails to load and the screen goes blank.
+// This wraps lazy() so that on such a failure the app reloads ONCE to pick
+// up the new version. The sessionStorage flag prevents an endless reload
+// loop if the failure is something else (e.g. no internet).
+const RELOAD_FLAG = 'pdra_chunk_reload'
+function lazyWithReload(factory) {
+  return lazy(() => factory()
+    .then(module => { sessionStorage.removeItem(RELOAD_FLAG); return module })
+    .catch(err => {
+      if (!sessionStorage.getItem(RELOAD_FLAG)) {
+        sessionStorage.setItem(RELOAD_FLAG, '1')
+        window.location.reload()
+        return new Promise(() => {}) // keep showing the loading state until the reload happens
+      }
+      throw err
+    }))
+}
+// Vite also reports failed preloads of those files through this event.
+window.addEventListener('vite:preloadError', (event) => {
+  if (!sessionStorage.getItem(RELOAD_FLAG)) {
+    event.preventDefault()
+    sessionStorage.setItem(RELOAD_FLAG, '1')
+    window.location.reload()
+  }
+})
+
+// Last line of defense: if any page still crashes, show a message with a
+// Reload button instead of a completely blank screen.
+class AppErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false } }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(err) { console.error('Page error:', err) }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 max-w-sm text-center">
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">Something went wrong loading this page</h2>
+          <p className="text-sm text-gray-500 mb-5">This usually happens right after the system is updated. Reloading will fix it.</p>
+          <button type="button" className="btn-primary w-full" onClick={() => { sessionStorage.removeItem(RELOAD_FLAG); window.location.reload() }}>Reload</button>
+        </div>
+      </div>
+    )
+  }
+}
 
 import MainLayout        from './layouts/MainLayout'
 import RoleGuard         from './components/RoleGuard'
@@ -13,15 +61,15 @@ import { getStoredUser, setStoredUser, clearStoredUser } from './utils/storage'
 // PDRA — 5 modules only (Chapter 1, Section 1.5):
 // Risk Assessment Dashboard, Web-Based Hazard Mapping (+ Geofencing),
 // Household and Population Management, User Management
-const RiskAssessmentDashboard = lazy(() => import('./pages/RiskAssessmentDashboard'))
-const BarangayManagement      = lazy(() => import('./pages/BarangayManagement'))
-const PurokManagement         = lazy(() => import('./pages/PurokManagement'))
-const HouseholdManagement     = lazy(() => import('./pages/HouseholdManagement'))
-const ResidentManagement      = lazy(() => import('./pages/ResidentManagement'))
-const GISMap                  = lazy(() => import('./pages/GISMap'))
-const FloodSimulationControl  = lazy(() => import('./pages/FloodSimulationControl'))
-const UserManagement          = lazy(() => import('./pages/UserManagement'))
-const Settings                = lazy(() => import('./pages/Settings'))
+const RiskAssessmentDashboard = lazyWithReload(() => import('./pages/RiskAssessmentDashboard'))
+const BarangayManagement      = lazyWithReload(() => import('./pages/BarangayManagement'))
+const PurokManagement         = lazyWithReload(() => import('./pages/PurokManagement'))
+const HouseholdManagement     = lazyWithReload(() => import('./pages/HouseholdManagement'))
+const ResidentManagement      = lazyWithReload(() => import('./pages/ResidentManagement'))
+const GISMap                  = lazyWithReload(() => import('./pages/GISMap'))
+const FloodSimulationControl  = lazyWithReload(() => import('./pages/FloodSimulationControl'))
+const UserManagement          = lazyWithReload(() => import('./pages/UserManagement'))
+const Settings                = lazyWithReload(() => import('./pages/Settings'))
 
 // Wraps a page element with RoleGuard so direct URL access is also blocked
 function Protected({ currentUser, children }) {
@@ -53,6 +101,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <AppErrorBoundary>
       <Suspense fallback={routeFallback}>
       <Routes>
         {/* Public */}
@@ -111,6 +160,7 @@ function App() {
         <Route path="*" element={<Navigate to={defaultRouteFor(currentUser)} replace />} />
       </Routes>
       </Suspense>
+      </AppErrorBoundary>
     </BrowserRouter>
   )
 }
