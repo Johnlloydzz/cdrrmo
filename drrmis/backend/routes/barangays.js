@@ -90,7 +90,10 @@ router.put('/:id', async (req, res) => {
     }
     const flood_area_geojson = 'flood_area_geojson' in req.body ? req.body.flood_area_geojson : current.flood_area_geojson
     const landslide_area_geojson = 'landslide_area_geojson' in req.body ? req.body.landslide_area_geojson : current.landslide_area_geojson
-    if (!validArea(flood_area_geojson ?? null) || !validArea(landslide_area_geojson ?? null)) {
+    // Residential area (the yellow "Residential Area" on CDRA's Population
+    // Flooding Exposure Map) — shown on the flood layer only. null = none.
+    const residential_area_geojson = 'residential_area_geojson' in req.body ? req.body.residential_area_geojson : current.residential_area_geojson
+    if (!validArea(flood_area_geojson ?? null) || !validArea(landslide_area_geojson ?? null) || !validArea(residential_area_geojson ?? null)) {
       return res.status(400).json({ error: 'A hazard area needs at least 3 points.' })
     }
 
@@ -109,8 +112,8 @@ router.put('/:id', async (req, res) => {
     const contact_number            = current.contact_number
 
     await run(
-      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, flood_area_geojson=?, landslide_area_geojson=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, flood_area_geojson ?? null, landslide_area_geojson ?? null, req.params.id]
+      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, flood_area_geojson=?, landslide_area_geojson=?, residential_area_geojson=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, flood_area_geojson ?? null, landslide_area_geojson ?? null, residential_area_geojson ?? null, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
     res.json(updated)

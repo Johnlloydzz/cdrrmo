@@ -407,6 +407,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               {[
                 { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
                 { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
+                { color: '#facc15', label: 'Residential Area' },
               ].map(l => (
                 <div key={l.label} className="flex items-center gap-2 text-xs">
                   <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
@@ -464,6 +465,16 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip></GeoJSON>
               )
             })()}
+  {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
+                    Map) — on top of the flood colors, flood layer only. */}
+                {true && b.residential_area_geojson && (() => {
+                  let res
+                  try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
+                  return (
+                    <GeoJSON data={res} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
+                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
+                  )
+                })()}
                 </React.Fragment>
               )
             })}

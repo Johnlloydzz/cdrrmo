@@ -446,6 +446,16 @@ export default function FloodSimulationControl() {
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip></GeoJSON>
               )
             })()}
+  {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
+                    Map) — on top of the flood colors, flood layer only. */}
+                {isFlood && b.residential_area_geojson && (() => {
+                  let res
+                  try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
+                  return (
+                    <GeoJSON data={res} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
+                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
+                  )
+                })()}
                 </React.Fragment>
               )
             })}

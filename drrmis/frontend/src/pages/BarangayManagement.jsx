@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { GeoJSON } from 'react-leaflet'
-import { Search, Pencil, Building2, Waves, Mountain, RotateCcw } from 'lucide-react'
+import { Search, Pencil, Building2, Waves, Mountain, RotateCcw, Home } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
 import PolygonEditor, { geojsonToLatLngs, latLngsToGeojson, simplifyPoints } from '../components/editor'
 import { SkeletonTableRows } from '../components/Skeleton'
@@ -19,12 +19,18 @@ const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
 const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
 const hazardColors = (key) => key === 'flood' ? FLOOD_COLOR : LANDSLIDE_COLOR
 const levelColor = (key, level) => hazardColors(key)[level] || hazardColors(key).Low
+// Yellow "Residential Area" from CDRA's Population Flooding Exposure Map —
+// drawn on top of the flood colors, flood layer only.
+const RESIDENTIAL_COLOR = '#facc15'
 
 // Starting shape for a hazard area: the saved custom area if there is one,
 // otherwise the whole barangay boundary (simplified to a manageable number
 // of draggable points).
 function initialArea(b, key) {
   const custom = b[`${key}_area_geojson`]
+  // Residential never starts as the whole barangay — it starts empty and
+  // is drawn only where people actually live.
+  if (key === 'residential') return { points: custom ? geojsonToLatLngs(custom) : [], custom: !!custom }
   if (custom) return { points: geojsonToLatLngs(custom), custom: true }
   return { points: simplifyPoints(geojsonToLatLngs(b.boundary_geojson), 60), custom: false }
 }
@@ -42,7 +48,7 @@ export default function BarangayManagement() {
   const [areaTab, setAreaTab] = useState('flood')
   // Per hazard: current points + whether it's been customized (false = the
   // whole barangay, saved as null).
-  const [areas, setAreas] = useState({ flood: { points: [], custom: false }, landslide: { points: [], custom: false } })
+  const [areas, setAreas] = useState({ flood: { points: [], custom: false }, residential: { points: [], custom: false }, landslide: { points: [], custom: false } })
 
   const load = () => { setLoading(true); apiGet('/barangays').then(setBarangays).catch(err => setError(err.message)).finally(() => setLoading(false)) }
   useEffect(() => { load() }, [])
@@ -58,22 +64,26 @@ export default function BarangayManagement() {
       landslide_susceptibility: b.landslide_susceptibility || 'Low',
     })
     setAreaTab('flood')
-    if (b.boundary_geojson) setAreas({ flood: initialArea(b, 'flood'), landslide: initialArea(b, 'landslide') })
+    if (b.boundary_geojson) setAreas({ flood: initialArea(b, 'flood'), residential: initialArea(b, 'residential'), landslide: initialArea(b, 'landslide') })
     setShowModal(true)
   }
 
   const setAreaPoints = (key, points) => setAreas(a => ({ ...a, [key]: { points, custom: true } }))
-  const resetArea = (key) => setAreas(a => ({ ...a, [key]: { points: simplifyPoints(geojsonToLatLngs(editingBarangay.boundary_geojson), 60), custom: false } }))
+  // The Residential tab is part of the flood map, so it shows the flood colors behind it.
+  const bgHazard = areaTab === 'landslide' ? 'landslide' : 'flood'
+  const resetArea = (key) => setAreas(a => ({ ...a, [key]: key === 'residential'
+    ? { points: [], custom: false }
+    : { points: simplifyPoints(geojsonToLatLngs(editingBarangay.boundary_geojson), 60), custom: false } }))
 
   const handleSave = async () => {
     const payload = { ...form }
     if (editingBarangay?.boundary_geojson) {
-      for (const key of ['flood', 'landslide']) {
+      for (const key of ['flood', 'residential', 'landslide']) {
         const a = areas[key]
-        if (a.custom && a.points.length < 3) {
-          alert(`The ${key} area needs at least 3 points (or click "Use whole barangay").`); setAreaTab(key); return
+        if (a.custom && a.points.length > 0 && a.points.length < 3) {
+          alert(`The ${key} area needs at least 3 points.`); setAreaTab(key); return
         }
-        payload[`${key}_area_geojson`] = a.custom ? latLngsToGeojson(a.points) : null
+        payload[`${key}_area_geojson`] = a.custom && a.points.length >= 3 ? latLngsToGeojson(a.points) : null
       }
     }
     setSaving(true)
@@ -124,8 +134,8 @@ export default function BarangayManagement() {
                   <td className="table-cell"><span className={LANDSLIDE_BADGE[b.landslide_susceptibility] || 'badge-gray'}>{b.landslide_susceptibility}</span></td>
                   <td className="table-cell text-xs text-gray-400">
                     {b.boundary_geojson ? '✓ Loaded' : 'None'}
-                    {(b.flood_area_geojson || b.landslide_area_geojson) && (
-                      <span className="block text-primary-600">Adjusted: {[b.flood_area_geojson && 'flood', b.landslide_area_geojson && 'landslide'].filter(Boolean).join(', ')}</span>
+                    {(b.flood_area_geojson || b.landslide_area_geojson || b.residential_area_geojson) && (
+                      <span className="block text-primary-600">Adjusted: {[b.flood_area_geojson && 'flood', b.residential_area_geojson && 'residential', b.landslide_area_geojson && 'landslide'].filter(Boolean).join(', ')}</span>
                     )}
                   </td>
                   <td className="table-cell"><button className="p-1.5 rounded hover:bg-amber-50 text-amber-600" onClick={() => openEdit(b)}><Pencil size={15} /></button></td>
@@ -168,22 +178,26 @@ export default function BarangayManagement() {
                   <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                     <label className="label mb-0">Hazard Area</label>
                     <div className="flex gap-2">
-                      {[['flood', 'Flood', Waves], ['landslide', 'Landslide', Mountain]].map(([key, label, Icon]) => (
+                      {[['flood', 'Flood', Waves], ['residential', 'Residential', Home], ['landslide', 'Landslide', Mountain]].map(([key, label, Icon]) => (
                         <button key={key} type="button" onClick={() => setAreaTab(key)}
                           className={`text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors ${areaTab === key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
-                          <Icon size={12} /> {label} {areas[key].custom ? '(adjusted)' : '(whole)'}
+                          <Icon size={12} /> {label} {key === 'residential'
+                            ? (areas[key].points.length >= 3 ? '(drawn)' : '(none)')
+                            : (areas[key].custom ? '(adjusted)' : '(whole)')}
                         </button>
                       ))}
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mb-2">
-                    Starts as the whole barangay. Drag the points to cover only the part that is actually affected — click on the map to add a point. The dashed line is the full barangay boundary.
+                    {areaTab === 'residential'
+                      ? 'Click on the map to trace where people actually live (yellow). Drag points to adjust. Shown on top of the flood colors, on the flood map only.'
+                      : 'Starts as the whole barangay. Drag the points to cover only the part that is actually affected — click on the map to add a point. The dashed line is the full barangay boundary.'}
                   </p>
                   <PolygonEditor
                     key={`${editing}-${areaTab}`}
                     points={areas[areaTab].points}
                     onChange={pts => setAreaPoints(areaTab, pts)}
-                    color={levelColor(areaTab, areaTab === 'flood' ? form.flood_susceptibility : form.landslide_susceptibility)}
+                    color={areaTab === 'residential' ? RESIDENTIAL_COLOR : levelColor(areaTab, areaTab === 'flood' ? form.flood_susceptibility : form.landslide_susceptibility)}
                     heightClass="h-[42vh]"
                   >
                     {/* Every OTHER barangay, colored exactly like the GIS Map
@@ -193,36 +207,51 @@ export default function BarangayManagement() {
                     {barangays.filter(b => b.id !== editing && b.boundary_geojson).map(b => {
                       let geo
                       try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-                      const color = levelColor(areaTab, areaTab === 'flood' ? b.flood_susceptibility : b.landslide_susceptibility)
-                      const areaStr = areaTab === 'flood' ? b.flood_area_geojson : b.landslide_area_geojson
-                      let area = null
-                      if (areaStr) { try { area = JSON.parse(areaStr) } catch { area = null } }
+                      const color = levelColor(bgHazard, bgHazard === 'flood' ? b.flood_susceptibility : b.landslide_susceptibility)
+                      const areaStr = bgHazard === 'flood' ? b.flood_area_geojson : b.landslide_area_geojson
+                      const parse = (str) => { if (!str) return null; try { return JSON.parse(str) } catch { return null } }
+                      const area = parse(areaStr)
+                      const residential = bgHazard === 'flood' ? parse(b.residential_area_geojson) : null
                       return (
-                        <Fragment key={`ref-${areaTab}-${b.id}`}>
-                          <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? hazardColors(areaTab).Low : color, fillOpacity: 0.55 }} />
+                        <Fragment key={`ref-${bgHazard}-${b.id}`}>
+                          <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? hazardColors(bgHazard).Low : color, fillOpacity: 0.55 }} />
                           {area && <GeoJSON data={area} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }} />}
+                          {residential && <GeoJSON data={residential} interactive={false} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: RESIDENTIAL_COLOR, fillOpacity: 0.7 }} />}
                         </Fragment>
                       )
                     })}
+                    {/* This barangay's OTHER flood-map shape, for reference:
+                        its flood area while drawing residential, and its
+                        residential area while adjusting the flood area. */}
+                    {areaTab === 'residential' && areas.flood.custom && areas.flood.points.length >= 3 && (
+                      <GeoJSON key={`self-flood-${areas.flood.points.length}`} data={JSON.parse(latLngsToGeojson(areas.flood.points))} interactive={false}
+                        pathOptions={{ color: '#555', weight: 0.5, fillColor: levelColor('flood', form.flood_susceptibility), fillOpacity: 0.5 }} />
+                    )}
+                    {areaTab === 'flood' && areas.residential.points.length >= 3 && (
+                      <GeoJSON key={`self-res-${areas.residential.points.length}`} data={JSON.parse(latLngsToGeojson(areas.residential.points))} interactive={false}
+                        pathOptions={{ color: '#a16207', weight: 0.5, fillColor: RESIDENTIAL_COLOR, fillOpacity: 0.5 }} />
+                    )}
                     {/* This barangay: outside the adjusted area shows as Low
                         (same as the maps); dashed line = its full boundary. */}
                     {(() => {
                       let geo
                       try { geo = JSON.parse(editingBarangay.boundary_geojson) } catch { return null }
                       return (
-                        <GeoJSON key={`self-${areaTab}-${areas[areaTab].custom}`} data={geo} interactive={false}
-                          pathOptions={{ color: '#1e293b', weight: 2, dashArray: '5, 4', fillColor: hazardColors(areaTab).Low, fillOpacity: areas[areaTab].custom ? 0.55 : 0 }} />
+                        <GeoJSON key={`self-${areaTab}-${areas[bgHazard].custom}`} data={geo} interactive={false}
+                          pathOptions={{ color: '#1e293b', weight: 2, dashArray: '5, 4', fillColor: hazardColors(bgHazard).Low,
+                            fillOpacity: areaTab === 'residential' ? (areas.flood.custom ? 0.55 : 0.35) : (areas[areaTab].custom ? 0.55 : 0) }} />
                       )
                     })()}
                   </PolygonEditor>
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                    {Object.entries(hazardColors(areaTab)).map(([lvl, c]) => (
+                    {Object.entries(hazardColors(bgHazard)).map(([lvl, c]) => (
                       <span key={lvl} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: c }} /> {lvl}</span>
                     ))}
+                    {bgHazard === 'flood' && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: RESIDENTIAL_COLOR }} /> Residential Area</span>}
                   </div>
-                  {areas[areaTab].custom && (
+                  {areas[areaTab].custom && areas[areaTab].points.length > 0 && (
                     <button type="button" onClick={() => resetArea(areaTab)} className="btn-secondary text-xs px-2.5 py-1.5 mt-2 flex items-center gap-1">
-                      <RotateCcw size={12} /> Use whole barangay
+                      <RotateCcw size={12} /> {areaTab === 'residential' ? 'Remove residential area' : 'Use whole barangay'}
                     </button>
                   )}
                 </div>
