@@ -9,8 +9,35 @@ function hasWindow() {
   return typeof window !== 'undefined' && window.localStorage && window.sessionStorage
 }
 
+// A tab opened FROM the system (e.g. "Open Big-Screen Display Mode") starts
+// with an empty sessionStorage, because sessionStorage belongs to one tab
+// only. Without this, a user who logged in WITHOUT "Remember me" would be
+// sent to the Login page in the new tab. If this tab has no session but was
+// opened by a PDRA tab that does, copy that session over. It's kept in this
+// tab's sessionStorage, so it still ends when this tab is closed — the same
+// "Remember me unchecked" behavior as the original tab.
+let adoptedFromOpener = false
+function adoptSessionFromOpener() {
+  if (adoptedFromOpener) return
+  adoptedFromOpener = true
+  try {
+    if (window.localStorage.getItem('drrmis_token') || window.sessionStorage.getItem('drrmis_token')) return
+    const opener = window.opener
+    if (!opener || opener.location.origin !== window.location.origin) return
+    const token = opener.sessionStorage.getItem('drrmis_token')
+    const user = opener.sessionStorage.getItem('drrmis_user')
+    if (token && user) {
+      window.sessionStorage.setItem('drrmis_token', token)
+      window.sessionStorage.setItem('drrmis_user', user)
+    }
+  } catch {
+    // Opener closed or not accessible — nothing to adopt; normal login applies.
+  }
+}
+
 export function getStoredUser() {
   if (!hasWindow()) return null
+  adoptSessionFromOpener()
   try {
     const saved = window.localStorage.getItem('drrmis_user') || window.sessionStorage.getItem('drrmis_user')
     if (!saved) return null
@@ -43,6 +70,7 @@ export function clearStoredUser() {
 
 export function getStoredToken() {
   if (!hasWindow()) return null
+  adoptSessionFromOpener()
   return window.localStorage.getItem('drrmis_token') || window.sessionStorage.getItem('drrmis_token')
 }
 
