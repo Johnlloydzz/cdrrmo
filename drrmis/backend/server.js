@@ -82,11 +82,14 @@ initDb().then(() => {
   app.listen(PORT, () => console.log(`PDRA API running on http://localhost:${PORT}`))
 
   // Pure-JS scheduled job (no external service, no YAML workflow) — runs
-  // the flood auto-detect check every 10 minutes for as long as this
+  // the flood auto-detect check every 5 minutes for as long as this
   // server process stays awake. Render's free tier can put the service to
   // sleep after ~15 minutes with no incoming requests, in which case this
   // simply pauses until the next real visitor wakes it back up.
-  cron.schedule('*/10 * * * *', () => {
+  // Every 5 min: Open-Meteo's current values update every 15 min, so checking
+  // more often (e.g. every 1 min) returns the same numbers and would push the
+  // free API past its 10,000 calls/day limit, getting the server blocked.
+  cron.schedule('*/5 * * * *', () => {
     internalRoutes.runFloodAutoDetectCheck()
       .then(result => console.log('[flood-check]', JSON.stringify(result)))
       .catch(err => console.error('[flood-check] failed:', err.message))

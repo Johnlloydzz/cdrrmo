@@ -375,7 +375,9 @@ export default function FloodSimulationControl() {
                   ) : (
                     <>
                       {(() => {
-                        const rainMm = liveWeather?.current?.rain
+                        // `precipitation` = ALL rain. Open-Meteo's `rain` excludes convective
+                        // showers (most of Gingoog's rain), so it often read 0 while raining.
+                        const rainMm = liveWeather?.current?.precipitation
                         const warning = getRainfallWarning(rainMm)
                         if (!warning || warning.level === 'None') return null
                         return (
@@ -392,7 +394,7 @@ export default function FloodSimulationControl() {
                       })()}
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
-                          <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
+                          <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.precipitation ?? '—'} mm</p>
                           <p className="text-[9px] text-gray-500 uppercase">Rain now</p>
                         </div>
                         <div className="bg-blue-50 rounded-lg p-2 text-center">

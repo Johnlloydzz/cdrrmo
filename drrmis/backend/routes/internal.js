@@ -84,6 +84,36 @@ function sumLastHours(times, values, currentTime, hours) {
   return total
 }
 
+// Barangays close together share the same weather — the global models
+// Open-Meteo serves for the Philippines are ~9–11 km resolution — so
+// centroids are grouped onto a ~5.6 km grid and each grid point is fetched
+// once. 79 barangays become ~19 points. That matters because the free
+// Open-Meteo API allows < 10,000 calls/day and EVERY location in a request
+// counts as a call: 79 points every 10 min was already over the limit
+// (~11,400/day); ~19 points every 5 min is ~5,500/day.
+const GRID_DEG = 0.05
+const gridKey = ([lat, lng]) => `${(Math.round(lat / GRID_DEG) * GRID_DEG).toFixed(3)},${(Math.round(lng / GRID_DEG) * GRID_DEG).toFixed(3)}`
+
+// River discharge is DAILY data, so there's no point re-fetching it every
+// few minutes — it's cached for an hour (it's also a 33-day request, which
+// Open-Meteo counts as more than one call).
+let dischargeCache = { at: 0, ratio: null }
+async function getDischargeRatio() {
+  if (Date.now() - dischargeCache.at < 60 * 60 * 1000) return dischargeCache.ratio
+  const floodResp = await fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json())
+  if (floodResp?.error) throw new Error(`Open-Meteo flood API: ${floodResp.reason || 'error'}`)
+  const daily = floodResp?.daily?.river_discharge
+  let ratio = null
+  if (daily && daily.length >= 4) {
+    const past = daily.slice(0, daily.length - 3)
+    const baseline = past.reduce((sum, v) => sum + (v ?? 0), 0) / past.length
+    const today = daily[past.length]
+    if (baseline && today != null) ratio = today / baseline
+  }
+  dischargeCache = { at: Date.now(), ratio }
+  return ratio
+}
+
 async function runFloodAutoDetectCheck() {
   const barangays = await all('SELECT id, name, boundary_geojson FROM barangays WHERE boundary_geojson IS NOT NULL')
   const withCentroid = barangays
@@ -94,37 +124,35 @@ async function runFloodAutoDetectCheck() {
     return { checked: 0, qualifying_barangays: [], note: 'No barangays with a boundary to check.' }
   }
 
-  const lats = withCentroid.map(b => b.centroid[0]).join(',')
-  const lngs = withCentroid.map(b => b.centroid[1]).join(',')
+  // Unique grid points (see GRID_DEG above)
+  const points = [...new Set(withCentroid.map(b => gridKey(b.centroid)))]
+  const lats = points.map(k => k.split(',')[0]).join(',')
+  const lngs = points.map(k => k.split(',')[1]).join(',')
 
-  // One batched call: current rain + the last 7 days of hourly rainfall for
-  // every barangay, so accumulated totals (24h / 3 days / 7 days) can be
-  // computed — not just what's falling this very hour.
-  const [floodResp, perBarangayResp] = await Promise.all([
-    fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json()),
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=rain&hourly=precipitation&past_days=7&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
+  // One batched call: current precipitation + the last 7 days of hourly
+  // precipitation per grid point, so accumulated totals (24h / 3 days /
+  // 7 days) can be computed. Uses `precipitation` (ALL rain), not `rain`:
+  // Open-Meteo's `rain` excludes convective showers — which is most of the
+  // rain in a tropical place like Gingoog — so it often read 0 while it was
+  // actually raining.
+  const [dischargeRatio, perPointResp] = await Promise.all([
+    getDischargeRatio(),
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=precipitation&hourly=precipitation&past_days=7&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
   ])
-
-  const daily = floodResp?.daily?.river_discharge
-  let dischargeRatio = null
-  if (daily && daily.length >= 4) {
-    const past = daily.slice(0, daily.length - 3)
-    const baseline = past.reduce((sum, v) => sum + (v ?? 0), 0) / past.length
-    const today = daily[past.length]
-    if (baseline && today != null) dischargeRatio = today / baseline
-  }
+  if (perPointResp?.error) throw new Error(`Open-Meteo forecast API: ${perPointResp.reason || 'error'}`)
 
   // Open-Meteo returns an array for multiple locations, a single object for one.
-  const results = Array.isArray(perBarangayResp) ? perBarangayResp : [perBarangayResp]
+  const results = Array.isArray(perPointResp) ? perPointResp : [perPointResp]
+  const byPoint = new Map(points.map((k, i) => [k, results[i]]))
   const reasons = {}
-  withCentroid.forEach((b, i) => {
-    const r = results[i]
+  withCentroid.forEach((b) => {
+    const r = byPoint.get(gridKey(b.centroid))
     if (!r) return
     const currentTime = r.current?.time || ''
     const times = r.hourly?.time
     const values = r.hourly?.precipitation
     const reason = evaluateBarangay({
-      currentRain: r.current?.rain ?? null,
+      currentRain: r.current?.precipitation ?? null,
       sum24:  sumLastHours(times, values, currentTime, 24),
       sum72:  sumLastHours(times, values, currentTime, 72),
       sum168: sumLastHours(times, values, currentTime, 168),
@@ -144,6 +172,7 @@ async function runFloodAutoDetectCheck() {
 
   return {
     checked: withCentroid.length,
+    weather_points: points.length,
     discharge_ratio: dischargeRatio,
     qualifying_barangays: withCentroid.filter(b => reasons[b.id]).map(b => `${b.name} — ${reasons[b.id]}`),
   }
