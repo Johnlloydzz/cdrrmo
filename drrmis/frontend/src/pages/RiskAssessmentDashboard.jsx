@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves } from 'lucide-react'
 import { apiGet } from '../utils/api'
@@ -497,12 +497,19 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             {/* Selected barangay — highlighted outline, same style as Hazard Map & Geofencing */}
             {selectedGeojson && (
               <>
-                <GeoJSON
-                  key={`selected-${selectedBarangay.id}`}
-                  data={selectedGeojson}
-                  pathOptions={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
-                  ref={setSelectedGeojsonLayer}
-                />
+                {/* Own pane ABOVE every colored layer (but below house pins), so the
+                sky-blue outline is never covered by violet/yellow shapes that
+                get redrawn later (e.g. after toggling a layer). Non-interactive,
+                so clicks still reach the puroks/areas underneath. */}
+                <Pane name="selected-outline" style={{ zIndex: 450, pointerEvents: 'none' }}>
+                  <GeoJSON
+                    key={`selected-${selectedBarangay.id}`}
+                    data={selectedGeojson}
+                    interactive={false}
+                    pathOptions={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
+                    ref={setSelectedGeojsonLayer}
+                  />
+                </Pane>
                 <FitToBoundary geojsonLayer={selectedGeojsonLayer} />
               </>
             )}

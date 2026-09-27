@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
-import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
 import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2 } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
@@ -504,11 +504,14 @@ export default function FloodSimulationControl() {
               let geo
               try { geo = JSON.parse(selectedBarangay.boundary_geojson) } catch { return null }
               return (
-                <GeoJSON
-                  key={`selected-${selectedBarangay.id}`}
-                  data={geo}
-                  pathOptions={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
-                />
+                <Pane name="selected-outline" style={{ zIndex: 450, pointerEvents: 'none' }}>
+                  <GeoJSON
+                    key={`selected-${selectedBarangay.id}`}
+                    data={geo}
+                    interactive={false}
+                    pathOptions={{ color: '#0ea5e9', weight: 3, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
+                  />
+                </Pane>
               )
             })()}
 
