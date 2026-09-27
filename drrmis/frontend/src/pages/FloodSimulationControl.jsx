@@ -23,10 +23,10 @@ const CENTER = [8.8231, 125.1109]
 // Gingoog City specifically, but does publish these official rain thresholds.
 function getRainfallWarning(mm) {
   if (mm == null) return null
-  if (mm > 30) return { level: 'Red', color: '#dc2626', bg: '#fef2f2', message: 'Torrential rain — severe flooding expected. Evacuation of low-lying and high-risk areas should begin.' }
-  if (mm >= 15) return { level: 'Orange', color: '#ea580c', bg: '#fff7ed', message: 'Intense rain — flooding is a real threat. Be ready for pre-emptive evacuation.' }
-  if (mm >= 7.5) return { level: 'Yellow', color: '#ca8a04', bg: '#fefce8', message: 'Heavy rain — flooding possible in low-lying areas. Monitor conditions closely.' }
-  return { level: 'None', color: '#16a34a', bg: '#f0fdf4', message: 'No heavy rainfall detected at this time.' }
+  if (mm > 30) return { level: 'Red', color: '#dc2626', bg: '#fef2f2', message: 'Severe flooding expected. Begin evacuation of high-risk areas.' }
+  if (mm >= 15) return { level: 'Orange', color: '#ea580c', bg: '#fff7ed', message: 'Flooding likely. Prepare for pre-emptive evacuation.' }
+  if (mm >= 7.5) return { level: 'Yellow', color: '#ca8a04', bg: '#fefce8', message: 'Flooding possible in low-lying areas.' }
+  return { level: 'None', color: '#16a34a', bg: '#f0fdf4', message: 'No heavy rainfall.' }
 }
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors —
@@ -406,10 +406,10 @@ export default function FloodSimulationControl() {
                       </div>
                       <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        Updated {liveUpdatedAt ? liveUpdatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—'} · refreshes every 5 min
+                        Updated {liveUpdatedAt ? liveUpdatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—'}
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        Source: Open-Meteo &amp; GloFAS. "Rain now" is the rain falling at this moment — it shows 0 during a pause even if it rained earlier. River discharge is volume flow, not water depth — a reference trend only.
+                      <p className="text-[10px] text-gray-400 mt-1 cursor-help" title="Refreshes every 5 minutes. &quot;Rain now&quot; is the rain at this moment and shows 0 during a pause. River discharge is volume flow, not water depth.">
+                        Source: Open-Meteo, GloFAS
                       </p>
                     </>
                   )}
@@ -427,28 +427,28 @@ export default function FloodSimulationControl() {
                     {floodLevel > 0 ? (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        REPORTED FLOOD LEVEL: <strong className="mx-1">{floodLevel} m</strong> — applied live to the whole system (Dashboard, GIS Map and this page). Puroks with a flood threshold at or below this level are at-risk.
+                        Flood level: <strong className="mx-1">{floodLevel} m</strong> — applied system-wide
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-2">No flood level reported — the system uses live auto-detect or the official CDRA classification. Enter the observed water level (meters) above to apply it system-wide.</p>
+                      <p className="text-xs text-gray-500 mt-2">No flood level reported.</p>
                     )}
                     {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
-                    <p className="text-[10px] text-gray-400 mt-1">A reported level resets to normal automatically after 12 hours without an update — update it again if the flood is still ongoing.</p>
+                    {floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Resets automatically after 12 hours without an update.</p>}
 
                     {autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        Auto-detected in: <strong className="mx-1">{autoFloodedBarangayNames.join(', ')}</strong>
+                        Flood detected: <strong className="mx-1">{autoFloodedBarangayNames.join(', ')}</strong>
                       </p>
                     )}
-                    <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100">
-                      <strong>Auto-detect (live, every ~10 min)</strong> flags a barangay when ANY of these happen: (1) intense rain now &gt;30 mm/hr while the river is 50%+ above normal; (2) 100 mm+ of rain within 24 hours; or (3) prolonged rain — 150 mm+ over 3 days or 250 mm+ over 7 days — while the river is rising (20%+ above normal).
+                    <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100 cursor-help" title="A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.">
+                      Auto-detect: every 10 minutes, based on live rainfall and river data.
                     </p>
                   </div>
                 ) : (
                   <div className="border-t border-gray-100 pt-3">
                     <p className="text-xs text-gray-500">
-                      Landslide risk has no continuous measured value — this always uses the official CDRA classification.
+                      Based on the official CDRA landslide classification.
                     </p>
                   </div>
                 )}
