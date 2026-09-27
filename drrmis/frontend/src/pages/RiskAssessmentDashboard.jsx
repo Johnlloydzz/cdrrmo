@@ -19,6 +19,21 @@ L.Icon.Default.mergeOptions({
 // Control, matching the City of Gingoog CLUP Flood Susceptibility Map.
 const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
 
+// A barangay with an adjusted hazard area is drawn as two shapes: the rest
+// of the barangay in the "Low" color, and the area in its real color. If
+// the Low shape covered the area too, the area's color would be blended on
+// top of tan and look like a different shade than barangays colored as a
+// whole. So the area is cut out of the Low shape (a hole) — the area's
+// color then sits directly on the map, identical to everywhere else.
+function withHole(geo, areaStr) {
+  try {
+    const area = JSON.parse(areaStr)
+    if (geo?.type !== 'Polygon' || area?.type !== 'Polygon') return geo
+    return { type: 'Polygon', coordinates: [geo.coordinates[0], area.coordinates[0]] }
+  } catch { return geo }
+}
+
+
 // Red pin for households within a high flood-risk (geofenced) zone
 const redPinIcon = new L.DivIcon({
   className: 'household-pin',
@@ -446,7 +461,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               return (
                 <React.Fragment key={`${b.id}-${b.updated_at}`}>
                   <GeoJSON
-                    data={geo}
+                    data={b.flood_area_geojson ? withHole(geo, b.flood_area_geojson) : geo}
                     pathOptions={{ color: '#555', weight: 0.5, fillColor: b.flood_area_geojson ? FLOOD_COLOR.Low : color, fillOpacity: 0.55 }}
                     eventHandlers={{ click: () => setSelectedBarangay(b) }}
                   >
@@ -461,7 +476,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               try { area = JSON.parse(areaStr) } catch { return null }
               return (
                 <GeoJSON key={`d-area-${b.id}-${b.updated_at}`} data={area}
-                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip></GeoJSON>
               )
             })()}

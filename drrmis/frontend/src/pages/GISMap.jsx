@@ -65,6 +65,21 @@ const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flo
 const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
 const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
 
+// A barangay with an adjusted hazard area is drawn as two shapes: the rest
+// of the barangay in the "Low" color, and the area in its real color. If
+// the Low shape covered the area too, the area's color would be blended on
+// top of tan and look like a different shade than barangays colored as a
+// whole. So the area is cut out of the Low shape (a hole) — the area's
+// color then sits directly on the map, identical to everywhere else.
+function withHole(geo, areaStr) {
+  try {
+    const area = JSON.parse(areaStr)
+    if (geo?.type !== 'Polygon' || area?.type !== 'Polygon') return geo
+    return { type: 'Polygon', coordinates: [geo.coordinates[0], area.coordinates[0]] }
+  } catch { return geo }
+}
+
+
 // Approximate centroid (average of vertices) for a Polygon or MultiPolygon.
 // Used to place a barangay pin and as a fly-to fallback when no boundary is loaded yet.
 function getCentroid(geojson) {
@@ -586,7 +601,7 @@ export default function GISMap() {
             return (
               <React.Fragment key={`hz-${hazardLayer}-${b.id}-${b.updated_at}`}>
                 <GeoJSON
-                  data={geo}
+                  data={areaStr ? withHole(geo, areaStr) : geo}
                   style={{ color: '#555', weight: 0.5, fillColor: areaStr ? colors.Low : color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}
                 />
@@ -598,7 +613,7 @@ export default function GISMap() {
               try { area = JSON.parse(areaStr) } catch { return null }
               return (
                 <GeoJSON key={`hz-area-${b.id}-${b.updated_at}`} data={area}
-                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}></GeoJSON>
               )
             })()}

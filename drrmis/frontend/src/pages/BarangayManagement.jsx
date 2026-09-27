@@ -19,6 +19,21 @@ const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
 const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
 const hazardColors = (key) => key === 'flood' ? FLOOD_COLOR : LANDSLIDE_COLOR
 const levelColor = (key, level) => hazardColors(key)[level] || hazardColors(key).Low
+
+// A barangay with an adjusted hazard area is drawn as two shapes: the rest
+// of the barangay in the "Low" color, and the area in its real color. If
+// the Low shape covered the area too, the area's color would be blended on
+// top of tan and look like a different shade than barangays colored as a
+// whole. So the area is cut out of the Low shape (a hole) — the area's
+// color then sits directly on the map, identical to everywhere else.
+function withHole(geo, areaStr) {
+  try {
+    const area = JSON.parse(areaStr)
+    if (geo?.type !== 'Polygon' || area?.type !== 'Polygon') return geo
+    return { type: 'Polygon', coordinates: [geo.coordinates[0], area.coordinates[0]] }
+  } catch { return geo }
+}
+
 // Yellow "Residential Area" from CDRA's Population Flooding Exposure Map —
 // drawn on top of the flood colors, flood layer only.
 const RESIDENTIAL_COLOR = '#facc15'
@@ -214,8 +229,8 @@ export default function BarangayManagement() {
                       const residential = bgHazard === 'flood' ? parse(b.residential_area_geojson) : null
                       return (
                         <Fragment key={`ref-${bgHazard}-${b.id}`}>
-                          <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? hazardColors(bgHazard).Low : color, fillOpacity: 0.55 }} />
-                          {area && <GeoJSON data={area} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }} />}
+                          <GeoJSON data={area ? withHole(geo, areaStr) : geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? hazardColors(bgHazard).Low : color, fillOpacity: 0.55 }} />
+                          {area && <GeoJSON data={area} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }} />}
                           {residential && <GeoJSON data={residential} interactive={false} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: RESIDENTIAL_COLOR, fillOpacity: 0.7 }} />}
                         </Fragment>
                       )

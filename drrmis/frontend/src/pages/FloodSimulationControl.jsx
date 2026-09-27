@@ -34,6 +34,21 @@ function getRainfallWarning(mm) {
 const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
 const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
 
+// A barangay with an adjusted hazard area is drawn as two shapes: the rest
+// of the barangay in the "Low" color, and the area in its real color. If
+// the Low shape covered the area too, the area's color would be blended on
+// top of tan and look like a different shade than barangays colored as a
+// whole. So the area is cut out of the Low shape (a hole) — the area's
+// color then sits directly on the map, identical to everywhere else.
+function withHole(geo, areaStr) {
+  try {
+    const area = JSON.parse(areaStr)
+    if (geo?.type !== 'Polygon' || area?.type !== 'Polygon') return geo
+    return { type: 'Polygon', coordinates: [geo.coordinates[0], area.coordinates[0]] }
+  } catch { return geo }
+}
+
+
 const barangayIcon = new L.DivIcon({
   className: 'barangay-pin',
   html: `<div style="background:#1d4ed8;width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
@@ -428,7 +443,7 @@ export default function FloodSimulationControl() {
               return (
                 <React.Fragment key={`${b.id}-${b.updated_at}`}>
                   <GeoJSON
-                    data={geo}
+                    data={areaStr ? withHole(geo, areaStr) : geo}
                     pathOptions={{ color: '#555', weight: 0.5, fillColor: areaStr ? colorMap.Low : color, fillOpacity: 0.55 }}
                     eventHandlers={{ click: () => setSelectedBarangay(b) }}
                   >
@@ -442,7 +457,7 @@ export default function FloodSimulationControl() {
               try { area = JSON.parse(areaStr) } catch { return null }
               return (
                 <GeoJSON key={`f-area-${b.id}-${b.updated_at}`} data={area}
-                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.6 }}
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip></GeoJSON>
               )
             })()}
