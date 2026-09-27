@@ -312,17 +312,26 @@ export default function RiskAssessmentDashboard({ currentUser }) {
 
       {/* LIVE flood banner — only appears when the server-side auto-detect
           (actual heavy rain + high river discharge right now) flags one or
-          more barangays. Manual simulations on Flood Simulation Control
-          never show here. Smooth grid-rows expand/collapse, no popping. */}
-      <div className={`grid transition-all duration-300 ease-out flex-shrink-0 ${autoFloodedIds.length > 0 ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          more barangays, OR when CDRRMO reports an observed flood level on
+          Flood Simulation Control (that level is real, applied citywide).
+          Smooth grid-rows expand/collapse, no popping. */}
+      <div className={`grid transition-all duration-300 ease-out flex-shrink-0 ${(floodLevel > 0 || autoFloodedIds.length > 0) ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
         <div className="overflow-hidden">
           <div className="card p-2.5 bg-red-50 border border-red-200 flex items-center gap-2">
             <Waves size={14} className="text-red-500 flex-shrink-0" />
             <p className="text-xs text-red-700">
-              <strong>LIVE flood alert</strong> (real-time rainfall + river data) — puroks with a flood threshold of 1 m or lower are flagged at-risk:
-              {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => (
-                <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'flooding detected'}</span>
-              ))}
+              {floodLevel > 0 ? (
+                <>
+                  <strong>LIVE flood alert — reported water level: {floodLevel} m</strong> (reported by CDRRMO, applied citywide) — puroks with a flood threshold at or below {floodLevel} m are flagged at-risk.
+                </>
+              ) : (
+                <>
+                  <strong>LIVE flood alert</strong> (real-time rainfall + river data) — puroks with a flood threshold of 1 m or lower are flagged at-risk:
+                  {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => (
+                    <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'flooding detected'}</span>
+                  ))}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -332,7 +341,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         <button type="button" onClick={() => setShowRiskBarangays(true)} className="card p-3 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
           <Waves size={18} className="mx-auto mb-1 text-blue-500" />
           <p className="text-xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Barangays in Risk Zone {autoFloodedIds.length > 0 ? '(live)' : ''}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Barangays in Risk Zone {(floodLevel > 0 || autoFloodedIds.length > 0) ? '(live)' : ''}</p>
         </button>
         <div className="card p-3 text-center transition-all">
           <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
@@ -396,7 +405,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   <p className="text-base font-bold text-gray-700">
                     {(() => {
                       const puroks = selectedBarangay.puroks || []
-                      const atRisk = puroks.filter(p => autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High').length
+                      const atRisk = puroks.filter(p => floodLevel > 0 ? floodLevel >= p.flood_threshold_m : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High').length
                       return `${atRisk} / ${puroks.length}`
                     })()}
                   </p>
@@ -529,7 +538,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 // discharge). CDRA "High" alone is just susceptibility, not a
                 // warning, so with no active flood there's no warning.
                 const autoFlooded = autoFloodedIds.includes(selectedBarangay.id)
-                const activeLevel = autoFlooded ? 1 : 0 // live auto-detect only — manual simulations never count here
+                // A CDRRMO-reported level is real and citywide; otherwise the
+                // live auto-detect treats a flagged barangay as a 1 m flood.
+                const activeLevel = floodLevel > 0 ? floodLevel : (autoFlooded ? 1 : 0)
                 const atRisk = activeLevel > 0 && activeLevel >= p.flood_threshold_m
                 return (
                   <GeoJSON
@@ -547,7 +558,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       {activeLevel === 0
                         ? <span style={{ color: '#16a34a' }}>No active flood right now</span>
                         : atRisk
-                          ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: Flooded at {activeLevel} m (live, auto-detected)</span>
+                          ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: Flooded at {activeLevel} m ({floodLevel > 0 ? 'reported, live' : 'live, auto-detected'})</span>
                           : <span style={{ color: '#16a34a' }}>Above flood level ({activeLevel} m) — not at risk</span>}
                     </Popup>
                   </GeoJSON>

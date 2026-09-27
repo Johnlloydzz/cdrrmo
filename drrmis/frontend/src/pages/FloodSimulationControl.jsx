@@ -215,7 +215,7 @@ export default function FloodSimulationControl() {
   }
 
   const handleReset = async () => {
-    if (!window.confirm('Reset to normal? This clears the active flood simulation and returns to the official CDRA classification.')) return
+    if (!window.confirm('Reset to normal? This clears the reported flood level for the WHOLE system (Dashboard, GIS Map and this page).')) return
     setSaving(true)
     try { await apiPut('/settings/flood-level', { level_m: 0, source: 'manual' }); load() }
     catch (err) { alert(err.message) } finally { setSaving(false) }
@@ -224,13 +224,10 @@ export default function FloodSimulationControl() {
   const isFlood = hazard === 'flood'
   const atRiskKey = isFlood ? 'in_flood_risk_zone' : 'in_landslide_risk_zone'
   const susceptKey = isFlood ? 'flood_susceptibility' : 'landslide_susceptibility'
-  // A manually-entered level is a SIMULATION / drill that only affects
-  // this page — the server no longer applies it to real figures (Dashboard,
-  // GIS Map stay live). So while a simulation is running, the at-risk check
-  // for flood is computed right here: the simulated level vs. each
-  // household's purok threshold. Otherwise use the live server value.
-  const simulating = isFlood && floodLevel > 0
-  const isAtRisk = (h) => simulating ? floodLevel >= (h.flood_threshold_m ?? 1) : !!h[atRiskKey]
+  // A reported flood level is REAL (the system is used 24/7), so the server
+  // already applies it to every page — this page just shows the same live
+  // at-risk status as the Dashboard and GIS Map.
+  const isAtRisk = (h) => !!h[atRiskKey]
   const atRiskHouseholds = households.filter(isAtRisk)
 
   const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name)
@@ -311,7 +308,8 @@ export default function FloodSimulationControl() {
             </div>
           </div>
 
-          {/* Simulation controls — manual water level input and live weather/
+          {/* Flood level controls — CDRRMO's reported water level (real, applied
+              system-wide) and live weather/
               river reference data. Collapsed by default so the map (with
               affected barangays already color-coded) is what's seen first.
               Lives here in the sidebar instead of a full-width bar at the
@@ -324,13 +322,13 @@ export default function FloodSimulationControl() {
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                 <Settings2 size={15} className="text-gray-400 flex-shrink-0" />
-                <span>Simulation Controls</span>
+                <span>Flood Level Controls</span>
               </span>
               <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${showControls ? 'rotate-180' : ''}`} />
             </button>
             {(floodLevel > 0 || autoFloodedIds.length > 0) && (
               <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-                {floodLevel > 0 && <span className="badge-red text-[10px]">Simulation: {floodLevel}m</span>}
+                {floodLevel > 0 && <span className="badge-red text-[10px]">Flood level: {floodLevel}m (live)</span>}
                 {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
               </div>
             )}
@@ -398,13 +396,13 @@ export default function FloodSimulationControl() {
                     {floodLevel > 0 ? (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        SIMULATION: <strong className="mx-1">{floodLevel} m</strong> — drill only, shown on this page. Dashboard and GIS Map stay live.
+                        REPORTED FLOOD LEVEL: <strong className="mx-1">{floodLevel} m</strong> — applied live to the whole system (Dashboard, GIS Map and this page). Puroks with a flood threshold at or below this level are at-risk.
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-2">No simulation running — map shows live data (auto-detect or CDRA classification). Enter meters above to run a drill.</p>
+                      <p className="text-xs text-gray-500 mt-2">No flood level reported — the system uses live auto-detect or the official CDRA classification. Enter the observed water level (meters) above to apply it system-wide.</p>
                     )}
                     {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
-                    <p className="text-[10px] text-gray-400 mt-1">A manual level automatically resets to normal after 12 hours with no update — re-enter it if the flood is still ongoing.</p>
+                    <p className="text-[10px] text-gray-400 mt-1">A reported level resets to normal automatically after 12 hours without an update — update it again if the flood is still ongoing.</p>
 
                     {autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
@@ -518,7 +516,7 @@ export default function FloodSimulationControl() {
 
             {households.filter(h => h.latitude && h.longitude).map(h => (
               <Marker key={h.id} position={[h.latitude, h.longitude]} icon={isAtRisk(h) ? redPin : bluePin}>
-                <Popup><strong>{h.household_id}</strong> - {h.head_family}<br />{isAtRisk(h) ? (simulating ? `SIMULATION: flooded at ${floodLevel} m` : `WARNING: Within high ${hazard}-risk zone`) : 'Outside high-risk zone'}</Popup>
+                <Popup><strong>{h.household_id}</strong> - {h.head_family}<br />{isAtRisk(h) ? (isFlood && floodLevel > 0 ? `WARNING: flooded at ${floodLevel} m (reported, live)` : `WARNING: Within high ${hazard}-risk zone`) : 'Outside high-risk zone'}</Popup>
               </Marker>
             ))}
           </MapContainer>

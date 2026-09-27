@@ -39,12 +39,13 @@ router.get('/', async (req, res) => {
       get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
     ])
     const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
-    // The manually-typed flood level on Flood Simulation Control is now a
-    // SIMULATION / drill only — it never drives real figures here. Real
-    // at-risk status comes only from LIVE data: the server-side auto-detect
-    // (actual heavy rain + high river discharge, checked every ~10 min).
-    // With no live flood, it falls back to the static CDRA classification.
-    const manualActive = false
+    // A flood level reported by CDRRMO on Flood Simulation Control is REAL,
+    // not a drill — the system is used 24/7, so a reported level applies to
+    // every page (Dashboard, GIS Map, Flood Control) right away. Priority:
+    //  1. CDRRMO-reported level (> 0 m) — citywide, vs. each purok's threshold
+    //  2. Live auto-detect (real rain + river discharge) — flagged barangays
+    //  3. Otherwise the official CDRA classification.
+    const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
     let autoBarangayIds = []
     try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
 
