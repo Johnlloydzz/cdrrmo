@@ -405,7 +405,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   <p className="text-base font-bold text-gray-700">
                     {(() => {
                       const puroks = selectedBarangay.puroks || []
-                      const atRisk = puroks.filter(p => floodLevel > 0 ? floodLevel >= p.flood_threshold_m : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High').length
+                      // A barangay classified LOW flood susceptibility has no at-risk puroks.
+                      const lowBarangay = (selectedBarangay.flood_susceptibility || 'Low') === 'Low'
+                      const atRisk = lowBarangay ? 0 : puroks.filter(p => floodLevel > 0 ? floodLevel >= p.flood_threshold_m : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High').length
                       return `${atRisk} / ${puroks.length}`
                     })()}
                   </p>
@@ -541,7 +543,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 // A CDRRMO-reported level is real and citywide; otherwise the
                 // live auto-detect treats a flagged barangay as a 1 m flood.
                 const activeLevel = floodLevel > 0 ? floodLevel : (autoFlooded ? 1 : 0)
-                const atRisk = activeLevel > 0 && activeLevel >= p.flood_threshold_m
+                // Same rule as the backend: a LOW-susceptibility barangay is never high risk.
+                const lowBarangay = (selectedBarangay.flood_susceptibility || 'Low') === 'Low'
+                const atRisk = !lowBarangay && activeLevel > 0 && activeLevel >= p.flood_threshold_m
                 return (
                   <GeoJSON
                     key={`purok-${p.id}`}
@@ -555,7 +559,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       Population: {p.resident_count ?? 0}<br />
                       Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}<br />
                       {autoFlooded && autoFloodReasons[selectedBarangay.id] && <>Reason: {autoFloodReasons[selectedBarangay.id]}<br /></>}
-                      {activeLevel === 0
+                      {lowBarangay
+                        ? <span style={{ color: '#16a34a' }}>Low flood susceptibility — not high risk</span>
+                        : activeLevel === 0
                         ? <span style={{ color: '#16a34a' }}>No active flood right now</span>
                         : atRisk
                           ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: Flooded at {activeLevel} m ({floodLevel > 0 ? 'reported, live' : 'live, auto-detected'})</span>

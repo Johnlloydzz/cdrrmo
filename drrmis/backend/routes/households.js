@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     // Barangay Officials only ever see their own barangay's households —
     // enforced server-side, not just hidden in the UI.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
-    let sql = `SELECT h.*, b.name as barangay_name, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk
+    let sql = `SELECT h.*, b.name as barangay_name, b.flood_susceptibility as barangay_flood_susceptibility, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
                LEFT JOIN puroks p ON h.purok_id = p.id
@@ -49,13 +49,17 @@ router.get('/', async (req, res) => {
     let autoBarangayIds = []
     try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
 
+    // A barangay CDRRMO classified as LOW flood susceptibility (Barangays
+    // page) is never high flood risk — whether or not a flood level is
+    // reported — so its household pins follow what the map shows (tan, not
+    // violet). Otherwise the purok-level rules below decide.
     const withRisk = rows.map(h => ({
       ...h,
-      in_flood_risk_zone: manualActive
+      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && (manualActive
         ? floodLevel >= h.flood_threshold_m
         : autoBarangayIds.includes(h.barangay_id)
           ? 1 >= h.flood_threshold_m
-          : h.purok_flood_risk === 'High',
+          : h.purok_flood_risk === 'High'),
       // Landslide has no continuous measured value like flood depth — it
       // always uses the static official CDRA classification.
       in_landslide_risk_zone: h.purok_landslide_risk === 'High',

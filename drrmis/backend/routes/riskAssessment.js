@@ -50,6 +50,10 @@ router.get('/summary', async (req, res) => {
       atRiskParams = []
     }
 
+    // Same as /api/households: a barangay classified LOW flood susceptibility
+    // is never counted as high flood risk.
+    atRiskCondition = `(COALESCE(b.flood_susceptibility, 'Low') != 'Low' AND (${atRiskCondition}))`
+
     const rows = await all(`
       SELECT
         b.id                                            AS barangay_id,
