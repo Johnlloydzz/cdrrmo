@@ -77,13 +77,16 @@ export default function ResidentManagement({ currentUser }) {
   }
 
   const handleSave = async () => {
-    if (!form.last_name.trim() || !form.first_name.trim() || !form.household_id || !form.birthdate) {
-      alert('Last name, first name, household, and birthdate are required.'); return
+    if (!form.last_name.trim() || !form.first_name.trim() || !form.birthdate) {
+      alert('Last name, first name, and birthdate are required.'); return
     }
     setSaving(true)
     try {
-      if (editing) { await apiPut(`/residents/${editing}`, form) }
-      else { await apiPost('/residents', form) }
+      // Household is optional: residents are registered first, and a Head is
+      // linked when their household is registered (or assigned here later).
+      const payload = { ...form, household_id: form.household_id || null }
+      if (editing) { await apiPut(`/residents/${editing}`, payload) }
+      else { await apiPost('/residents', payload) }
       setShowModal(false)
       load()
     } catch (err) { alert(err.message) } finally { setSaving(false) }
@@ -150,7 +153,7 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
                   <td className="table-cell">{r.barangay_name || '—'}</td>
                   <td className="table-cell">{r.purok_name || '—'}</td>
-                  <td className="table-cell font-mono text-xs">{r.hh_code}</td>
+                  <td className="table-cell font-mono text-xs">{r.hh_code || <span className="font-sans text-gray-400">Not assigned</span>}</td>
                   <td className="table-cell font-medium">{r.name}</td>
                   <td className="table-cell">{r.sex || '—'}</td>
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
@@ -187,20 +190,21 @@ export default function ResidentManagement({ currentUser }) {
             <div className="overflow-y-auto px-6 py-5 space-y-4 bg-gray-50/50">
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><MapPin size={13} className="text-primary-500" /> Purok</label>
-                <select className="input mb-3" value={purokFilter} onChange={e => { setPurokFilter(e.target.value); setForm({...form, household_id: ''}) }} disabled={!!editing}>
+                <select className="input mb-3" value={purokFilter} onChange={e => { setPurokFilter(e.target.value); setForm({...form, household_id: ''}) }}>
                   <option value="">All puroks — show every household</option>
                   {puroks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <p className="text-xs text-gray-400 mb-3 -mt-2">Uses the puroks you set up in Puroks — pick one to narrow down the household list below.</p>
 
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Home size={13} className="text-primary-500" /> Household</label>
-                <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!!editing}>
-                  <option value="">Select household…</option>
+                <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})}>
+                  <option value="">No household yet — assign later</option>
                   {households.filter(h => !purokFilter || String(h.purok_id) === String(purokFilter)).map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
                 </select>
                 {purokFilter && households.filter(h => String(h.purok_id) === String(purokFilter)).length === 0 && (
                   <p className="text-xs text-amber-600 mt-2">No households registered in this purok yet.</p>
                 )}
+                <p className="text-xs text-gray-400 mt-2">Register the resident first. A Head of Family is linked automatically when their household is registered; other members can be assigned here.</p>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-4">

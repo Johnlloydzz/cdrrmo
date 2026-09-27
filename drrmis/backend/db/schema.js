@@ -62,7 +62,8 @@ const tables = [
   `CREATE TABLE IF NOT EXISTS residents (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     resident_id       TEXT    NOT NULL UNIQUE,
-    household_id      INTEGER NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+    household_id      INTEGER REFERENCES households(id) ON DELETE SET NULL, -- optional: residents are registered first, then assigned
+    barangay_id       INTEGER REFERENCES barangays(id),
     name              TEXT    NOT NULL,
     birthdate         TEXT    NOT NULL,
     age_bracket       TEXT,

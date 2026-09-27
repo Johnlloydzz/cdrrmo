@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Search, Plus, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
@@ -36,7 +37,7 @@ function FitToBarangayBoundary({ geojsonLayer, hasPin }) {
   return null
 }
 
-const emptyForm = { barangay_id: '', purok_id: '', head_family: '', latitude: '', longitude: '' }
+const emptyForm = { barangay_id: '', purok_id: '', head_resident_id: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
@@ -51,6 +52,24 @@ export default function HouseholdManagement({ currentUser }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [selectedBoundaryLayer, setSelectedBoundaryLayer] = useState(null)
+  // Registered residents who can be picked as Head of Family: relation "Head"
+  // and not in a household yet (plus the current Head, when editing).
+  const [headOptions, setHeadOptions] = useState([])
+  const [headsLoading, setHeadsLoading] = useState(false)
+
+  const loadHeads = async (household) => {
+    setHeadsLoading(true)
+    try {
+      const unassigned = await apiGet('/residents?unassigned=1&relation=Head')
+      const current = household ? await apiGet(`/residents?household_id=${household.id}&relation=Head`) : []
+      setHeadOptions([...current, ...unassigned])
+      // When editing, pre-select the resident who is this household's Head
+      if (household) {
+        const match = current.find(r => r.name === household.head_family) || current[0]
+        if (match) setForm(f => ({ ...f, head_resident_id: String(match.id) }))
+      }
+    } catch { setHeadOptions([]) } finally { setHeadsLoading(false) }
+  }
 
   const load = () => {
     setLoading(true)
@@ -74,14 +93,16 @@ export default function HouseholdManagement({ currentUser }) {
   const openAdd = () => {
     setEditing(null)
     setForm(canAdd ? { ...emptyForm, barangay_id: currentUser?.barangay_id || '' } : emptyForm)
+    loadHeads(null)
     setShowModal(true)
   }
   const openEdit = (h) => {
     setEditing(h.id)
     setForm({
-      barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_family: h.head_family || '',
+      barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_resident_id: '',
       latitude: h.latitude || '', longitude: h.longitude || '',
     })
+    loadHeads(h)
     setShowModal(true)
   }
 
@@ -91,7 +112,7 @@ export default function HouseholdManagement({ currentUser }) {
   }
 
   const handleSave = async () => {
-    if (!form.head_family.trim() || !form.barangay_id || !form.purok_id) {
+    if (!form.head_resident_id || !form.barangay_id || !form.purok_id) {
       alert('Head of family, barangay, and purok are required.'); return
     }
     setSaving(true)
@@ -188,8 +209,17 @@ export default function HouseholdManagement({ currentUser }) {
                 </div>
                 <div className="col-span-2">
                   <label className="label">Head of Family</label>
-                  <input className="input" value={form.head_family} onChange={e => setForm({...form, head_family: e.target.value})} />
-                  <p className="text-xs text-gray-400 mt-1">Add the head's birthdate, contact number, and other family members in Resident Management.</p>
+                  <select className="input" value={form.head_resident_id} onChange={e => setForm({...form, head_resident_id: e.target.value})} disabled={headsLoading}>
+                    <option value="">{headsLoading ? 'Loading residents…' : 'Select the Head of Family…'}</option>
+                    {headOptions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.resident_id})</option>)}
+                  </select>
+                  {!headsLoading && headOptions.length === 0 ? (
+                    <p className="text-xs text-amber-600 mt-1">
+                      No available Head of Family. Register the head first in <Link to="/residents" className="underline font-medium">Residents</Link> with Relation to Head set to "Head".
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-1">Only registered residents with Relation to Head "Head" and no household yet are listed.</p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <label className="label flex items-center gap-1.5"><MapPin size={14} /> Household Location</label>

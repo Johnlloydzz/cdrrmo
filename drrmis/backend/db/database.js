@@ -52,6 +52,9 @@ const EXPECTED_COLUMNS = {
     resident_id: `TEXT`, age_bracket: `TEXT`, relation_to_head: `TEXT`, created_at: `TEXT`,
     last_name: `TEXT`, first_name: `TEXT`, middle_name: `TEXT`,
     sex: `TEXT`, contact_number: `TEXT`,
+    // Which barangay the resident belongs to — needed now that a resident can
+    // be registered BEFORE being assigned to a household.
+    barangay_id: `INTEGER REFERENCES barangays(id)`,
   },
 }
 
@@ -107,12 +110,68 @@ async function selfHealPurokNames() {
   }
 }
 
+// One-time migration: residents used to REQUIRE a household (household_id
+// NOT NULL). The flow is now "register the resident first, then create the
+// household and pick its Head from the registered residents", so a resident
+// must be able to exist without a household for a while.
+//
+// SQLite can't drop a NOT NULL constraint in place, so the table is rebuilt:
+// create residents_new (household_id nullable, ON DELETE SET NULL so deleting
+// a household no longer deletes the people in it), copy EVERY existing
+// column and row across, drop the old table, rename. All four steps run as
+// ONE atomic batch — if anything fails, nothing changes. Only runs while
+// household_id is still NOT NULL, so it's a no-op on every later startup.
+async function migrateResidentsHouseholdOptional() {
+  let info
+  try { info = await all('PRAGMA table_info(residents)') } catch { return }
+  const hh = info.find(c => c.name === 'household_id')
+  if (!hh || Number(hh.notnull) === 0) return // already migrated (or fresh schema)
+
+  const known = {
+    id: 'INTEGER PRIMARY KEY AUTOINCREMENT',
+    resident_id: 'TEXT NOT NULL UNIQUE',
+    household_id: 'INTEGER REFERENCES households(id) ON DELETE SET NULL',
+    barangay_id: 'INTEGER REFERENCES barangays(id)',
+    name: 'TEXT NOT NULL',
+    birthdate: 'TEXT NOT NULL',
+    age_bracket: 'TEXT',
+    relation_to_head: 'TEXT',
+    created_at: "TEXT DEFAULT (datetime('now', '+8 hours'))",
+    last_name: 'TEXT', first_name: 'TEXT', middle_name: 'TEXT',
+    sex: 'TEXT', contact_number: 'TEXT',
+  }
+  const oldCols = info.map(c => c.name)
+  // Keep any column not in the list above too, so no data is ever dropped.
+  const extra = info.filter(c => !(c.name in known)).map(c => `${c.name} ${c.type || 'TEXT'}`)
+  const createSql = `CREATE TABLE residents_new (${[...Object.entries(known).map(([n, d]) => `${n} ${d}`), ...extra].join(', ')})`
+
+  const copyCols = oldCols.filter(c => c !== 'barangay_id')
+  const barangayExpr = oldCols.includes('barangay_id')
+    ? 'COALESCE(barangay_id, (SELECT h.barangay_id FROM households h WHERE h.id = residents.household_id))'
+    : '(SELECT h.barangay_id FROM households h WHERE h.id = residents.household_id)'
+  const copySql = `INSERT INTO residents_new (${[...copyCols, 'barangay_id'].join(', ')}) SELECT ${[...copyCols, barangayExpr].join(', ')} FROM residents`
+
+  try {
+    await getDb().batch([
+      createSql,
+      copySql,
+      'DROP TABLE residents',
+      'ALTER TABLE residents_new RENAME TO residents',
+    ], 'write')
+    const n = await get('SELECT COUNT(*) AS c FROM residents')
+    console.log(`Migration: residents.household_id is now optional (${n?.c ?? 0} residents kept).`)
+  } catch (err) {
+    console.log(`Migration: could not make residents.household_id optional: ${err.message}`)
+  }
+}
+
 async function initDb() {
   const schema = require('./schema')
   for (const stmt of schema) {
     await run(stmt)
   }
   await selfHealColumns()
+  await migrateResidentsHouseholdOptional()
   await seedBarangays()
   await seedDefaultAdmin()
   await seedBoundaries()
@@ -303,4 +362,4 @@ async function seedBoundaries() {
   }
 }
 
-module.exports = { getDb, run, get, all, initDb }
+module.exports = { getDb, run, get, all, initDb, migrateResidentsHouseholdOptional }

@@ -68,22 +68,44 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// The Head of Family must be an already-registered resident of the same
+// barangay, with relation "Head", who isn't in another household yet (or is
+// already in THIS household, when editing). Returns the resident or an error.
+async function validateHead(head_resident_id, barangay_id, householdId = null) {
+  const r = await get(
+    `SELECT r.id, r.name, r.relation_to_head, r.household_id, COALESCE(r.barangay_id, h.barangay_id) AS barangay_id
+     FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+    [head_resident_id]
+  )
+  if (!r) return { error: 'The selected Head of Family was not found. Register them in Residents first.' }
+  if (Number(r.barangay_id) !== Number(barangay_id)) return { error: 'The Head of Family must be a resident of this barangay.' }
+  if (r.relation_to_head !== 'Head') return { error: 'The selected resident is not registered as "Head" (Relation to Head).' }
+  if (r.household_id && Number(r.household_id) !== Number(householdId)) return { error: 'The selected resident is already assigned to another household.' }
+  return { resident: r }
+}
+
 // POST /api/households
 router.post('/', async (req, res) => {
   try {
-    const { purok_id, head_family, latitude, longitude } = req.body
+    const { purok_id, head_resident_id, latitude, longitude } = req.body
     // Barangay Officials can only register households under their own barangay,
     // regardless of what barangay_id is sent in the request body.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.body.barangay_id
-    if (!barangay_id || !purok_id || !head_family) {
-      return res.status(400).json({ error: 'barangay_id, purok_id, and head_family are required' })
+    if (!barangay_id || !purok_id || !head_resident_id) {
+      return res.status(400).json({ error: 'Barangay, purok, and Head of Family are required.' })
     }
+    // Residents are registered first; the Head is picked from them.
+    const { resident: head, error } = await validateHead(head_resident_id, barangay_id)
+    if (error) return res.status(400).json({ error })
+    const head_family = head.name
     const count = await get('SELECT COUNT(*) as c FROM households')
     const household_id = `HH-${String((count?.c || 0) + 1).padStart(5, '0')}`
     const result = await run(
       `INSERT INTO households (household_id, barangay_id, purok_id, head_family, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)`,
       [household_id, barangay_id, purok_id, head_family, latitude || null, longitude || null]
     )
+    // Link the Head to their new household.
+    await run('UPDATE residents SET household_id = ?, barangay_id = ? WHERE id = ?', [result.lastID, barangay_id, head.id])
     const newRow = await get('SELECT * FROM households WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -99,7 +121,16 @@ router.put('/:id', async (req, res) => {
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
     }
-    const { head_family, latitude, longitude, purok_id } = req.body
+    const { latitude, longitude, purok_id, head_resident_id } = req.body
+    // Changing the Head: must be a registered "Head" resident, unassigned or
+    // already in this household. The new Head is linked to this household.
+    let head_family = (await get('SELECT head_family FROM households WHERE id = ?', [req.params.id]))?.head_family
+    if (head_resident_id) {
+      const { resident: head, error } = await validateHead(head_resident_id, existing.barangay_id, req.params.id)
+      if (error) return res.status(400).json({ error })
+      head_family = head.name
+      await run('UPDATE residents SET household_id = ?, barangay_id = ? WHERE id = ?', [req.params.id, existing.barangay_id, head.id])
+    }
     await run(
       `UPDATE households SET head_family=?, latitude=?, longitude=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
       [head_family, latitude, longitude, purok_id, req.params.id]
@@ -119,6 +150,10 @@ router.delete('/:id', async (req, res) => {
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only delete households in your own barangay.' })
     }
+    // Residents are people, not part of the household record: deleting a
+    // household un-assigns its members (they stay registered and can be
+    // assigned to another household) instead of deleting them.
+    await run('UPDATE residents SET household_id = NULL, barangay_id = COALESCE(barangay_id, ?) WHERE household_id = ?', [existing.barangay_id, req.params.id])
     const result = await run('DELETE FROM households WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
     res.json({ message: 'Deleted' })

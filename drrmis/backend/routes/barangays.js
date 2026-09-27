@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
       SELECT b.*,
         (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS purok_count,
         (SELECT COUNT(*) FROM households h WHERE h.barangay_id = b.id) AS household_count,
-        (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.barangay_id = b.id) AS resident_count
+        (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(r.barangay_id, h.barangay_id) = b.id) AS resident_count
       FROM barangays b WHERE 1=1`
     const params = []
     if (search) { sql += ' AND b.name LIKE ?'; params.push(`%${search}%`) }
@@ -45,7 +45,7 @@ router.get('/:id', async (req, res) => {
       SELECT b.*,
         (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS purok_count,
         (SELECT COUNT(*) FROM households h WHERE h.barangay_id = b.id) AS household_count,
-        (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.barangay_id = b.id) AS resident_count
+        (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(r.barangay_id, h.barangay_id) = b.id) AS resident_count
       FROM barangays b WHERE b.id = ?`, [req.params.id])
     if (!b) return res.status(404).json({ error: 'Not found' })
     b.puroks = await all('SELECT id, name, flood_risk, landslide_risk FROM puroks WHERE barangay_id = ? ORDER BY name', [req.params.id])

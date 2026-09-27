@@ -28,18 +28,24 @@ function toProperCase(str) {
 // GET /api/residents
 router.get('/', async (req, res) => {
   try {
-    const { household_id, search } = req.query
+    const { household_id, search, unassigned, relation } = req.query
+    // A resident's barangay is their own barangay_id (set at registration,
+    // since they can exist before being assigned to a household), falling
+    // back to their household's barangay for older records.
     let sql = `SELECT r.*, h.household_id as hh_code, b.name as barangay_name, p.name as purok_name
                FROM residents r
                LEFT JOIN households h ON r.household_id = h.id
-               LEFT JOIN barangays b ON h.barangay_id = b.id
+               LEFT JOIN barangays b ON b.id = COALESCE(r.barangay_id, h.barangay_id)
                LEFT JOIN puroks p ON h.purok_id = p.id
                WHERE 1=1`
     const params = []
-    // Barangay Officials only ever see residents whose household belongs to
-    // their own barangay — enforced server-side, not just hidden in the UI.
-    if (req.user.role === 'Barangay Official') { sql += ' AND h.barangay_id = ?'; params.push(req.user.barangay_id) }
+    // Barangay Officials only ever see residents of their own barangay —
+    // enforced server-side, not just hidden in the UI.
+    if (req.user.role === 'Barangay Official') { sql += ' AND COALESCE(r.barangay_id, h.barangay_id) = ?'; params.push(req.user.barangay_id) }
     if (household_id) { sql += ' AND r.household_id = ?'; params.push(household_id) }
+    // Used by Register Household to list residents that can be picked as Head
+    if (unassigned === '1') sql += ' AND r.household_id IS NULL'
+    if (relation) { sql += ' AND r.relation_to_head = ?'; params.push(relation) }
     if (search) { sql += ' AND r.name LIKE ?'; params.push(`%${search}%`) }
     res.json(await all(sql, params))
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -49,26 +55,32 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { household_id, last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
-    if (!household_id || !last_name?.trim() || !first_name?.trim() || !birthdate) {
-      return res.status(400).json({ error: 'household_id, last name, first name, and birthdate are required' })
+    if (!last_name?.trim() || !first_name?.trim() || !birthdate) {
+      return res.status(400).json({ error: 'Last name, first name, and birthdate are required' })
     }
-    // Barangay Officials can only register residents into a household that
-    // belongs to their own barangay.
-    if (req.user.role === 'Barangay Official') {
+    // Residents are registered FIRST; the household is optional and can be
+    // assigned later (a Head is linked when their household is registered).
+    // The resident's barangay: the official's own barangay, or the chosen
+    // household's barangay.
+    let barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : (req.body.barangay_id || null)
+    if (household_id) {
       const household = await get('SELECT barangay_id FROM households WHERE id = ?', [household_id])
-      if (!household || household.barangay_id !== req.user.barangay_id) {
+      if (!household) return res.status(400).json({ error: 'Household not found.' })
+      if (req.user.role === 'Barangay Official' && household.barangay_id !== req.user.barangay_id) {
         return res.status(403).json({ error: 'You can only register residents into households in your own barangay.' })
       }
+      barangay_id = household.barangay_id
     }
+    if (!barangay_id) return res.status(400).json({ error: 'Barangay is required.' })
     const count = await get('SELECT COUNT(*) as c FROM residents')
     const resident_id = `RES-${String((count?.c || 0) + 1).padStart(5, '0')}`
     const age_bracket = computeAgeBracket(birthdate)
     const properLast = toProperCase(last_name), properFirst = toProperCase(first_name), properMiddle = toProperCase(middle_name)
     const name = [properFirst, properMiddle, properLast].filter(Boolean).join(' ')
     const result = await run(
-      `INSERT INTO residents (resident_id, household_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [resident_id, household_id, name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head || null, sex || null, contact_number || null]
+      `INSERT INTO residents (resident_id, household_id, barangay_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [resident_id, household_id || null, barangay_id, name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head || null, sex || null, contact_number || null]
     )
     const newRow = await get('SELECT * FROM residents WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -82,19 +94,28 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to resident records.' })
     }
     const existing = await get(
-      `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+      `SELECT r.household_id, COALESCE(r.barangay_id, h.barangay_id) AS barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
       [req.params.id]
     )
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
     }
     const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
+    // A resident registered without a household can be assigned one later
+    // (or moved). Only households in the official's own barangay.
+    let household_id = 'household_id' in req.body ? (req.body.household_id || null) : existing.household_id
+    if (household_id) {
+      const household = await get('SELECT barangay_id FROM households WHERE id = ?', [household_id])
+      if (!household || household.barangay_id !== req.user.barangay_id) {
+        return res.status(403).json({ error: 'You can only assign residents to households in your own barangay.' })
+      }
+    }
     const age_bracket = computeAgeBracket(birthdate)
     const properLast = toProperCase(last_name), properFirst = toProperCase(first_name), properMiddle = toProperCase(middle_name)
     const name = [properFirst, properMiddle, properLast].filter(Boolean).join(' ')
     await run(
-      `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=? WHERE id=?`,
-      [name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, req.params.id]
+      `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=?, household_id=?, barangay_id=? WHERE id=?`,
+      [name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, household_id, existing.barangay_id, req.params.id]
     )
     const updated = await get('SELECT * FROM residents WHERE id = ?', [req.params.id])
     res.json(updated)
@@ -108,7 +129,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to resident records.' })
     }
     const existing = await get(
-      `SELECT h.barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
+      `SELECT COALESCE(r.barangay_id, h.barangay_id) AS barangay_id FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE r.id = ?`,
       [req.params.id]
     )
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
