@@ -143,6 +143,7 @@ export default function FloodSimulationControl() {
   const [liveFlood, setLiveFlood] = useState(null)
   const [liveLoading, setLiveLoading] = useState(true)
   const [liveError, setLiveError] = useState(false)
+  const [liveUpdatedAt, setLiveUpdatedAt] = useState(null) // when the live data was last refreshed
 
   const [autoFloodedIds, setAutoFloodedIds] = useState([])
 
@@ -150,10 +151,12 @@ export default function FloodSimulationControl() {
     setLiveLoading(true)
     setLiveError(false)
     Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&timezone=Asia%2FManila`).then(r => r.json()),
+      // current rain + the last 24 hours of hourly rain, so a brief pause in
+      // the rain doesn't make it look like nothing fell today
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&hourly=precipitation&past_days=1&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
       fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json()),
     ])
-      .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood) })
+      .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood); setLiveUpdatedAt(new Date()) })
       .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false))
   }
@@ -178,6 +181,26 @@ export default function FloodSimulationControl() {
     if (!baseline || today == null) return null
     return today / baseline
   }, [liveFlood])
+
+  // The discharge list holds the past 30 days + today + 2 forecast days, so
+  // TODAY is the 3rd-from-last entry — not [0], which is 30 days ago.
+  const todayDischarge = useMemo(() => {
+    const d = liveFlood?.daily?.river_discharge
+    return d && d.length >= 3 ? d[d.length - 3] : null
+  }, [liveFlood])
+
+  // Total rain over the last 24 hours up to the current hour.
+  const rain24h = useMemo(() => {
+    const times = liveWeather?.hourly?.time, vals = liveWeather?.hourly?.precipitation
+    const now = liveWeather?.current?.time
+    if (!times || !vals || !now) return null
+    let idx = -1
+    for (let i = times.length - 1; i >= 0; i--) { if (times[i] <= now) { idx = i; break } }
+    if (idx < 0) return null
+    let total = 0
+    for (let i = Math.max(0, idx - 23); i <= idx; i++) total += vals[i] ?? 0
+    return Math.round(total * 10) / 10
+  }, [liveWeather])
 
   // Re-poll just the auto-detect result periodically so this page reflects
   // what the server-side check decided, without a full page reload.
@@ -367,18 +390,26 @@ export default function FloodSimulationControl() {
                           </div>
                         )
                       })()}
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.rain ?? '—'} mm</p>
-                          <p className="text-[9px] text-gray-500 uppercase">Current Rain</p>
+                          <p className="text-[9px] text-gray-500 uppercase">Rain now</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <p className="text-sm font-bold text-blue-700">{rain24h ?? '—'} mm</p>
+                          <p className="text-[9px] text-gray-500 uppercase">Last 24 hrs</p>
                         </div>
                         <div className="bg-amber-50 rounded-lg p-2 text-center">
-                          <p className="text-sm font-bold text-amber-700">{liveFlood?.daily?.river_discharge?.[0] ?? '—'} m³/s</p>
-                          <p className="text-[9px] text-gray-500 uppercase">Discharge</p>
+                          <p className="text-sm font-bold text-amber-700">{todayDischarge ?? '—'}</p>
+                          <p className="text-[9px] text-gray-500 uppercase">River m³/s{dischargeRatio != null ? ` · ${dischargeRatio.toFixed(1)}× normal` : ''}</p>
                         </div>
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-2">
-                        Source: Open-Meteo &amp; GloFAS. Discharge is volume flow, not water depth — a reference trend only.
+                      <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        Updated {liveUpdatedAt ? liveUpdatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—'} · refreshes every 5 min
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        Source: Open-Meteo &amp; GloFAS. "Rain now" is the rain falling at this moment — it shows 0 during a pause even if it rained earlier. River discharge is volume flow, not water depth — a reference trend only.
                       </p>
                     </>
                   )}
