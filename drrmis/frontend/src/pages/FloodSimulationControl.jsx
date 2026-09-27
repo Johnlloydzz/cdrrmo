@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
 import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2 } from 'lucide-react'
+import { prepareSessionHandoff } from '../utils/storage'
 import { apiGet, apiPut } from '../utils/api'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -257,7 +258,7 @@ export default function FloodSimulationControl() {
           <p className="text-sm text-gray-500 mt-1">Pick a hazard type to view its at-risk map and registered households/residents.</p>
         </div>
         <a
-          href="/flood-control/display" target="pdra-bigscreen-display" rel="opener"
+          href="/flood-control/display" target="pdra-bigscreen-display" rel="opener" onClick={prepareSessionHandoff}
           className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 border border-primary-200 rounded-lg px-3 py-1.5 flex-shrink-0"
         >
           <ExternalLink size={13} /> Open Big-Screen Display Mode
