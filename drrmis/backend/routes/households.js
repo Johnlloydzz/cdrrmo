@@ -114,6 +114,34 @@ async function validateHead(head_resident_id, barangay_id, householdId = null) {
   return { resident: r }
 }
 
+// Household number: typed by the Barangay Official (the number they already
+// use on their own records), or auto-generated as HH-00001, HH-00002, ...
+// when left blank. Allowed: letters, numbers, spaces, - and /.
+const HH_CODE_RE = /^[A-Za-z0-9][A-Za-z0-9 \-\/]{0,29}$/
+
+// Next free HH-xxxxx: highest existing auto number + 1, skipping any number
+// already taken (COUNT+1 collided after deletions or manual entries).
+async function nextAutoHouseholdCode() {
+  const rows = await all("SELECT household_id FROM households WHERE household_id LIKE 'HH-%'")
+  let n = rows.reduce((max, r) => {
+    const m = /^HH-(\d+)$/.exec(r.household_id || '')
+    return m ? Math.max(max, parseInt(m[1], 10)) : max
+  }, 0)
+  const taken = new Set(rows.map(r => r.household_id))
+  let code
+  do { n += 1; code = `HH-${String(n).padStart(5, '0')}` } while (taken.has(code))
+  return code
+}
+
+// Validates a typed household number. Returns { code } or { error }.
+async function checkHouseholdCode(raw, excludeId = null) {
+  const code = String(raw || '').trim().toUpperCase()
+  if (!HH_CODE_RE.test(code)) return { error: 'Household number may only use letters, numbers, spaces, - and / (max 30 characters).' }
+  const dup = await get('SELECT id FROM households WHERE UPPER(household_id) = ? AND id != ?', [code, excludeId ?? -1])
+  if (dup) return { error: `Household number ${code} is already used by another household.` }
+  return { code }
+}
+
 // POST /api/households
 router.post('/', async (req, res) => {
   try {
@@ -128,8 +156,14 @@ router.post('/', async (req, res) => {
     const { resident: head, error } = await validateHead(head_resident_id, barangay_id)
     if (error) return res.status(400).json({ error })
     const head_family = head.name
-    const count = await get('SELECT COUNT(*) as c FROM households')
-    const household_id = `HH-${String((count?.c || 0) + 1).padStart(5, '0')}`
+    let household_id
+    if (String(req.body.household_code || '').trim()) {
+      const { code, error: codeError } = await checkHouseholdCode(req.body.household_code)
+      if (codeError) return res.status(400).json({ error: codeError })
+      household_id = code
+    } else {
+      household_id = await nextAutoHouseholdCode()
+    }
     const result = await run(
       `INSERT INTO households (household_id, barangay_id, purok_id, head_family, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)`,
       [household_id, barangay_id, purok_id, head_family, latitude || null, longitude || null]
@@ -152,6 +186,13 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
     }
     const { latitude, longitude, purok_id, head_resident_id } = req.body
+    // Household number: blank keeps the current one.
+    let household_code = (await get('SELECT household_id FROM households WHERE id = ?', [req.params.id]))?.household_id
+    if (String(req.body.household_code || '').trim()) {
+      const { code, error: codeError } = await checkHouseholdCode(req.body.household_code, req.params.id)
+      if (codeError) return res.status(400).json({ error: codeError })
+      household_code = code
+    }
     // Changing the Head: must be a registered "Head" resident, unassigned or
     // already in this household. The new Head is linked to this household.
     let head_family = (await get('SELECT head_family FROM households WHERE id = ?', [req.params.id]))?.head_family
@@ -162,8 +203,8 @@ router.put('/:id', async (req, res) => {
       await run('UPDATE residents SET household_id = ?, barangay_id = ? WHERE id = ?', [req.params.id, existing.barangay_id, head.id])
     }
     await run(
-      `UPDATE households SET head_family=?, latitude=?, longitude=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [head_family, latitude, longitude, purok_id, req.params.id]
+      `UPDATE households SET household_id=?, head_family=?, latitude=?, longitude=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+      [household_code, head_family, latitude, longitude, purok_id, req.params.id]
     )
     const updated = await get('SELECT * FROM households WHERE id = ?', [req.params.id])
     res.json(updated)

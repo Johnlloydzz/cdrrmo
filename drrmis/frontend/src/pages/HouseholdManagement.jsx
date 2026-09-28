@@ -56,7 +56,7 @@ function FlyToPurokBoundary({ geojsonLayer, hasPin }) {
   return null
 }
 
-const emptyForm = { barangay_id: '', purok_id: '', head_resident_id: '', latitude: '', longitude: '' }
+const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
@@ -119,7 +119,7 @@ export default function HouseholdManagement({ currentUser }) {
   const openEdit = (h) => {
     setEditing(h.id)
     setForm({
-      barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_resident_id: '',
+      household_code: h.household_id || '', barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_resident_id: '',
       latitude: h.latitude || '', longitude: h.longitude || '',
     })
     loadHeads(h)
@@ -213,6 +213,17 @@ export default function HouseholdManagement({ currentUser }) {
             <h3 className="text-lg font-semibold px-6 pt-6 flex-shrink-0">{editing ? 'Edit Household' : 'Register Household'}</h3>
             <div className="overflow-y-auto px-6 py-4 flex-1">
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="label">Household Number</label>
+                  <input
+                    className="input"
+                    maxLength={30}
+                    placeholder={editing ? 'Household number' : 'Leave blank to auto-generate (HH-00001…)'}
+                    value={form.household_code}
+                    onChange={e => setForm({ ...form, household_code: e.target.value.toUpperCase() })}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Type the household number from your barangay records, or leave blank and the system assigns one.</p>
+                </div>
                 <div>
                   <label className="label">Barangay</label>
                   <select className="input" value={form.barangay_id} onChange={e => setForm({...form, barangay_id: e.target.value, purok_id: ''})} disabled={!!editing || canAdd}>
