@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, GeoJSON, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Search, Plus, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
@@ -37,6 +37,25 @@ function FitToBarangayBoundary({ geojsonLayer, hasPin }) {
   return null
 }
 
+// Flies the embedded map to the selected purok's boundary whenever the
+// Purok dropdown changes, so the official can pin inside it. When an
+// existing household is opened for editing, the first render keeps the
+// zoom on its saved pin; picking a purok afterwards still flies.
+function FlyToPurokBoundary({ geojsonLayer, hasPin }) {
+  const map = useMap()
+  const firstLayer = useRef(true)
+  useEffect(() => {
+    if (!geojsonLayer) return
+    const skip = firstLayer.current && hasPin
+    firstLayer.current = false
+    if (skip) return
+    const bounds = geojsonLayer.getBounds()
+    if (bounds.isValid()) map.flyToBounds(bounds, { padding: [20, 20], duration: 0.8 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geojsonLayer, map])
+  return null
+}
+
 const emptyForm = { barangay_id: '', purok_id: '', head_resident_id: '', latitude: '', longitude: '' }
 
 export default function HouseholdManagement({ currentUser }) {
@@ -52,6 +71,7 @@ export default function HouseholdManagement({ currentUser }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [selectedBoundaryLayer, setSelectedBoundaryLayer] = useState(null)
+  const [selectedPurokLayer, setSelectedPurokLayer] = useState(null)
   // Registered residents who can be picked as Head of Family: relation "Head"
   // and not in a household yet (plus the current Head, when editing).
   const [headOptions, setHeadOptions] = useState([])
@@ -249,11 +269,33 @@ export default function HouseholdManagement({ currentUser }) {
                           </>
                         )
                       })()}
+                      {(() => {
+                        const purok = puroks.find(p => String(p.id) === String(form.purok_id))
+                        if (!purok?.boundary_geojson) return null
+                        let geo
+                        try { geo = JSON.parse(purok.boundary_geojson) } catch { return null }
+                        return (
+                          <>
+                            <GeoJSON
+                              key={`purok-${purok.id}`}
+                              data={geo}
+                              pathOptions={{ color: '#2563eb', weight: 2, fillColor: '#2563eb', fillOpacity: 0.12, dashArray: '4, 3' }}
+                              ref={setSelectedPurokLayer}
+                            >
+                              <Tooltip permanent direction="center" className="purok-name-label">{purok.name}</Tooltip>
+                            </GeoJSON>
+                            <FlyToPurokBoundary geojsonLayer={selectedPurokLayer} hasPin={!!(form.latitude && form.longitude)} />
+                          </>
+                        )
+                      })()}
                       {form.latitude && form.longitude && (
                         <Marker position={[Number(form.latitude), Number(form.longitude)]} />
                       )}
                     </MapContainer>
                   </div>
+                  {form.purok_id && !puroks.find(p => String(p.id) === String(form.purok_id))?.boundary_geojson && (
+                    <p className="text-xs text-amber-600 mt-1">This purok has no drawn boundary yet — draw it in Puroks so the map can fly to it.</p>
+                  )}
                   <p className="text-xs text-gray-400 mt-1">
                     {form.latitude && form.longitude ? `Pinned: ${form.latitude}, ${form.longitude}` : 'No location pinned yet.'}
                   </p>
