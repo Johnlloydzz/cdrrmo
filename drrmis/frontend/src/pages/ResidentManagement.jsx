@@ -120,9 +120,9 @@ export default function ResidentManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Res. ID','Barangay','Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['Res. ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={10} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={canAdd ? 9 : 10} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -141,7 +141,7 @@ export default function ResidentManagement({ currentUser }) {
       <div className="card p-4 flex flex-wrap gap-3 items-center justify-between">
         <div className="relative flex-1 min-w-48">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input className="input pl-9" placeholder="Search resident or barangay…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input pl-9" placeholder={canAdd ? 'Search resident or purok…' : 'Search resident or barangay…'} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         {canAdd && (
           <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Register Resident</button>
@@ -152,13 +152,13 @@ export default function ResidentManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Res. ID','Barangay','Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['Res. ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
-                  <td className="table-cell">{r.barangay_name || '—'}</td>
+                  {!canAdd && <td className="table-cell">{r.barangay_name || '—'}</td>}
                   <td className="table-cell">{r.purok_name || '—'}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code || <span className="font-sans text-gray-400">Not assigned</span>}</td>
                   <td className="table-cell font-medium">{r.name}</td>
@@ -177,7 +177,7 @@ export default function ResidentManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={canAdd ? 11 : 10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
             </tbody>
           </table>
         </div>
