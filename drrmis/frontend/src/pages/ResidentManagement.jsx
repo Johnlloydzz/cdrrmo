@@ -80,6 +80,9 @@ export default function ResidentManagement({ currentUser }) {
     if (!form.last_name.trim() || !form.first_name.trim() || !form.birthdate) {
       alert('Last name, first name, and birthdate are required.'); return
     }
+    if (form.contact_number && !/^\d{11}$/.test(form.contact_number)) {
+      alert('Contact number must be exactly 11 digits (e.g. 09123456789).'); return
+    }
     setSaving(true)
     try {
       // Household is optional: residents are registered first, and a Head is
@@ -241,8 +244,11 @@ export default function ResidentManagement({ currentUser }) {
                   <label className="label">Contact Number</label>
                   <div className="relative">
                     <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input className="input pl-9" type="tel" placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value})} />
+                    <input className="input pl-9" type="tel" inputMode="numeric" maxLength={11} placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value.replace(/\D/g, '').slice(0, 11)})} />
                   </div>
+                  {form.contact_number && form.contact_number.length !== 11 && (
+                    <p className="text-xs text-amber-600 mt-1">Contact number must be exactly 11 digits ({form.contact_number.length}/11).</p>
+                  )}
                 </div>
               </div>
             </div>

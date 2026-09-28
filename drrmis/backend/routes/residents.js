@@ -58,6 +58,9 @@ router.post('/', async (req, res) => {
     if (!last_name?.trim() || !first_name?.trim() || !birthdate) {
       return res.status(400).json({ error: 'Last name, first name, and birthdate are required' })
     }
+    if (contact_number && !/^\d{11}$/.test(String(contact_number))) {
+      return res.status(400).json({ error: 'Contact number must be exactly 11 digits.' })
+    }
     // Residents are registered FIRST; the household is optional and can be
     // assigned later (a Head is linked when their household is registered).
     // The resident's barangay: the official's own barangay, or the chosen
@@ -101,6 +104,9 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
     }
     const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
+    if (contact_number && !/^\d{11}$/.test(String(contact_number))) {
+      return res.status(400).json({ error: 'Contact number must be exactly 11 digits.' })
+    }
     // A resident registered without a household can be assigned one later
     // (or moved). Only households in the official's own barangay.
     let household_id = 'household_id' in req.body ? (req.body.household_id || null) : existing.household_id
