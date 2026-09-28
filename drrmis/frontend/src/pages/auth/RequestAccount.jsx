@@ -4,6 +4,10 @@ import { Shield, ArrowLeft } from 'lucide-react'
 import { apiGet, apiPost } from '../../utils/api'
 import DropdownSelect from '../../components/DropdownSelect'
 
+// Philippine mobile number: 11 digits starting with 09, and not a dummy
+// like 09999999999 / 09000000000 (same digit repeated).
+const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
+
 const emptyForm = { name: '', email: '', contact: '', barangay_id: '', position: '', message: '' }
 
 export default function RequestAccount() {
@@ -21,8 +25,8 @@ export default function RequestAccount() {
       setError('Name, email, contact number, and barangay are required.')
       return
     }
-    if (!/^\d{11}$/.test(form.contact)) {
-      setError('Contact number must be exactly 11 digits (e.g. 09123456789).')
+    if (!isPhMobile(form.contact)) {
+      setError('Enter a valid Philippine mobile number: 11 digits starting with 09 (e.g. 09123456789).')
       return
     }
     setError('')
@@ -77,8 +81,8 @@ export default function RequestAccount() {
                   <div>
                     <label className="label text-xs">Contact Number</label>
                     <input className="input py-1.5 text-sm" type="tel" inputMode="numeric" maxLength={11} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="09XXXXXXXXX" />
-                    {form.contact && form.contact.length !== 11 && (
-                      <p className="text-xs text-amber-600 mt-1">Must be exactly 11 digits ({form.contact.length}/11).</p>
+                    {form.contact && !/^09\d{9}$/.test(form.contact) && (
+                      <p className="text-xs text-amber-600 mt-1">{!/^0(9|$)/.test(form.contact) ? 'Must be a Philippine mobile number starting with 09.' : `Must be exactly 11 digits (${form.contact.length}/11).`}</p>
                     )}
                   </div>
                   <div>

@@ -3,6 +3,10 @@ import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone, MapPin } from 'luc
 import { createPortal } from 'react-dom'
 import BirthdateInput from '../components/BirthdateInput'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+
+// Philippine mobile number: 11 digits starting with 09, and not a dummy
+// like 09999999999 / 09000000000 (same digit repeated).
+const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
 import { SkeletonStatCards, SkeletonTableRows } from '../components/Skeleton'
 
 const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
@@ -84,8 +88,8 @@ export default function ResidentManagement({ currentUser }) {
     if (!purokFilter) {
       alert('Purok is required — pick the purok where the resident lives.'); return
     }
-    if (form.contact_number && !/^\d{11}$/.test(form.contact_number)) {
-      alert('Contact number must be exactly 11 digits (e.g. 09123456789).'); return
+    if (form.contact_number && !isPhMobile(form.contact_number)) {
+      alert('Enter a valid Philippine mobile number: 11 digits starting with 09 (e.g. 09123456789).'); return
     }
     setSaving(true)
     try {
@@ -250,8 +254,8 @@ export default function ResidentManagement({ currentUser }) {
                     <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input className="input pl-9" type="tel" inputMode="numeric" maxLength={11} placeholder="09xxxxxxxxx" value={form.contact_number} onChange={e => setForm({...form, contact_number: e.target.value.replace(/\D/g, '').slice(0, 11)})} />
                   </div>
-                  {form.contact_number && form.contact_number.length !== 11 && (
-                    <p className="text-xs text-amber-600 mt-1">Contact number must be exactly 11 digits ({form.contact_number.length}/11).</p>
+                  {form.contact_number && !/^09\d{9}$/.test(form.contact_number) && (
+                      <p className="text-xs text-amber-600 mt-1">{!/^0(9|$)/.test(form.contact_number) ? 'Must be a Philippine mobile number starting with 09.' : `Must be exactly 11 digits (${form.contact_number.length}/11).`}</p>
                   )}
                 </div>
               </div>

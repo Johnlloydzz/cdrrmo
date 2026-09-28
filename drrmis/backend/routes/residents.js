@@ -1,4 +1,8 @@
 const router = require('express').Router()
+
+// Philippine mobile number: 11 digits starting with 09, and not a dummy
+// like 09999999999 / 09000000000 (same digit repeated).
+const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 
@@ -72,8 +76,8 @@ router.post('/', async (req, res) => {
     if (!last_name?.trim() || !first_name?.trim() || !birthdate) {
       return res.status(400).json({ error: 'Last name, first name, and birthdate are required' })
     }
-    if (contact_number && !/^\d{11}$/.test(String(contact_number))) {
-      return res.status(400).json({ error: 'Contact number must be exactly 11 digits.' })
+    if (contact_number && !isPhMobile(String(contact_number))) {
+      return res.status(400).json({ error: 'Enter a valid Philippine mobile number: 11 digits starting with 09.' })
     }
     // Residents are registered FIRST; the household is optional and can be
     // assigned later (a Head is linked when their household is registered).
@@ -120,8 +124,8 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
     }
     const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
-    if (contact_number && !/^\d{11}$/.test(String(contact_number))) {
-      return res.status(400).json({ error: 'Contact number must be exactly 11 digits.' })
+    if (contact_number && !isPhMobile(String(contact_number))) {
+      return res.status(400).json({ error: 'Enter a valid Philippine mobile number: 11 digits starting with 09.' })
     }
     // A resident registered without a household can be assigned one later
     // (or moved). Only households in the official's own barangay.

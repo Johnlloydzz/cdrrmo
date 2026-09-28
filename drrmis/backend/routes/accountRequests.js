@@ -1,4 +1,8 @@
 const router = require('express').Router()
+
+// Philippine mobile number: 11 digits starting with 09, and not a dummy
+// like 09999999999 / 09000000000 (same digit repeated).
+const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
 const { all, get, run } = require('../db/database')
 const { authenticate, authorize } = require('../middleware/auth')
 
@@ -20,8 +24,19 @@ router.post('/', async (req, res) => {
     if (!name || !email || !contact || !barangay_id) {
       return res.status(400).json({ error: 'Name, email, contact number, and barangay are required.' })
     }
-    if (!/^\d{11}$/.test(String(contact))) {
-      return res.status(400).json({ error: 'Contact number must be exactly 11 digits.' })
+    if (!isPhMobile(String(contact))) {
+      return res.status(400).json({ error: 'Enter a valid Philippine mobile number: 11 digits starting with 09.' })
+    }
+    // One account request per mobile number. A Rejected request doesn't
+    // count, so the person can apply again with the same number.
+    // (Residents may share a number — e.g. one phone per family — so this
+    // rule applies to account requests only.)
+    const dupContact = await get(
+      "SELECT id FROM account_requests WHERE contact = ? AND status != 'Rejected'",
+      [String(contact)]
+    )
+    if (dupContact) {
+      return res.status(400).json({ error: 'This contact number is already used in another account request.' })
     }
     const barangay = await get('SELECT id FROM barangays WHERE id = ?', [barangay_id])
     if (!barangay) return res.status(400).json({ error: 'Selected barangay was not found.' })
