@@ -5,6 +5,31 @@ const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
 
+// Ray-casting point-in-polygon on a GeoJSON ring ([lng, lat] pairs).
+function pointInRing(lng, lat, ring) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j]
+    if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+// True if the household's pin is inside the barangay's drawn hazard area.
+// No drawn area = the whole barangay carries its classification (true).
+// A household without coordinates can't be checked, so it keeps the
+// barangay/purok-level result (true).
+function insideHazardArea(h, areaStr) {
+  if (!areaStr) return true
+  const lat = parseFloat(h.latitude), lng = parseFloat(h.longitude)
+  if (isNaN(lat) || isNaN(lng)) return true
+  try {
+    const area = JSON.parse(areaStr)
+    if (area?.type !== 'Polygon' || !area.coordinates?.[0]) return true
+    return pointInRing(lng, lat, area.coordinates[0])
+  } catch { return true }
+}
+
 // GET /api/households — includes geofencing flag (in_flood_risk_zone)
 router.get('/', async (req, res) => {
   try {
@@ -12,7 +37,7 @@ router.get('/', async (req, res) => {
     // Barangay Officials only ever see their own barangay's households —
     // enforced server-side, not just hidden in the UI.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
-    let sql = `SELECT h.*, b.name as barangay_name, b.flood_susceptibility as barangay_flood_susceptibility, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk
+    let sql = `SELECT h.*, b.name as barangay_name, b.flood_susceptibility as barangay_flood_susceptibility, b.flood_area_geojson as barangay_flood_area, b.landslide_area_geojson as barangay_landslide_area, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
                LEFT JOIN puroks p ON h.purok_id = p.id
@@ -53,16 +78,21 @@ router.get('/', async (req, res) => {
     // page) is never high flood risk — whether or not a flood level is
     // reported — so its household pins follow what the map shows (tan, not
     // violet). Otherwise the purok-level rules below decide.
-    const withRisk = rows.map(h => ({
+    //
+    // Actual geofence: if CDRRMO drew a hazard area for the barangay
+    // (Barangays page), only that shape is violet on the map and the rest of
+    // the barangay is Low — so a household outside the drawn area is never
+    // flagged. The helper fields are stripped from the response.
+    const withRisk = rows.map(({ barangay_flood_area, barangay_landslide_area, ...h }) => ({
       ...h,
-      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && (manualActive
+      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && insideHazardArea(h, barangay_flood_area) && (manualActive
         ? floodLevel >= h.flood_threshold_m
         : autoBarangayIds.includes(h.barangay_id)
           ? 1 >= h.flood_threshold_m
           : h.purok_flood_risk === 'High'),
       // Landslide has no continuous measured value like flood depth — it
       // always uses the static official CDRA classification.
-      in_landslide_risk_zone: h.purok_landslide_risk === 'High',
+      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && insideHazardArea(h, barangay_landslide_area),
     }))
     res.json(withRisk)
   } catch (err) { res.status(500).json({ error: err.message }) }
