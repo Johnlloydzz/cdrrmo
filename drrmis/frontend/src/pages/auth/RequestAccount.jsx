@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Shield, ArrowLeft } from 'lucide-react'
 import { apiGet, apiPost } from '../../utils/api'
+import DropdownSelect from '../../components/DropdownSelect'
 
 const emptyForm = { name: '', email: '', contact: '', barangay_id: '', position: '', message: '' }
 
@@ -16,8 +17,12 @@ export default function RequestAccount() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!form.name.trim() || !form.email.trim() || !form.barangay_id) {
-      setError('Name, email, and barangay are required.')
+    if (!form.name.trim() || !form.email.trim() || !form.contact || !form.barangay_id) {
+      setError('Name, email, contact number, and barangay are required.')
+      return
+    }
+    if (!/^\d{11}$/.test(form.contact)) {
+      setError('Contact number must be exactly 11 digits (e.g. 09123456789).')
       return
     }
     setError('')
@@ -71,14 +76,20 @@ export default function RequestAccount() {
                   </div>
                   <div>
                     <label className="label text-xs">Contact Number</label>
-                    <input className="input py-1.5 text-sm" value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="09XXXXXXXXX" />
+                    <input className="input py-1.5 text-sm" type="tel" inputMode="numeric" maxLength={11} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="09XXXXXXXXX" />
+                    {form.contact && form.contact.length !== 11 && (
+                      <p className="text-xs text-amber-600 mt-1">Must be exactly 11 digits ({form.contact.length}/11).</p>
+                    )}
                   </div>
                   <div>
                     <label className="label text-xs">Barangay</label>
-                    <select className="input py-1.5 text-sm" value={form.barangay_id} onChange={e => setForm({ ...form, barangay_id: e.target.value })}>
-                      <option value="">Select your barangay…</option>
-                      {barangays.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    <DropdownSelect
+                      className="input py-1.5 text-sm"
+                      value={form.barangay_id}
+                      placeholder="Select your barangay…"
+                      options={barangays.map(b => ({ value: b.id, label: b.name }))}
+                      onChange={v => setForm({ ...form, barangay_id: v })}
+                    />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="label text-xs">Position (optional)</label>

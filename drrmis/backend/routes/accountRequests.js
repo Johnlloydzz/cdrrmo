@@ -17,8 +17,11 @@ router.get('/barangays', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, email, contact, barangay_id, position, message } = req.body
-    if (!name || !email || !barangay_id) {
-      return res.status(400).json({ error: 'Name, email, and barangay are required.' })
+    if (!name || !email || !contact || !barangay_id) {
+      return res.status(400).json({ error: 'Name, email, contact number, and barangay are required.' })
+    }
+    if (!/^\d{11}$/.test(String(contact))) {
+      return res.status(400).json({ error: 'Contact number must be exactly 11 digits.' })
     }
     const barangay = await get('SELECT id FROM barangays WHERE id = ?', [barangay_id])
     if (!barangay) return res.status(400).json({ error: 'Selected barangay was not found.' })
