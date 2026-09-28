@@ -15,7 +15,24 @@ function pointInRing(lng, lat, ring) {
   return inside
 }
 
-// True if the household's pin is inside the barangay's drawn hazard area.
+// A purok's representative point: center of its drawn boundary, else its
+// geocoded lat/lng, else null.
+function purokPoint(boundaryStr, lat, lng) {
+  if (boundaryStr) {
+    try {
+      const g = JSON.parse(boundaryStr)
+      const ring = g?.type === 'Polygon' ? g.coordinates?.[0] : g?.type === 'MultiPolygon' ? g.coordinates?.[0]?.[0] : null
+      if (ring && ring.length > 2) {
+        const pts = ring.slice(0, -1)
+        return { lng: pts.reduce((s, p) => s + p[0], 0) / pts.length, lat: pts.reduce((s, p) => s + p[1], 0) / pts.length }
+      }
+    } catch { /* fall through */ }
+  }
+  if (lat != null && lng != null) return { lat: Number(lat), lng: Number(lng) }
+  return null
+}
+
+// True if the household's purok point is inside the barangay's drawn hazard area.
 // No drawn area = the whole barangay carries its classification (true).
 // A household without coordinates can't be checked, so it keeps the
 // barangay/purok-level result (true).
@@ -37,7 +54,9 @@ router.get('/', async (req, res) => {
     // Barangay Officials only ever see their own barangay's households —
     // enforced server-side, not just hidden in the UI.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
-    let sql = `SELECT h.*, b.name as barangay_name, b.flood_susceptibility as barangay_flood_susceptibility, b.flood_area_geojson as barangay_flood_area, b.landslide_area_geojson as barangay_landslide_area, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk
+    let sql = `SELECT h.*, b.name as barangay_name, b.flood_susceptibility as barangay_flood_susceptibility, b.flood_area_geojson as barangay_flood_area, b.landslide_area_geojson as barangay_landslide_area, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk,
+                      p.latitude as purok_point_lat, p.longitude as purok_point_lng, p.boundary_geojson as purok_boundary,
+                      (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
                LEFT JOIN puroks p ON h.purok_id = p.id
@@ -83,17 +102,28 @@ router.get('/', async (req, res) => {
     // (Barangays page), only that shape is violet on the map and the rest of
     // the barangay is Low — so a household outside the drawn area is never
     // flagged. The helper fields are stripped from the response.
-    const withRisk = rows.map(({ barangay_flood_area, barangay_landslide_area, ...h }) => ({
+    //
+    // Households are no longer pinned individually (residents can't be
+    // expected to know their exact coordinates), so the geofence point is
+    // the household's PUROK: the center of its drawn boundary, or its
+    // geocoded location. purok_lat / purok_lng are returned so maps can
+    // place a household at its purok.
+    const withRisk = rows.map(({ barangay_flood_area, barangay_landslide_area, purok_point_lat, purok_point_lng, purok_boundary, latitude, longitude, ...raw }) => {
+      const pt = purokPoint(purok_boundary, purok_point_lat, purok_point_lng)
+      const h = { ...raw, purok_lat: pt?.lat ?? null, purok_lng: pt?.lng ?? null }
+      const loc = { latitude: h.purok_lat, longitude: h.purok_lng }
+      return {
       ...h,
-      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && insideHazardArea(h, barangay_flood_area) && (manualActive
+      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && insideHazardArea(loc, barangay_flood_area) && (manualActive
         ? floodLevel >= h.flood_threshold_m
         : autoBarangayIds.includes(h.barangay_id)
           ? 1 >= h.flood_threshold_m
           : h.purok_flood_risk === 'High'),
       // Landslide has no continuous measured value like flood depth — it
       // always uses the static official CDRA classification.
-      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && insideHazardArea(h, barangay_landslide_area),
-    }))
+      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && insideHazardArea(loc, barangay_landslide_area),
+      }
+    })
     res.json(withRisk)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -145,7 +175,7 @@ async function checkHouseholdCode(raw, excludeId = null) {
 // POST /api/households
 router.post('/', async (req, res) => {
   try {
-    const { purok_id, head_resident_id, latitude, longitude } = req.body
+    const { purok_id, head_resident_id } = req.body
     // Barangay Officials can only register households under their own barangay,
     // regardless of what barangay_id is sent in the request body.
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.body.barangay_id
@@ -165,11 +195,11 @@ router.post('/', async (req, res) => {
       household_id = await nextAutoHouseholdCode()
     }
     const result = await run(
-      `INSERT INTO households (household_id, barangay_id, purok_id, head_family, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)`,
-      [household_id, barangay_id, purok_id, head_family, latitude || null, longitude || null]
+      `INSERT INTO households (household_id, barangay_id, purok_id, head_family) VALUES (?, ?, ?, ?)`,
+      [household_id, barangay_id, purok_id, head_family]
     )
     // Link the Head to their new household.
-    await run('UPDATE residents SET household_id = ?, barangay_id = ? WHERE id = ?', [result.lastID, barangay_id, head.id])
+    await run('UPDATE residents SET household_id = ?, barangay_id = ?, purok_id = ? WHERE id = ?', [result.lastID, barangay_id, purok_id, head.id])
     const newRow = await get('SELECT * FROM households WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
   } catch (err) { res.status(500).json({ error: err.message }) }
@@ -185,7 +215,7 @@ router.put('/:id', async (req, res) => {
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
     }
-    const { latitude, longitude, purok_id, head_resident_id } = req.body
+    const { purok_id, head_resident_id } = req.body
     // Household number: blank keeps the current one.
     let household_code = (await get('SELECT household_id FROM households WHERE id = ?', [req.params.id]))?.household_id
     if (String(req.body.household_code || '').trim()) {
@@ -200,11 +230,16 @@ router.put('/:id', async (req, res) => {
       const { resident: head, error } = await validateHead(head_resident_id, existing.barangay_id, req.params.id)
       if (error) return res.status(400).json({ error })
       head_family = head.name
-      await run('UPDATE residents SET household_id = ?, barangay_id = ? WHERE id = ?', [req.params.id, existing.barangay_id, head.id])
+      await run('UPDATE residents SET household_id = ?, barangay_id = ?, purok_id = ? WHERE id = ?', [req.params.id, existing.barangay_id, purok_id, head.id])
     }
     await run(
-      `UPDATE households SET household_id=?, head_family=?, latitude=?, longitude=?, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [household_code, head_family, latitude, longitude, purok_id, req.params.id]
+      `UPDATE households SET household_id=?, head_family=?, latitude=NULL, longitude=NULL, purok_id=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+      [household_code, head_family, purok_id, req.params.id]
+    )
+    // Members follow the household's purok if it moved.
+    await run(
+      'UPDATE residents SET purok_id = ? WHERE household_id = ?',
+      [purok_id, req.params.id]
     )
     const updated = await get('SELECT * FROM households WHERE id = ?', [req.params.id])
     res.json(updated)

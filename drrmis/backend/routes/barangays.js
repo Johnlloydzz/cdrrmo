@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
     const allPuroks = await all(`
       SELECT p.id, p.barangay_id, p.name, p.flood_risk, p.flood_threshold_m, p.landslide_risk, p.latitude, p.longitude, p.boundary_geojson,
         (SELECT COUNT(*) FROM households h WHERE h.purok_id = p.id) AS household_count,
-        (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.purok_id = p.id) AS resident_count
+        (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(h.purok_id, r.purok_id) = p.id) AS resident_count
       FROM puroks p ORDER BY p.name`)
     const puroksByBarangay = {}
     for (const p of allPuroks) {

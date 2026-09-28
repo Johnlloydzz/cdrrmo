@@ -248,8 +248,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   }
 
   const flyToHousehold = (h) => {
-    if (!h.latitude || !h.longitude) { alert('No location recorded for this household yet.'); return }
-    setFlyTarget([h.latitude, h.longitude])
+    // Households aren't pinned individually — fly to the household's purok.
+    if (h.purok_lat == null || h.purok_lng == null) { alert('This household\'s purok has no boundary or location on the map yet.'); return }
+    setFlyTarget([h.purok_lat, h.purok_lng])
     setFocusedHousehold(h)
     setShowHouseholds(false)
   }
@@ -578,11 +579,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             {focusedHousehold && (
               <Marker
                 key={focusedHousehold.id}
-                position={[focusedHousehold.latitude, focusedHousehold.longitude]}
+                position={[focusedHousehold.purok_lat, focusedHousehold.purok_lng]}
                 icon={focusedHousehold.in_flood_risk_zone ? redPinIcon : bluePinIcon}
               >
                 <Popup eventHandlers={{ remove: () => setFocusedHousehold(null) }}>
-                  <strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
+                  <strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />Purok {focusedHousehold.purok_name}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
                 </Popup>
               </Marker>
             )}

@@ -1,6 +1,6 @@
 import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Circle, GeoJSON, Polyline, Tooltip, useMap, Pane } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Polyline, Tooltip, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
@@ -58,7 +58,7 @@ const LAYERS = [
 const ROADS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
 const RIVERS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Hydro_Reference_Overlay/MapServer/tile/{z}/{y}/{x}'
 
-const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones','Household Locations']
+const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones']
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors,
 // matching the City of Gingoog CLUP Landslide and Flood Susceptibility Map.
@@ -167,7 +167,7 @@ function FocusRoute({ trigger, coords }) {
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('street')
   const [hazardLayer, setHazardLayer] = useState('landslide') // 'landslide' | 'flood' | 'none'
-  const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Household Locations','Purok Boundaries'])
+  const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Purok Boundaries'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
   const [households, setHouseholds] = useState([])
@@ -224,36 +224,28 @@ export default function GISMap() {
     b.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Purok label position: prefer the purok's own geocoded location (from
-  // scripts/geocode-puroks.js) when available. If a purok wasn't found by
-  // the geocoder (many sitios are too hyper-local for OpenStreetMap), fall
-  // back to averaging the lat/lng of that purok's registered households —
-  // a purok with neither has no label to show yet.
+  // Purok label position for puroks WITHOUT a drawn boundary: the purok's
+  // own geocoded location (households are no longer pinned individually).
   const purokLabelPositions = useMemo(() => {
     if (!selectedBarangay) return []
-    const byPurok = {}
-    for (const h of households) {
-      if (!h.purok_id || !h.latitude || !h.longitude) continue
-      if (!byPurok[h.purok_id]) byPurok[h.purok_id] = { sumLat: 0, sumLng: 0, count: 0, name: h.purok_name }
-      byPurok[h.purok_id].sumLat += Number(h.latitude)
-      byPurok[h.purok_id].sumLng += Number(h.longitude)
-      byPurok[h.purok_id].count += 1
-    }
-    const centroids = new Map()
-    for (const [purokId, v] of Object.entries(byPurok)) {
-      centroids.set(Number(purokId), { name: v.name, lat: v.sumLat / v.count, lng: v.sumLng / v.count })
-    }
+    return (selectedBarangay.puroks || [])
+      .filter(p => p.latitude && p.longitude)
+      .map(p => ({ purokId: p.id, name: p.name, lat: p.latitude, lng: p.longitude, residents: p.resident_count ?? 0 }))
+  }, [selectedBarangay])
 
-    const positions = []
-    for (const p of (selectedBarangay.puroks || [])) {
-      if (p.latitude && p.longitude) {
-        positions.push({ purokId: p.id, name: p.name, lat: p.latitude, lng: p.longitude })
-      } else if (centroids.has(p.id)) {
-        positions.push({ purokId: p.id, ...centroids.get(p.id) })
-      }
+  // Geofencing is per purok: a purok is red when its households fall in a
+  // high flood-risk zone (same rules the backend applies to each household).
+  const purokRisk = useMemo(() => {
+    const m = new Map()
+    for (const h of households) {
+      if (!h.purok_id) continue
+      const r = m.get(h.purok_id) || { households: 0, atRisk: 0 }
+      r.households += 1
+      if (h.in_flood_risk_zone) r.atRisk += 1
+      m.set(h.purok_id, r)
     }
-    return positions
-  }, [households, selectedBarangay])
+    return m
+  }, [households])
 
   // Auto-select + fly to the barangay once the search narrows down to a single match
   useEffect(() => {
@@ -544,8 +536,8 @@ export default function GISMap() {
             ))}
             <div className="border-t border-gray-100 my-2" />
             {[
-              { color: '#dc2626', label: 'Household — High Flood-Risk Zone (Geofenced)' },
-              { color: '#3b82f6', label: 'Household — Outside High-Risk Zone' },
+              { color: '#dc2626', label: 'Purok — High Flood-Risk Zone (Geofenced)' },
+              { color: '#2563eb', label: 'Purok — Outside High-Risk Zone' },
               { color: '#0ea5e9', label: 'Selected Barangay Boundary' },
               { color: '#059669', label: 'CDRRMO Office / Driving Route' },
             ].map(l => (
@@ -703,15 +695,23 @@ export default function GISMap() {
               try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
               return (
                 <GeoJSON
-                  key={`purok-boundary-${p.id}`}
+                  key={`purok-boundary-${p.id}-${purokRisk.get(p.id)?.atRisk ? 'risk' : 'ok'}`}
                   data={geo}
-                  style={{ color: '#2563eb', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.08, dashArray: '4, 3' }}
+                  style={purokRisk.get(p.id)?.atRisk
+                    ? { color: '#dc2626', weight: 2, fillColor: '#dc2626', fillOpacity: 0.18, dashArray: '4, 3' }
+                    : { color: '#2563eb', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.08, dashArray: '4, 3' }}
                 >
-                  <Tooltip permanent direction="center" className="purok-name-label">{p.name}</Tooltip>
+                  <Tooltip permanent direction="center" className="purok-name-label">
+                    <div style={{ textAlign: 'center', lineHeight: 1.2 }}>
+                      <div>{p.name}</div>
+                      <div style={{ fontWeight: 600 }}>{p.resident_count ?? 0} residents</div>
+                    </div>
+                  </Tooltip>
                   <Popup>
                     <strong>{p.name}</strong> — {b.name}<br />
+                    Registered residents: {p.resident_count ?? 0}<br />
                     Households: {p.household_count ?? 0}<br />
-                    Population: {p.resident_count ?? 0}<br />
+                    {purokRisk.get(p.id)?.atRisk ? `⚠️ ${purokRisk.get(p.id).atRisk} household(s) in high flood-risk zone (geofenced)` : 'Outside high flood-risk zone'}<br />
                     Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}
                   </Popup>
                 </GeoJSON>
@@ -728,30 +728,12 @@ export default function GISMap() {
               position={[p.lat, p.lng]}
               icon={L.divIcon({
                 className: '',
-                html: `<div style="font-size:11px;font-weight:700;color:#57534e;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${p.name.toUpperCase()}</div>`,
+                html: `<div style="font-size:11px;font-weight:700;color:#57534e;text-align:center;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${p.name.toUpperCase()}<br/>${p.residents} residents</div>`,
                 iconSize: [0, 0],
               })}
             />
           ))}
 
-          {/* Household locations — colored by geofencing risk status (red = within high flood-risk purok) */}
-                  {activeOverlays.includes('Household Locations') && selectedBarangay && households.filter(h => h.latitude && h.longitude && String(h.barangay_id) === String(selectedBarangay.id)).map(h => (
-            <Circle
-              key={`hh-${h.id}`}
-              center={[h.latitude, h.longitude]}
-              radius={15}
-              pathOptions={{
-                color: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6',
-                fillColor: h.in_flood_risk_zone ? '#dc2626' : '#3b82f6',
-                fillOpacity: 0.7,
-              }}
-            >
-              <Popup>
-                <strong>{h.household_id}</strong> — {h.head_family}<br />
-                {h.in_flood_risk_zone ? '⚠️ Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
-              </Popup>
-            </Circle>
-          ))}
         </MapContainer>
 
         {/* Map toolbar overlay */}

@@ -64,6 +64,7 @@ const tables = [
     resident_id       TEXT    NOT NULL UNIQUE,
     household_id      INTEGER REFERENCES households(id) ON DELETE SET NULL, -- optional: residents are registered first, then assigned
     barangay_id       INTEGER REFERENCES barangays(id),
+    purok_id          INTEGER REFERENCES puroks(id),
     name              TEXT    NOT NULL,
     birthdate         TEXT    NOT NULL,
     age_bracket       TEXT,

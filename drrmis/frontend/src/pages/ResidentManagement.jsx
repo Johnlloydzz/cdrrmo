@@ -32,7 +32,8 @@ export default function ResidentManagement({ currentUser }) {
   const [residents, setResidents] = useState([])
   const [households, setHouseholds] = useState([])
   const [puroks, setPuroks] = useState([])
-  const [purokFilter, setPurokFilter] = useState('') // UI-only: narrows the Household list below
+  // The purok the resident lives in (saved) — also narrows the Household list below.
+  const [purokFilter, setPurokFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -69,16 +70,19 @@ export default function ResidentManagement({ currentUser }) {
       birthdate: r.birthdate || '', relation_to_head: r.relation_to_head || '',
       sex: r.sex || '', contact_number: r.contact_number || '',
     })
-    // Pre-set the purok filter to match this resident's current household,
-    // so the Household dropdown below opens already narrowed down to it.
+    // The resident's purok: their household's purok, else their own.
     const hh = households.find(h => String(h.id) === String(r.household_id))
-    setPurokFilter(hh?.purok_id ? String(hh.purok_id) : '')
+    const pid = hh?.purok_id || r.purok_id
+    setPurokFilter(pid ? String(pid) : '')
     setShowModal(true)
   }
 
   const handleSave = async () => {
     if (!form.last_name.trim() || !form.first_name.trim() || !form.birthdate) {
       alert('Last name, first name, and birthdate are required.'); return
+    }
+    if (!purokFilter) {
+      alert('Purok is required — pick the purok where the resident lives.'); return
     }
     if (form.contact_number && !/^\d{11}$/.test(form.contact_number)) {
       alert('Contact number must be exactly 11 digits (e.g. 09123456789).'); return
@@ -87,7 +91,7 @@ export default function ResidentManagement({ currentUser }) {
     try {
       // Household is optional: residents are registered first, and a Head is
       // linked when their household is registered (or assigned here later).
-      const payload = { ...form, household_id: form.household_id || null }
+      const payload = { ...form, household_id: form.household_id || null, purok_id: purokFilter }
       if (editing) { await apiPut(`/residents/${editing}`, payload) }
       else { await apiPost('/residents', payload) }
       setShowModal(false)
@@ -194,15 +198,15 @@ export default function ResidentManagement({ currentUser }) {
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><MapPin size={13} className="text-primary-500" /> Purok</label>
                 <select className="input mb-3" value={purokFilter} onChange={e => { setPurokFilter(e.target.value); setForm({...form, household_id: ''}) }}>
-                  <option value="">All puroks — show every household</option>
+                  <option value="">Select purok…</option>
                   {puroks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <p className="text-xs text-gray-400 mb-3 -mt-2">Uses the puroks you set up in Puroks — pick one to narrow down the household list below.</p>
+                <p className="text-xs text-gray-400 mb-3 -mt-2">The purok where the resident lives — they are counted in this purok on the map. Also narrows the household list below.</p>
 
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Home size={13} className="text-primary-500" /> Household</label>
-                <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})}>
+                <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!purokFilter}>
                   <option value="">No household yet — assign later</option>
-                  {households.filter(h => !purokFilter || String(h.purok_id) === String(purokFilter)).map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
+                  {households.filter(h => purokFilter && String(h.purok_id) === String(purokFilter)).map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
                 </select>
                 {purokFilter && households.filter(h => String(h.purok_id) === String(purokFilter)).length === 0 && (
                   <p className="text-xs text-amber-600 mt-2">No households registered in this purok yet.</p>

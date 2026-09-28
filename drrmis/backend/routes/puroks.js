@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
     let sql = `SELECT p.*, b.name as barangay_name,
                  (SELECT COUNT(*) FROM households h WHERE h.purok_id = p.id) AS household_count,
-                 (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE h.purok_id = p.id) AS resident_count
+                 (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(h.purok_id, r.purok_id) = p.id) AS resident_count
                FROM puroks p LEFT JOIN barangays b ON p.barangay_id = b.id WHERE 1=1`
     const params = []
     if (barangay_id) { sql += ' AND p.barangay_id = ?'; params.push(barangay_id) }

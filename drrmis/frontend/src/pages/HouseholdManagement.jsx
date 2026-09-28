@@ -1,62 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, GeoJSON, Tooltip, useMap, useMapEvents } from 'react-leaflet'
-import L from 'leaflet'
-import { Search, Plus, Eye, Pencil, Trash2, MapPin } from 'lucide-react'
+import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { SkeletonTableRows } from '../components/Skeleton'
 
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
-
-const GINGOOG_CENTER = [8.8231, 125.1109]
-
-// Captures a click anywhere on the embedded map and reports the coordinates —
-// this is how the Barangay Official pins exactly where a household is
-// located, since they're the ones who actually know.
-function LocationPicker({ onPick }) {
-  useMapEvents({ click(e) { onPick(e.latlng.lat, e.latlng.lng) } })
-  return null
-}
-
-// Flies the embedded map to the selected barangay's boundary — but only if
-// no location has been pinned yet, so it never overrides the zoom-in view
-// of an already-saved household location.
-function FitToBarangayBoundary({ geojsonLayer, hasPin }) {
-  const map = useMap()
-  useEffect(() => {
-    if (hasPin || !geojsonLayer) return
-    const bounds = geojsonLayer.getBounds()
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] })
-  }, [geojsonLayer, hasPin, map])
-  return null
-}
-
-// Flies the embedded map to the selected purok's boundary whenever the
-// Purok dropdown changes, so the official can pin inside it. When an
-// existing household is opened for editing, the first render keeps the
-// zoom on its saved pin; picking a purok afterwards still flies.
-function FlyToPurokBoundary({ geojsonLayer, hasPin }) {
-  const map = useMap()
-  const firstLayer = useRef(true)
-  useEffect(() => {
-    if (!geojsonLayer) return
-    const skip = firstLayer.current && hasPin
-    firstLayer.current = false
-    if (skip) return
-    const bounds = geojsonLayer.getBounds()
-    if (bounds.isValid()) map.flyToBounds(bounds, { padding: [20, 20], duration: 0.8 })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geojsonLayer, map])
-  return null
-}
-
-const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '', latitude: '', longitude: '' }
+const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
@@ -70,8 +19,6 @@ export default function HouseholdManagement({ currentUser }) {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
-  const [selectedBoundaryLayer, setSelectedBoundaryLayer] = useState(null)
-  const [selectedPurokLayer, setSelectedPurokLayer] = useState(null)
   // Registered residents who can be picked as Head of Family: relation "Head"
   // and not in a household yet (plus the current Head, when editing).
   const [headOptions, setHeadOptions] = useState([])
@@ -120,7 +67,6 @@ export default function HouseholdManagement({ currentUser }) {
     setEditing(h.id)
     setForm({
       household_code: h.household_id || '', barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_resident_id: '',
-      latitude: h.latitude || '', longitude: h.longitude || '',
     })
     loadHeads(h)
     setShowModal(true)
@@ -153,9 +99,9 @@ export default function HouseholdManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+            <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Members'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
           </thead>
-          <tbody><SkeletonTableRows columns={canAdd ? 4 : 5} rows={5} /></tbody>
+          <tbody><SkeletonTableRows columns={canAdd ? 5 : 6} rows={5} /></tbody>
         </table>
       </div>
     </div>
@@ -178,7 +124,7 @@ export default function HouseholdManagement({ currentUser }) {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+              <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Members', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(h => (
@@ -190,6 +136,7 @@ export default function HouseholdManagement({ currentUser }) {
                     {h.in_flood_risk_zone && <span className="badge-red text-xs ml-2">High Risk</span>}
                   </td>
                   <td className="table-cell font-medium">{h.head_family}</td>
+                  <td className="table-cell">{h.member_count ?? 0}</td>
                   {canAdd && (
                     <td className="table-cell">
                       <div className="flex gap-2">
@@ -200,7 +147,7 @@ export default function HouseholdManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={4} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -251,65 +198,6 @@ export default function HouseholdManagement({ currentUser }) {
                   ) : (
                     <p className="text-xs text-gray-400 mt-1">Only registered residents with Relation to Head "Head" and no household yet are listed.</p>
                   )}
-                </div>
-                <div className="col-span-2">
-                  <label className="label flex items-center gap-1.5"><MapPin size={14} /> Household Location</label>
-                  <p className="text-xs text-gray-400 mb-2">Click on the map below at exactly where this family lives.</p>
-                  <div className="h-56 rounded-lg overflow-hidden border border-gray-200">
-                    <MapContainer
-                      center={form.latitude && form.longitude ? [Number(form.latitude), Number(form.longitude)] : GINGOOG_CENTER}
-                      zoom={form.latitude && form.longitude ? 17 : 13}
-                      className="w-full h-full"
-                    >
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-                      <LocationPicker onPick={(lat, lng) => setForm(f => ({ ...f, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} />
-                      {(() => {
-                        const brgy = barangays.find(b => String(b.id) === String(form.barangay_id))
-                        if (!brgy?.boundary_geojson) return null
-                        let geo
-                        try { geo = JSON.parse(brgy.boundary_geojson) } catch { return null }
-                        return (
-                          <>
-                            <GeoJSON
-                              key={brgy.id}
-                              data={geo}
-                              pathOptions={{ color: '#0ea5e9', weight: 2.5, fillColor: '#0ea5e9', fillOpacity: 0.08 }}
-                              ref={setSelectedBoundaryLayer}
-                            />
-                            <FitToBarangayBoundary geojsonLayer={selectedBoundaryLayer} hasPin={!!(form.latitude && form.longitude)} />
-                          </>
-                        )
-                      })()}
-                      {(() => {
-                        const purok = puroks.find(p => String(p.id) === String(form.purok_id))
-                        if (!purok?.boundary_geojson) return null
-                        let geo
-                        try { geo = JSON.parse(purok.boundary_geojson) } catch { return null }
-                        return (
-                          <>
-                            <GeoJSON
-                              key={`purok-${purok.id}`}
-                              data={geo}
-                              pathOptions={{ color: '#2563eb', weight: 2, fillColor: '#2563eb', fillOpacity: 0.12, dashArray: '4, 3' }}
-                              ref={setSelectedPurokLayer}
-                            >
-                              <Tooltip permanent direction="center" className="purok-name-label">{purok.name}</Tooltip>
-                            </GeoJSON>
-                            <FlyToPurokBoundary geojsonLayer={selectedPurokLayer} hasPin={!!(form.latitude && form.longitude)} />
-                          </>
-                        )
-                      })()}
-                      {form.latitude && form.longitude && (
-                        <Marker position={[Number(form.latitude), Number(form.longitude)]} />
-                      )}
-                    </MapContainer>
-                  </div>
-                  {form.purok_id && !puroks.find(p => String(p.id) === String(form.purok_id))?.boundary_geojson && (
-                    <p className="text-xs text-amber-600 mt-1">This purok has no drawn boundary yet — draw it in Puroks so the map can fly to it.</p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {form.latitude && form.longitude ? `Pinned: ${form.latitude}, ${form.longitude}` : 'No location pinned yet.'}
-                  </p>
                 </div>
               </div>
             </div>

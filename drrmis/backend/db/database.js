@@ -55,6 +55,9 @@ const EXPECTED_COLUMNS = {
     // Which barangay the resident belongs to — needed now that a resident can
     // be registered BEFORE being assigned to a household.
     barangay_id: `INTEGER REFERENCES barangays(id)`,
+    // Which purok the resident lives in — residents are counted per purok
+    // (no house pins). If they're in a household, the household's purok wins.
+    purok_id: `INTEGER REFERENCES puroks(id)`,
   },
 }
 

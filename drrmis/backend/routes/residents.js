@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
                FROM residents r
                LEFT JOIN households h ON r.household_id = h.id
                LEFT JOIN barangays b ON b.id = COALESCE(r.barangay_id, h.barangay_id)
-               LEFT JOIN puroks p ON h.purok_id = p.id
+               LEFT JOIN puroks p ON p.id = COALESCE(h.purok_id, r.purok_id)
                WHERE 1=1`
     const params = []
     // Barangay Officials only ever see residents of their own barangay —
@@ -50,6 +50,20 @@ router.get('/', async (req, res) => {
     res.json(await all(sql, params))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
+
+// The purok a resident lives in: their household's purok when they're in a
+// household, otherwise the purok picked on the form (must be in their
+// barangay). Returns { purok_id } or { error }.
+async function resolvePurok(bodyPurokId, household_id, barangay_id) {
+  if (household_id) {
+    const hh = await get('SELECT purok_id FROM households WHERE id = ?', [household_id])
+    return { purok_id: hh?.purok_id || null }
+  }
+  if (!bodyPurokId) return { error: 'Purok is required — pick the purok where the resident lives.' }
+  const purok = await get('SELECT barangay_id FROM puroks WHERE id = ?', [bodyPurokId])
+  if (!purok || purok.barangay_id !== barangay_id) return { error: 'Pick a purok in your own barangay.' }
+  return { purok_id: bodyPurokId }
+}
 
 // POST /api/residents
 router.post('/', async (req, res) => {
@@ -75,15 +89,17 @@ router.post('/', async (req, res) => {
       barangay_id = household.barangay_id
     }
     if (!barangay_id) return res.status(400).json({ error: 'Barangay is required.' })
+    const { purok_id, error: purokError } = await resolvePurok(req.body.purok_id, household_id, barangay_id)
+    if (purokError) return res.status(400).json({ error: purokError })
     const count = await get('SELECT COUNT(*) as c FROM residents')
     const resident_id = `RES-${String((count?.c || 0) + 1).padStart(5, '0')}`
     const age_bracket = computeAgeBracket(birthdate)
     const properLast = toProperCase(last_name), properFirst = toProperCase(first_name), properMiddle = toProperCase(middle_name)
     const name = [properFirst, properMiddle, properLast].filter(Boolean).join(' ')
     const result = await run(
-      `INSERT INTO residents (resident_id, household_id, barangay_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [resident_id, household_id || null, barangay_id, name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head || null, sex || null, contact_number || null]
+      `INSERT INTO residents (resident_id, household_id, barangay_id, purok_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [resident_id, household_id || null, barangay_id, purok_id, name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head || null, sex || null, contact_number || null]
     )
     const newRow = await get('SELECT * FROM residents WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
@@ -116,12 +132,14 @@ router.put('/:id', async (req, res) => {
         return res.status(403).json({ error: 'You can only assign residents to households in your own barangay.' })
       }
     }
+    const { purok_id, error: purokError } = await resolvePurok(req.body.purok_id, household_id, existing.barangay_id)
+    if (purokError) return res.status(400).json({ error: purokError })
     const age_bracket = computeAgeBracket(birthdate)
     const properLast = toProperCase(last_name), properFirst = toProperCase(first_name), properMiddle = toProperCase(middle_name)
     const name = [properFirst, properMiddle, properLast].filter(Boolean).join(' ')
     await run(
-      `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=?, household_id=?, barangay_id=? WHERE id=?`,
-      [name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, household_id, existing.barangay_id, req.params.id]
+      `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=?, household_id=?, barangay_id=?, purok_id=? WHERE id=?`,
+      [name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, household_id, existing.barangay_id, purok_id, req.params.id]
     )
     const updated = await get('SELECT * FROM residents WHERE id = ?', [req.params.id])
     res.json(updated)

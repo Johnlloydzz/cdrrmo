@@ -547,9 +547,22 @@ export default function FloodSimulationControl() {
               )
             })()}
 
-            {households.filter(h => h.latitude && h.longitude).map(h => (
-              <Marker key={h.id} position={[h.latitude, h.longitude]} icon={isAtRisk(h) ? redPin : bluePin}>
-                <Popup><strong>{h.household_id}</strong> - {h.head_family}<br />{isAtRisk(h) ? (isFlood && floodLevel > 0 ? `WARNING: flooded at ${floodLevel} m (reported, live)` : `WARNING: Within high ${hazard}-risk zone`) : 'Outside high-risk zone'}</Popup>
+            {/* One pin per PUROK (households aren't pinned individually):
+                red if any of its households is at risk. */}
+            {Object.values(households.reduce((acc, h) => {
+              if (!h.purok_id || h.purok_lat == null || h.purok_lng == null) return acc
+              const g = acc[h.purok_id] || (acc[h.purok_id] = { id: h.purok_id, name: h.purok_name, barangay: h.barangay_name, lat: h.purok_lat, lng: h.purok_lng, households: 0, atRisk: 0, members: 0 })
+              g.households += 1
+              g.members += Number(h.member_count || 0)
+              if (isAtRisk(h)) g.atRisk += 1
+              return acc
+            }, {})).map(g => (
+              <Marker key={`purok-${g.id}`} position={[g.lat, g.lng]} icon={g.atRisk ? redPin : bluePin}>
+                <Popup>
+                  <strong>Purok {g.name}</strong> — {g.barangay}<br />
+                  Households: {g.households} · Residents in households: {g.members}<br />
+                  {g.atRisk ? (isFlood && floodLevel > 0 ? `WARNING: ${g.atRisk} household(s) flooded at ${floodLevel} m (reported, live)` : `WARNING: ${g.atRisk} household(s) within high ${hazard}-risk zone`) : 'Outside high-risk zone'}
+                </Popup>
               </Marker>
             ))}
           </MapContainer>
