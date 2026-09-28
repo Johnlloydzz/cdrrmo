@@ -24,13 +24,11 @@ router.get('/', async (req, res) => {
 // POST /api/puroks
 router.post('/', async (req, res) => {
   try {
-    // CDRRMO Personnel can add a purok for any barangay (they select which
-    // one in the form). A Barangay Official can only add puroks for their
-    // own barangay — enforced here regardless of what's sent in the body.
+    // Only a Barangay Official adds puroks, and only for their own barangay —
+    // enforced here regardless of what's sent in the body. CDRRMO Personnel
+    // classify existing puroks (risk, threshold) but don't create them.
     let barangay_id
-    if (req.user.role === 'CDRRMO Personnel') {
-      barangay_id = req.body.barangay_id
-    } else if (req.user.role === 'Barangay Official') {
+    if (req.user.role === 'Barangay Official') {
       barangay_id = req.user.barangay_id
     } else {
       return res.status(403).json({ error: 'You do not have permission to add puroks.' })

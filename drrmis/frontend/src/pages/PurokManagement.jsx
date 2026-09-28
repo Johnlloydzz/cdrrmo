@@ -239,7 +239,7 @@ export default function PurokManagement({ currentUser }) {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input className="input pl-9" placeholder="Search purok or barangay…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        {canAdd && (
+        {canAdd && !isCdrrmo && (
           <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Add Purok</button>
         )}
       </div>
