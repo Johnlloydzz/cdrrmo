@@ -735,7 +735,7 @@ export default function GISMap() {
           ))}
 
           {/* Household locations — colored by geofencing risk status (red = within high flood-risk purok) */}
-          {activeOverlays.includes('Household Locations') && households.filter(h => h.latitude && h.longitude).map(h => (
+                  {activeOverlays.includes('Household Locations') && selectedBarangay && households.filter(h => h.latitude && h.longitude && String(h.barangay_id) === String(selectedBarangay.id)).map(h => (
             <Circle
               key={`hh-${h.id}`}
               center={[h.latitude, h.longitude]}
