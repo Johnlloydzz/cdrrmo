@@ -2,6 +2,7 @@ const router = require('express').Router()
 const { expireStaleFloodData } = require('../db/floodLevel')
 const { get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 router.use(authenticate)
 
@@ -40,6 +41,8 @@ router.put('/flood-level', async (req, res) => {
     const level = parseFloat(req.body.level_m)
     if (isNaN(level) || level < 0) return res.status(400).json({ error: 'level_m must be a non-negative number' })
     const source = req.body.source === 'auto' ? 'auto' : 'manual'
+    const prevRow = await get("SELECT value FROM system_settings WHERE key = 'current_flood_level_m'")
+    const prevLevel = parseFloat(prevRow?.value) || 0
     await run(
       `INSERT INTO system_settings (key, value, updated_at) VALUES ('current_flood_level_m', ?, datetime('now', '+8 hours'))
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
@@ -50,6 +53,18 @@ router.put('/flood-level', async (req, res) => {
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
       [source]
     )
+    if (level !== prevLevel) {
+      const how = source === 'auto' ? ' (auto-detected)' : ''
+      const msg = level > 0
+        ? { type: 'alert', title: `Flood level reported: ${level} m${how}`,
+            body: `Puroks with a flood threshold of ${level} m or lower are now at risk. Check your households.` }
+        : { type: 'system', title: 'Flood level cleared',
+            body: 'The reported flood water level is back to 0 m (normal).' }
+      await notify({ role: OFFICIAL, ...msg, link: '/households' })
+      await notify({ role: CDRRMO, exclude_user_id: req.user.id, ...msg,
+        body: level > 0 ? `${req.user.name || 'CDRRMO'} reported ${level} m${how}.` : `${req.user.name || 'CDRRMO'} reset the flood level to normal.`,
+        link: '/flood-control' })
+    }
     res.json({ level_m: level, source })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -84,11 +99,15 @@ router.put('/auto-flood-barangays', async (req, res) => {
       return res.status(403).json({ error: 'Only CDRRMO Personnel can update this.' })
     }
     const ids = Array.isArray(req.body.barangay_ids) ? req.body.barangay_ids.filter(n => Number.isInteger(n)) : []
+    const prevRow = await get("SELECT value FROM system_settings WHERE key = 'auto_flooded_barangay_ids'")
+    let prevIds = []
+    try { prevIds = prevRow ? JSON.parse(prevRow.value) : [] } catch { prevIds = [] }
     await run(
       `INSERT INTO system_settings (key, value, updated_at) VALUES ('auto_flooded_barangay_ids', ?, datetime('now', '+8 hours'))
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
       [JSON.stringify(ids)]
     )
+    await notifyAutoFlood(prevIds, ids)
     res.json({ barangay_ids: ids })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

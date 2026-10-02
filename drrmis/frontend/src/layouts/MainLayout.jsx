@@ -1,7 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import Sidebar from '../components/Sidebar'
-import NotificationPanel, { INITIAL_NOTIFICATIONS } from '../components/NotificationPanel'
+import NotificationPanel, { useNotifications } from '../components/NotificationPanel'
 import ProfilePanel from '../components/ProfilePanel'
 import { Menu, Bell, ChevronDown } from 'lucide-react'
 
@@ -32,7 +32,7 @@ export default function MainLayout({ onLogout, currentUser }) {
   const [mobileOpen, setMobileOpen]       = useState(false)
   const [notifOpen, setNotifOpen]         = useState(false)
   const [profileOpen, setProfileOpen]     = useState(false)
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
+  const { notifications, setNotifications } = useNotifications(!!currentUser)
 
   const location = useLocation()
   const title = pageTitles[location.pathname] || 'PDRA'

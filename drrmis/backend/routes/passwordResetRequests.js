@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const { all, get, run } = require('../db/database')
 const { authenticate, authorize } = require('../middleware/auth')
+const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 // POST /api/password-reset-requests — public, no auth. A user who can't
 // receive the OTP email submits their username or email here instead.
@@ -12,12 +13,18 @@ router.post('/', async (req, res) => {
     if (!identifier || !identifier.trim()) {
       return res.status(400).json({ error: 'Enter your username or email.' })
     }
-    const user = await get('SELECT id FROM users WHERE username = ? OR email = ?', [identifier.trim(), identifier.trim()])
+    const user = await get('SELECT id, name, username FROM users WHERE username = ? OR email = ?', [identifier.trim(), identifier.trim()])
     if (user) {
       await run(
         'INSERT INTO password_reset_requests (user_id, message) VALUES (?, ?)',
         [user.id, message || null]
       )
+      await notify({
+        role: CDRRMO, type: 'system',
+        title: 'Password reset request',
+        body: `${user.name} (${user.username}) asked for a password reset.`,
+        link: '/users',
+      })
     }
     res.status(201).json({ message: 'If that account exists, CDRRMO has been notified and will reset your password.' })
   } catch (err) { res.status(500).json({ error: err.message }) }

@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 router.use(authenticate)
 
@@ -47,6 +48,13 @@ router.post('/', async (req, res) => {
       [barangay_id, name, flood_risk, flood_threshold_m, landslide_risk, boundary_geojson || null]
     )
     const newRow = await get('SELECT * FROM puroks WHERE id = ?', [result.lastID])
+    const brgy = await get('SELECT name FROM barangays WHERE id = ?', [barangay_id])
+    await notify({
+      role: CDRRMO, type: 'system',
+      title: 'New purok to classify',
+      body: `Purok ${name} was added in Brgy. ${brgy?.name || ''}. Set its flood risk, flood threshold and landslide risk.`,
+      link: '/puroks',
+    })
     res.status(201).json(newRow)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -78,6 +86,18 @@ router.put('/:id', async (req, res) => {
       [name, flood_risk, flood_threshold_m, landslide_risk, boundary_geojson, req.params.id]
     )
     const updated = await get('SELECT * FROM puroks WHERE id = ?', [req.params.id])
+    if (req.user.role === 'CDRRMO Personnel' && (
+      existing.flood_risk !== flood_risk ||
+      Number(existing.flood_threshold_m) !== Number(flood_threshold_m) ||
+      existing.landslide_risk !== landslide_risk
+    )) {
+      await notify({
+        role: OFFICIAL, barangay_ids: [existing.barangay_id], type: 'system',
+        title: `Purok ${existing.name} classification updated`,
+        body: `CDRRMO set flood risk: ${flood_risk}, flood threshold: ${flood_threshold_m} m, landslide risk: ${landslide_risk}.`,
+        link: '/puroks',
+      })
+    }
     res.json(updated)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

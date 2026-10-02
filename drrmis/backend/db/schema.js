@@ -126,6 +126,19 @@ const tables = [
     created_at  TEXT    DEFAULT (datetime('now', '+8 hours')),
     updated_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
+
+  // In-app notifications, one row per recipient (own read/dismiss state).
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type        TEXT    NOT NULL DEFAULT 'system',   -- alert / incident / evacuation / relief / system
+    title       TEXT    NOT NULL,
+    body        TEXT,
+    link        TEXT,
+    is_read     INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, id)`,
 ]
 
 module.exports = tables

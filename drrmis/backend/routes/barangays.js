@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 router.use(authenticate)
 
@@ -116,6 +117,14 @@ router.put('/:id', async (req, res) => {
       [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, flood_area_geojson ?? null, landslide_area_geojson ?? null, residential_area_geojson ?? null, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
+    if (current.flood_susceptibility !== flood_susceptibility || current.landslide_susceptibility !== landslide_susceptibility) {
+      await notify({
+        role: OFFICIAL, barangay_ids: [current.id], type: 'system',
+        title: 'Barangay hazard classification updated',
+        body: `CDRRMO set Brgy. ${name}: flood susceptibility ${flood_susceptibility}, landslide susceptibility ${landslide_susceptibility}.`,
+        link: '/puroks',
+      })
+    }
     res.json(updated)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

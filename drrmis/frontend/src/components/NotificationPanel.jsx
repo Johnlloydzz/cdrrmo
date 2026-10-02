@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell, X, AlertTriangle, Tent, Package, ShieldAlert,
   Info, CheckCircle, Trash2
 } from 'lucide-react'
 
-// ── Mock notifications ─────────────────────────────────────────────────────
+import { apiGet, apiPut, apiDelete } from '../utils/api'
+
+// ── Notification types → icon / colors ─────────────────────────────────────
 const TYPE_META = {
   alert:     { icon: ShieldAlert,   color: 'text-red-500',    bg: 'bg-red-50',    dot: 'bg-red-500' },
   incident:  { icon: AlertTriangle, color: 'text-orange-500', bg: 'bg-orange-50', dot: 'bg-orange-500' },
@@ -14,44 +16,44 @@ const TYPE_META = {
   system:    { icon: Info,          color: 'text-gray-500',   bg: 'bg-gray-50',   dot: 'bg-gray-400' },
 }
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 1, type: 'alert', read: false,
-    title: 'RED Alert — Flood Warning',
-    body: 'Mandatory evacuation in effect for Kioskos, Barangay 1–3.',
-    time: '5 min ago', link: '/alerts',
-  },
-  {
-    id: 2, type: 'incident', read: false,
-    title: 'New Incident: INC-006',
-    body: 'Flood reported in Kalambogan, Purok 3. Assigned to Team Alpha.',
-    time: '18 min ago', link: '/incidents',
-  },
-  {
-    id: 3, type: 'evacuation', read: false,
-    title: 'Evacuation Update',
-    body: '48 families checked in at Central Gym. Available space: 452.',
-    time: '35 min ago', link: '/evacuation-centers',
-  },
-  {
-    id: 4, type: 'relief', read: true,
-    title: 'Low Stock Warning',
-    body: 'Baby Food stock is below threshold (40 boxes remaining).',
-    time: '1 hr ago', link: '/relief',
-  },
-  {
-    id: 5, type: 'incident', read: true,
-    title: 'Incident Resolved: INC-002',
-    body: 'Landslide in Magsaysay has been cleared. Road now passable.',
-    time: '2 hrs ago', link: '/incidents',
-  },
-  {
-    id: 6, type: 'system', read: true,
-    title: 'New User Registered',
-    body: 'Barangay Admin account created for Brgy. 12.',
-    time: '5 hrs ago', link: '/users',
-  },
-]
+// created_at is stored in Philippine time ("YYYY-MM-DD HH:MM:SS", +08:00).
+function timeAgo(createdAt) {
+  if (!createdAt) return ''
+  const t = new Date(createdAt.replace(' ', 'T') + '+08:00').getTime()
+  const s = Math.max(0, Math.floor((Date.now() - t) / 1000))
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} min ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} hr${h > 1 ? 's' : ''} ago`
+  const d = Math.floor(h / 24)
+  return `${d} day${d > 1 ? 's' : ''} ago`
+}
+
+const POLL_MS = 30000
+
+// Loads the signed-in user's OWN notifications from the server and checks
+// for new ones every 30 seconds (and when the tab regains focus). CDRRMO
+// Personnel and Barangay Officials each get only what's meant for them —
+// the server decides who receives what.
+export function useNotifications(enabled = true) {
+  const [notifications, setNotifications] = useState([])
+
+  const load = useCallback(async () => {
+    try { setNotifications(await apiGet('/notifications')) } catch { /* keep current list */ }
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) return
+    load()
+    const timer = setInterval(() => { if (!document.hidden) load() }, POLL_MS)
+    const onFocus = () => load()
+    window.addEventListener('focus', onFocus)
+    return () => { clearInterval(timer); window.removeEventListener('focus', onFocus) }
+  }, [enabled, load])
+
+  return { notifications, setNotifications, reload: load }
+}
 
 export default function NotificationPanel({
   notifications, setNotifications, open, onClose
@@ -71,21 +73,31 @@ export default function NotificationPanel({
 
   const unread = notifications.filter(n => !n.read).length
 
-  const markAllRead = () =>
+  // Update the list right away, then save to the server.
+  const markAllRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    apiPut('/notifications/read-all', {}).catch(() => {})
+  }
 
-  const markRead = (id) =>
+  const markRead = (id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    apiPut(`/notifications/${id}/read`, {}).catch(() => {})
+  }
 
-  const dismiss = (id) =>
+  const dismiss = (id) => {
     setNotifications(prev => prev.filter(n => n.id !== id))
+    apiDelete(`/notifications/${id}`).catch(() => {})
+  }
 
-  const clearAll = () => setNotifications([])
+  const clearAll = () => {
+    setNotifications([])
+    apiDelete('/notifications').catch(() => {})
+  }
 
   const handleClick = (n) => {
-    markRead(n.id)
+    if (!n.read) markRead(n.id)
     onClose()
-    navigate(n.link)
+    if (n.link) navigate(n.link)
   }
 
   if (!open) return null
@@ -167,8 +179,8 @@ export default function NotificationPanel({
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${meta.dot}`} />
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
-                    <p className="text-xs text-gray-400 mt-1">{n.time}</p>
+                    {n.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-3">{n.body}</p>}
+                    <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
                   </div>
 
                   {/* Dismiss */}
@@ -186,19 +198,6 @@ export default function NotificationPanel({
         )}
       </div>
 
-      {/* Footer */}
-      {notifications.length > 0 && (
-        <div className="px-4 py-2.5 border-t border-gray-100 text-center">
-          <button
-            onClick={() => { onClose(); navigate('/alerts') }}
-            className="text-xs text-primary-600 hover:text-primary-800 font-medium"
-          >
-            View all alerts →
-          </button>
-        </div>
-      )}
     </div>
   )
 }
-
-export { INITIAL_NOTIFICATIONS }

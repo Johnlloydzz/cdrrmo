@@ -5,6 +5,7 @@ const router = require('express').Router()
 const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
 const { all, get, run } = require('../db/database')
 const { authenticate, authorize } = require('../middleware/auth')
+const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 // GET /api/account-requests/barangays — public, no auth. Only what the
 // Request Account form needs (id + name) so a Barangay Official without a
@@ -38,7 +39,7 @@ router.post('/', async (req, res) => {
     if (dupContact) {
       return res.status(400).json({ error: 'This contact number is already used in another account request.' })
     }
-    const barangay = await get('SELECT id FROM barangays WHERE id = ?', [barangay_id])
+    const barangay = await get('SELECT id, name FROM barangays WHERE id = ?', [barangay_id])
     if (!barangay) return res.status(400).json({ error: 'Selected barangay was not found.' })
 
     const r = await run(
@@ -46,6 +47,12 @@ router.post('/', async (req, res) => {
       [name, email, contact || null, barangay_id, position || null, message || null]
     )
     const created = await get('SELECT * FROM account_requests WHERE id = ?', [r.lastID])
+    await notify({
+      role: CDRRMO, type: 'system',
+      title: 'New account request',
+      body: `${name} requested a Barangay Official account for Brgy. ${barangay.name}.`,
+      link: '/users',
+    })
     res.status(201).json(created)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

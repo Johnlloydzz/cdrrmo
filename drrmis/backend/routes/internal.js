@@ -13,7 +13,8 @@
 // system on a free-tier server.
 
 const router = require('express').Router()
-const { all, run } = require('../db/database')
+const { all, get, run } = require('../db/database')
+const { notifyAutoFlood } = require('../utils/notify')
 
 const CENTER = [8.8231, 125.1109] // Gingoog City
 
@@ -167,7 +168,11 @@ async function runFloodAutoDetectCheck() {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     [key, value]
   )
+  const prevRow = await get("SELECT value FROM system_settings WHERE key = 'auto_flooded_barangay_ids'")
+  let prevIds = []
+  try { prevIds = prevRow ? JSON.parse(prevRow.value) : [] } catch { prevIds = [] }
   await upsert('auto_flooded_barangay_ids', JSON.stringify(qualifying))
+  await notifyAutoFlood(prevIds, qualifying, reasons)
   await upsert('auto_flood_reasons', JSON.stringify(reasons))
 
   return {

@@ -14,6 +14,7 @@ const passwordResetRequestRoutes = require('./routes/passwordResetRequests')
 const riskAssessmentRoutes = require('./routes/riskAssessment')
 const settingsRoutes       = require('./routes/settings')
 const internalRoutes       = require('./routes/internal')
+const notificationRoutes   = require('./routes/notifications')
 const cron                 = require('node-cron')
 
 const { initDb } = require('./db/database')
@@ -64,6 +65,7 @@ app.use('/api/password-reset-requests', passwordResetRequestRoutes)
 app.use('/api/risk-assessment', riskAssessmentRoutes)
 app.use('/api/settings',        settingsRoutes)
 app.use('/api/internal',        internalRoutes)
+app.use('/api/notifications',   notificationRoutes)
 
 // ── Health check ────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
