@@ -1,15 +1,16 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check } from 'lucide-react'
-import BrandLogo from './BrandLogo'
+import { ArrowLeft, Check, Shield } from 'lucide-react'
 
 // Shared frame for the public auth pages (Request an Account, Request a
-// Password Reset): blue background, CDRRMO logo, white card, Back to Login.
+// Password Reset): blue background, PDRA badge, white card, Back to Login.
 export default function AuthCard({ maxWidth = 'max-w-lg', children }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center px-4 py-8">
       <div className={`w-full ${maxWidth}`}>
         <div className="text-center mb-4 animate-login-rise">
-          <BrandLogo size={56} className="w-14 h-14 object-contain mx-auto drop-shadow-lg" />
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white shadow-lg">
+            <Shield size={18} className="text-primary-700" aria-hidden="true" />
+          </div>
           <p className="text-sm font-bold text-white mt-2 leading-tight">PDRA</p>
           <p className="text-blue-200 text-xs">Gingoog City CDRRMO</p>
         </div>
