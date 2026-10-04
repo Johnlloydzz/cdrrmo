@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { GeoJSON } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import { Search, Pencil, Building2, Waves, Mountain, RotateCcw, Home } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
 import PolygonEditor, { geojsonToLatLngs, latLngsToGeojson, simplifyPoints } from '../components/editor'

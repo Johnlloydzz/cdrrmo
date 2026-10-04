@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, Component } from 'react'
 import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, Marker, useMap, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Search, Plus, Pencil, Trash2, MapPin, Undo2, RotateCcw } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'

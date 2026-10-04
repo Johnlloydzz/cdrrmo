@@ -1,5 +1,6 @@
 import { useEffect, useRef, Component } from 'react'
 import { MapContainer, TileLayer, Polygon, Polyline, Marker, useMap, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Undo2, RotateCcw } from 'lucide-react'
 

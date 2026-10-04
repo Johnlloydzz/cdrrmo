@@ -1,6 +1,7 @@
 import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Polyline, Tooltip, useMap, Pane } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'

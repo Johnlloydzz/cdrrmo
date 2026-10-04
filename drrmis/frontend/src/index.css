@@ -146,3 +146,35 @@
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after, .animate-fade-in { animation: none; }
 }
+/* ── Login & cookie notice motion ────────────────────────────────────────
+   One short entrance when the login page opens, plus motion that answers
+   the user (cookie bar sliding up, policy window opening). */
+@keyframes login-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-login-rise { animation: login-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-login-rise-late { animation: login-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+
+@keyframes cookie-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-cookie-up { animation: cookie-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both; }
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-modal-in { animation: modal-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes slide-down-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-slide-down-in { animation: slide-down-in 0.2s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-login-rise, .animate-login-rise-late, .animate-cookie-up,
+  .animate-modal-in, .animate-slide-down-in { animation: none; }
+}
