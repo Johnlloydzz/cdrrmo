@@ -220,6 +220,9 @@ export default function FloodSimulationControl() {
         setFloodLevel(fl.level_m); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
       }).catch(() => {})
       apiGet('/settings/auto-flood-barangays').then(af => setAutoFloodedIds(af.barangay_ids || [])).catch(() => {})
+      // At-risk flags come from the server (same geofence everywhere), so
+      // refresh them too when the level may have changed.
+      apiGet('/households').then(setHouseholds).catch(() => {})
     }
     const interval = setInterval(poll, 30000)
     window.addEventListener('focus', poll)

@@ -6,6 +6,7 @@ import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown, ArrowLeft } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { Skeleton, SkeletonBlock, SkeletonList } from '../components/Skeleton'
+import { purokInHazardArea } from '../utils/geofence'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -585,7 +586,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       const puroks = selectedBarangay.puroks || []
                       // A barangay classified LOW flood susceptibility has no at-risk puroks.
                       const lowBarangay = (selectedBarangay.flood_susceptibility || 'Low') === 'Low'
-                      const atRisk = lowBarangay ? 0 : puroks.filter(p => floodLevel > 0 ? floodLevel >= p.flood_threshold_m : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High').length
+                      const atRisk = lowBarangay ? 0 : puroks.filter(p => purokInHazardArea(p, selectedBarangay.flood_area_geojson) && (floodLevel > 0 ? floodLevel >= p.flood_threshold_m : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High')).length
                       return `${atRisk} / ${puroks.length}`
                     })()}
                   </p>
@@ -723,7 +724,10 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 const activeLevel = floodLevel > 0 ? floodLevel : (autoFlooded ? 1 : 0)
                 // Same rule as the backend: a LOW-susceptibility barangay is never high risk.
                 const lowBarangay = (selectedBarangay.flood_susceptibility || 'Low') === 'Low'
-                const atRisk = !lowBarangay && activeLevel > 0 && activeLevel >= p.flood_threshold_m
+                // ...and only puroks inside the barangay's drawn flood area
+                // (the violet shape) can be at risk.
+                const outsideArea = !purokInHazardArea(p, selectedBarangay.flood_area_geojson)
+                const atRisk = !lowBarangay && !outsideArea && activeLevel > 0 && activeLevel >= p.flood_threshold_m
                 return (
                   <GeoJSON
                     key={`purok-${p.id}`}
@@ -739,6 +743,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       {autoFlooded && autoFloodReasons[selectedBarangay.id] && <>Reason: {autoFloodReasons[selectedBarangay.id]}<br /></>}
                       {lowBarangay
                         ? <span style={{ color: '#16a34a' }}>Low flood susceptibility — not high risk</span>
+                        : outsideArea
+                        ? <span style={{ color: '#16a34a' }}>Outside the flood-prone area — not at risk</span>
                         : activeLevel === 0
                         ? <span style={{ color: '#16a34a' }}>No active flood right now</span>
                         : atRisk
