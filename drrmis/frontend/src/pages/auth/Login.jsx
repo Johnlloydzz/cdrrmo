@@ -4,7 +4,8 @@ import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, Map
 import { apiPost } from '../../utils/api'
 import { setStoredToken } from '../../utils/storage'
 
-const REMEMBERED_USERNAME_KEY = 'pdra_remembered_username'
+const REMEMBERED_USERNAME_KEY = 'pdra_remembered_username' // last username (always kept)
+const REMEMBER_ME_KEY = 'pdra_remember_me'                   // '1' if Remember me was checked
 
 const HAZARDS = [
   { icon: Waves, label: 'FLOOD', bg: 'bg-sky-500' },
@@ -14,15 +15,23 @@ const HAZARDS = [
 ]
 
 export default function Login({ onLogin }) {
-  // "Remember me" keeps the USERNAME on this device, so after logging out the
-  // account is already filled in. The password is never stored by the app —
-  // the browser's own password manager (key icon in the address bar) can
-  // fill it in securely.
+  // After logging out:
+  //  - the last USERNAME is always filled in;
+  //  - the PASSWORD is filled in (by the browser's own password manager) only
+  //    if Remember me was checked last time — otherwise it stays blank.
+  // The app itself never stores the password.
+  const [rememberedBefore] = useState(() => {
+    try { return localStorage.getItem(REMEMBER_ME_KEY) === '1' } catch { return false }
+  })
   const [form, setForm] = useState(() => {
     let saved = ''
     try { saved = localStorage.getItem(REMEMBERED_USERNAME_KEY) || '' } catch { /* storage blocked */ }
-    return { username: saved, password: '', remember: !!saved }
+    return { username: saved, password: '', remember: rememberedBefore }
   })
+  // Without Remember me, the password box starts read-only so the browser
+  // can't auto-fill it on page load; it becomes editable once clicked/typed in
+  // (the browser may still offer its suggestions then — the user's choice).
+  const [pwEditable, setPwEditable] = useState(rememberedBefore)
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -47,20 +56,25 @@ export default function Login({ onLogin }) {
   const submit = async (e) => {
     e.preventDefault()
     setError('')
-    if (!form.username || !form.password) {
+    // Read straight from the inputs too: a value the browser auto-filled may
+    // not have reached React state yet.
+    const username = (e.target.username?.value || form.username).trim()
+    const password = e.target.password?.value || form.password
+    if (!username || !password) {
       setError('Please enter your username and password.')
       return
     }
     setLoading(true)
     try {
       const data = await apiPost('/auth/login', {
-        username: form.username,
-        password: form.password,
+        username,
+        password,
         remember: form.remember,
       })
       try {
-        if (form.remember) localStorage.setItem(REMEMBERED_USERNAME_KEY, form.username)
-        else localStorage.removeItem(REMEMBERED_USERNAME_KEY)
+        localStorage.setItem(REMEMBERED_USERNAME_KEY, username)
+        if (form.remember) localStorage.setItem(REMEMBER_ME_KEY, '1')
+        else localStorage.removeItem(REMEMBER_ME_KEY)
       } catch { /* storage blocked */ }
       // Remember me → ask the browser to save this login in ITS password
       // manager (Chrome shows "Save password?"). The app itself never stores
@@ -68,9 +82,9 @@ export default function Login({ onLogin }) {
       if (form.remember && window.PasswordCredential && navigator.credentials?.store) {
         try {
           navigator.credentials.store(new window.PasswordCredential({
-            id: form.username,
-            password: form.password,
-            name: data.user?.name || form.username,
+            id: username,
+            password,
+            name: data.user?.name || username,
           })).catch(() => {})
         } catch { /* not supported */ }
       }
@@ -178,7 +192,9 @@ export default function Login({ onLogin }) {
                         className={`input pl-9 pr-10 ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`}
                         placeholder="Enter your password"
                         autoComplete="current-password"
-                        autoFocus={!!form.username}
+                        autoFocus={!!form.username && rememberedBefore}
+                        readOnly={!pwEditable}
+                        onFocus={() => setPwEditable(true)}
                       />
                       <button
                         type="button"
