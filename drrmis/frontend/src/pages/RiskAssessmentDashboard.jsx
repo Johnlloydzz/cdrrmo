@@ -1,9 +1,9 @@
 import React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
-import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves } from 'lucide-react'
+import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { Skeleton, SkeletonBlock } from '../components/Skeleton'
 
@@ -140,6 +140,16 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   // "Barangays in Risk Zone" card -> list of at-risk barangays -> pick one
   // to see its at-risk households -> pick a household to see its family.
   const [showRiskBarangays, setShowRiskBarangays] = useState(false)
+  const riskDropdownRef = useRef(null)
+  // Close the "Barangays in Risk Zone" dropdown on an outside click or Esc.
+  useEffect(() => {
+    if (!showRiskBarangays) return
+    const onDown = (e) => { if (!riskDropdownRef.current?.contains(e.target)) setShowRiskBarangays(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setShowRiskBarangays(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [showRiskBarangays])
 
   const loadDashboardData = () =>
     Promise.all([
@@ -359,11 +369,54 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
-        <button type="button" onClick={() => setShowRiskBarangays(true)} className="card p-3 text-center hover:shadow-md hover:border-primary-300 border border-transparent transition-all cursor-pointer">
-          <Waves size={18} className="mx-auto mb-1 text-blue-500" />
-          <p className="text-xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Barangays in Risk Zone {(floodLevel > 0 || autoFloodedIds.length > 0) ? '(live)' : ''}</p>
-        </button>
+        {/* "Barangays in Risk Zone" — opens a dropdown right under the card
+            (pick one to open its at-risk households). */}
+        <div className="relative" ref={riskDropdownRef}>
+          <button type="button" onClick={() => setShowRiskBarangays(v => !v)} className={`card p-3 w-full text-center hover:shadow-md hover:border-primary-300 border transition-all cursor-pointer ${showRiskBarangays ? 'border-primary-300 shadow-md' : 'border-transparent'}`}>
+            <Waves size={18} className="mx-auto mb-1 text-blue-500" />
+            <p className="text-xl font-bold text-gray-800">{barangaysInRiskZoneCount.toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-0.5 flex items-center justify-center gap-1">
+              Barangays in Risk Zone {(floodLevel > 0 || autoFloodedIds.length > 0) ? '(live)' : ''}
+              <ChevronDown size={13} className={`transition-transform ${showRiskBarangays ? 'rotate-180' : ''}`} />
+            </p>
+          </button>
+          <div className={`absolute left-0 right-0 top-full mt-1 z-[1100] origin-top transition-all duration-150 ${showRiskBarangays ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-95 pointer-events-none'}`}>
+            <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              <div className="px-4 py-2 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Barangays in Risk Zone ({barangaysInRiskZoneCount})
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+                {barangaysInRiskZoneCount === 0
+                  ? <p className="text-center text-gray-400 py-6 text-sm">No barangays currently in a risk zone.</p>
+                  : <>
+                {visible.filter(s => (s.at_risk_households || 0) > 0).map(s => {
+                  const b = barangays.find(bb => bb.id === s.barangay_id)
+                  return (
+                    <button
+                      key={s.barangay_id}
+                      type="button"
+                      onClick={() => {
+                        if (b) setSelectedBarangay(b)
+                        setFilterAtRiskOnly(true)
+                        setShowRiskBarangays(false)
+                        setShowHouseholds(true)
+                        setExpandedHousehold(null)
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left"
+                    >
+                      <span>
+                        <span className="block font-medium text-gray-800 text-sm">{s.barangay_name}</span>
+                        <span className="block text-xs text-gray-400">{s.at_risk_households} at-risk household{s.at_risk_households === 1 ? '' : 's'}</span>
+                      </span>
+                      <AlertTriangle size={15} className="text-red-500 flex-shrink-0" />
+                    </button>
+                  )
+                })}
+                  </>}
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="card p-3 text-center transition-all">
           <AlertTriangle size={18} className="mx-auto mb-1 text-red-500" />
           <p className="text-xl font-bold text-red-600">{displayTotals.atRiskHouseholds.toLocaleString()}</p>
@@ -690,58 +743,6 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       document.body
       )}
 
-      {/* "Barangays in Risk Zone" card -> this list -> pick one to open its
-          at-risk households (same slide-in panel as above, filtered).
-          Also portal-rendered for the same reason as the panel above. */}
-      {createPortal(
-      <div
-        className={`fixed inset-0 z-[100] bg-black/40 transition-opacity duration-300 ${showRiskBarangays ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={() => setShowRiskBarangays(false)}
-      >
-        <div
-          className={`absolute top-0 right-0 h-full w-full sm:w-72 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${showRiskBarangays ? 'translate-x-0' : 'translate-x-full'}`}
-          style={{ maxHeight: '100vh' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
-            <h3 className="font-semibold text-gray-800 text-sm">Barangays in Risk Zone ({barangaysInRiskZoneCount})</h3>
-            <button onClick={() => setShowRiskBarangays(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {barangaysInRiskZoneCount === 0 ? (
-              <p className="text-center text-gray-400 py-8 text-sm">No barangays currently in a risk zone.</p>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {visible.filter(s => (s.at_risk_households || 0) > 0).map(s => {
-                  const b = barangays.find(bb => bb.id === s.barangay_id)
-                  return (
-                    <button
-                      key={s.barangay_id}
-                      type="button"
-                      onClick={() => {
-                        if (b) setSelectedBarangay(b)
-                        setFilterAtRiskOnly(true)
-                        setShowRiskBarangays(false)
-                        setShowHouseholds(true)
-                        setExpandedHousehold(null)
-                      }}
-                      className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 text-left"
-                    >
-                      <span>
-                        <span className="block font-medium text-gray-800 text-sm">{s.barangay_name}</span>
-                        <span className="block text-xs text-gray-400">{s.at_risk_households} at-risk household{s.at_risk_households === 1 ? '' : 's'}</span>
-                      </span>
-                      <AlertTriangle size={15} className="text-red-500 flex-shrink-0" />
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>,
-      document.body
-      )}
     </div>
   )
 }
