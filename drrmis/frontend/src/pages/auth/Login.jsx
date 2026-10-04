@@ -28,23 +28,10 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false)
   const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
 
-  // If this browser has a saved password for this site (and Remember me was
-  // used), fill the form from it right away — so it's just "Sign in".
-  // Uses the browser's Credential Management API (Chrome, Edge); other
-  // browsers simply skip this and still autofill from their own manager.
-  useEffect(() => {
-    if (!window.PasswordCredential || !navigator.credentials?.get) return
-    let remembered = ''
-    try { remembered = localStorage.getItem(REMEMBERED_USERNAME_KEY) || '' } catch { /* storage blocked */ }
-    if (!remembered) return
-    navigator.credentials.get({ password: true, mediation: 'optional' })
-      .then(cred => {
-        if (cred && cred.type === 'password' && cred.password) {
-          setForm(f => ({ ...f, username: cred.id, password: cred.password, remember: true }))
-        }
-      })
-      .catch(() => {})
-  }, [])
+  // Filling in a saved password is left to the browser's own autofill
+  // (it fills the form / shows its account dropdown on its own). Asking it
+  // via navigator.credentials.get() would show Chrome's black
+  // "Signing in as …" popup, so that isn't used.
 
   useEffect(() => {
     if (sessionExpired) {
