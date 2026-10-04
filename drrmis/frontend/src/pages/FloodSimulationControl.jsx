@@ -1,5 +1,5 @@
 import React from 'react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
@@ -203,13 +203,27 @@ export default function FloodSimulationControl() {
     return Math.round(total * 10) / 10
   }, [liveWeather])
 
-  // Re-poll just the auto-detect result periodically so this page reflects
-  // what the server-side check decided, without a full page reload.
+  // Every 30 s, re-check the reported flood level AND the auto-detect result,
+  // so this page (and the big-screen display) shows a level reported from
+  // ANOTHER computer without a page reload. The level input box is only
+  // updated if nobody is in the middle of typing a new value in it.
+  const lastLevelRef = useRef(null)
+  useEffect(() => { lastLevelRef.current = floodLevel }, [floodLevel])
   useEffect(() => {
-    const interval = setInterval(() => {
+    const poll = () => {
+      if (document.hidden) return
+      apiGet('/settings/flood-level').then(fl => {
+        const prev = lastLevelRef.current
+        if (fl.level_m !== prev) {
+          setInput(cur => (cur === String(prev) ? String(fl.level_m) : cur))
+        }
+        setFloodLevel(fl.level_m); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
+      }).catch(() => {})
       apiGet('/settings/auto-flood-barangays').then(af => setAutoFloodedIds(af.barangay_ids || [])).catch(() => {})
-    }, 2 * 60000)
-    return () => clearInterval(interval)
+    }
+    const interval = setInterval(poll, 30000)
+    window.addEventListener('focus', poll)
+    return () => { clearInterval(interval); window.removeEventListener('focus', poll) }
   }, [])
 
   const load = () => {
