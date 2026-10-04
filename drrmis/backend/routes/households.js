@@ -1,51 +1,10 @@
 const router = require('express').Router()
-const { expireStaleFloodData } = require('../db/floodLevel')
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { loadRiskContext, withHouseholdRisk } = require('../utils/householdRisk')
 
 router.use(authenticate)
 
-// Ray-casting point-in-polygon on a GeoJSON ring ([lng, lat] pairs).
-function pointInRing(lng, lat, ring) {
-  let inside = false
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i], [xj, yj] = ring[j]
-    if ((yi > lat) !== (yj > lat) && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside
-  }
-  return inside
-}
-
-// A purok's representative point: center of its drawn boundary, else its
-// geocoded lat/lng, else null.
-function purokPoint(boundaryStr, lat, lng) {
-  if (boundaryStr) {
-    try {
-      const g = JSON.parse(boundaryStr)
-      const ring = g?.type === 'Polygon' ? g.coordinates?.[0] : g?.type === 'MultiPolygon' ? g.coordinates?.[0]?.[0] : null
-      if (ring && ring.length > 2) {
-        const pts = ring.slice(0, -1)
-        return { lng: pts.reduce((s, p) => s + p[0], 0) / pts.length, lat: pts.reduce((s, p) => s + p[1], 0) / pts.length }
-      }
-    } catch { /* fall through */ }
-  }
-  if (lat != null && lng != null) return { lat: Number(lat), lng: Number(lng) }
-  return null
-}
-
-// True if the household's purok point is inside the barangay's drawn hazard area.
-// No drawn area = the whole barangay carries its classification (true).
-// A household without coordinates can't be checked, so it keeps the
-// barangay/purok-level result (true).
-function insideHazardArea(h, areaStr) {
-  if (!areaStr) return true
-  const lat = parseFloat(h.latitude), lng = parseFloat(h.longitude)
-  if (isNaN(lat) || isNaN(lng)) return true
-  try {
-    const area = JSON.parse(areaStr)
-    if (area?.type !== 'Polygon' || !area.coordinates?.[0]) return true
-    return pointInRing(lng, lat, area.coordinates[0])
-  } catch { return true }
-}
 
 // GET /api/households — includes geofencing flag (in_flood_risk_zone)
 router.get('/', async (req, res) => {
@@ -67,63 +26,9 @@ router.get('/', async (req, res) => {
     if (search)      { sql += ' AND (h.head_family LIKE ? OR h.household_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
     if (at_risk === '1') { sql += " AND p.flood_risk = 'High'" }
     const rows = await all(sql, params)
-
-    // Real-time at-risk status, in priority order:
-    //  1. A manually-reported citywide flood level (CDRRMO typed a number) —
-    //     applies everywhere, compared against each purok's own threshold.
-    //  2. Auto-detect's per-barangay list — only barangays where local rain
-    //     actually crossed PAGASA Red AND river discharge is elevated get
-    //     treated as a 1m flood event; every other barangay is unaffected by
-    //     auto-detect even while it's active elsewhere in the city.
-    //  3. Otherwise, fall back to the static CDRA susceptibility classification.
-    await expireStaleFloodData()
-    const [levelRow, sourceRow, autoRow] = await Promise.all([
-      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
-      get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
-      get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
-    ])
-    const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
-    // A flood level reported by CDRRMO on Flood Simulation Control is REAL,
-    // not a drill — the system is used 24/7, so a reported level applies to
-    // every page (Dashboard, GIS Map, Flood Control) right away. Priority:
-    //  1. CDRRMO-reported level (> 0 m) — citywide, vs. each purok's threshold
-    //  2. Live auto-detect (real rain + river discharge) — flagged barangays
-    //  3. Otherwise the official CDRA classification.
-    const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
-    let autoBarangayIds = []
-    try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
-
-    // A barangay CDRRMO classified as LOW flood susceptibility (Barangays
-    // page) is never high flood risk — whether or not a flood level is
-    // reported — so its household pins follow what the map shows (tan, not
-    // violet). Otherwise the purok-level rules below decide.
-    //
-    // Actual geofence: if CDRRMO drew a hazard area for the barangay
-    // (Barangays page), only that shape is violet on the map and the rest of
-    // the barangay is Low — so a household outside the drawn area is never
-    // flagged. The helper fields are stripped from the response.
-    //
-    // Households are no longer pinned individually (residents can't be
-    // expected to know their exact coordinates), so the geofence point is
-    // the household's PUROK: the center of its drawn boundary, or its
-    // geocoded location. purok_lat / purok_lng are returned so maps can
-    // place a household at its purok.
-    const withRisk = rows.map(({ barangay_flood_area, barangay_landslide_area, purok_point_lat, purok_point_lng, purok_boundary, latitude, longitude, ...raw }) => {
-      const pt = purokPoint(purok_boundary, purok_point_lat, purok_point_lng)
-      const h = { ...raw, purok_lat: pt?.lat ?? null, purok_lng: pt?.lng ?? null }
-      const loc = { latitude: h.purok_lat, longitude: h.purok_lng }
-      return {
-      ...h,
-      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && insideHazardArea(loc, barangay_flood_area) && (manualActive
-        ? floodLevel >= h.flood_threshold_m
-        : autoBarangayIds.includes(h.barangay_id)
-          ? 1 >= h.flood_threshold_m
-          : h.purok_flood_risk === 'High'),
-      // Landslide has no continuous measured value like flood depth — it
-      // always uses the static official CDRA classification.
-      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && insideHazardArea(loc, barangay_landslide_area),
-      }
-    })
+    // Geofencing (at-risk flags) — shared with the Dashboard summary so both
+    // always agree. See utils/householdRisk.js.
+    const withRisk = withHouseholdRisk(rows, await loadRiskContext())
     res.json(withRisk)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
