@@ -7,7 +7,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 // Philippine mobile number: 11 digits starting with 09, and not a dummy
 // like 09999999999 / 09000000000 (same digit repeated).
 const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
-import { SkeletonStatCards, SkeletonTableRows } from '../components/Skeleton'
+import { SkeletonNumber, SkeletonTableRows } from '../components/Skeleton'
 
 const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
 
@@ -114,31 +114,14 @@ export default function ResidentManagement({ currentUser }) {
     return acc
   }, {})
 
-  if (loading) return (
-    <div className="space-y-4">
-      <SkeletonStatCards count={5} />
-      <div className="card p-4 flex gap-3 items-center justify-between">
-        <div className="h-9 bg-gray-100 rounded flex-1 max-w-xs animate-pulse" />
-        <div className="h-9 w-36 bg-gray-100 rounded animate-pulse" />
-      </div>
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Res. ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
-          </thead>
-          <tbody><SkeletonTableRows columns={canAdd ? 9 : 10} rows={5} /></tbody>
-        </table>
-      </div>
-    </div>
-  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="card p-4 text-center"><p className="text-2xl font-bold text-gray-800">{residents.length}</p><p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
+        <div className="card p-4 text-center">{loading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-gray-800 animate-fade-in">{residents.length}</p>}<p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
         {['Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].map(b => (
-          <div key={b} className="card p-4 text-center"><p className="text-2xl font-bold text-primary-700">{ageBracketCounts[b] || 0}</p><p className="text-xs text-gray-500 mt-1">{b}</p></div>
+          <div key={b} className="card p-4 text-center">{loading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-primary-700 animate-fade-in">{ageBracketCounts[b] || 0}</p>}<p className="text-xs text-gray-500 mt-1">{b}</p></div>
         ))}
       </div>
 
@@ -158,7 +141,8 @@ export default function ResidentManagement({ currentUser }) {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>{['Res. ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
+              {loading ? <SkeletonTableRows columns={10} actions={canAdd} /> : (<>
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
@@ -182,6 +166,7 @@ export default function ResidentManagement({ currentUser }) {
                 </tr>
               ))}
               {filtered.length === 0 && <tr><td colSpan={10} className="table-cell text-center text-gray-400 py-6">No residents found.</td></tr>}
+              </>)}
             </tbody>
           </table>
         </div>

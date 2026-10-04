@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane 
 import L from 'leaflet'
 import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft } from 'lucide-react'
 import { prepareSessionHandoff } from '../utils/storage'
+import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { apiGet, apiPut } from '../utils/api'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -264,7 +265,6 @@ export default function FloodSimulationControl() {
     apiGet(`/residents?household_id=${h.id}`).then(setResidents).catch(() => {}).finally(() => setResidentsLoading(false))
   }
 
-  if (loading) return <div className="card p-10 text-center text-gray-400">Loading…</div>
 
   return (
     // Both URLs are full pages without the app's sidebar/header:
@@ -335,7 +335,8 @@ export default function FloodSimulationControl() {
               <input className="input text-sm mb-3" placeholder="Search barangay…" value={search} onChange={e => setSearch(e.target.value)} autoFocus />
             )}
             <div className="space-y-0.5 max-h-64 overflow-y-auto">
-              {filteredBarangays.map(b => (
+              {loading && <SkeletonList rows={8} />}
+              {!loading && filteredBarangays.map(b => (
                 <button
                   key={b.id} onClick={() => setSelectedBarangay(b)}
                   className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between ${
@@ -346,7 +347,7 @@ export default function FloodSimulationControl() {
                   {b[susceptKey] === 'High' && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
                 </button>
               ))}
-              {filteredBarangays.length === 0 && <p className="text-xs text-gray-400 py-2">No barangays found.</p>}
+              {!loading && filteredBarangays.length === 0 && <p className="text-xs text-gray-400 py-2">No barangays found.</p>}
             </div>
           </div>
 
@@ -479,7 +480,9 @@ export default function FloodSimulationControl() {
         </div>
 
         <div className={`flood-map-container ${isDisplayMode ? 'h-full flex-1' : 'h-[70vh] lg:h-auto lg:flex-1'} rounded-xl overflow-hidden shadow-sm border border-gray-200 lg:order-1`}>
-          <MapContainer center={CENTER} zoom={12} className="w-full h-full">
+          {/* While loading: a shimmer block exactly where the map goes. */}
+          {loading ? <SkeletonBlock className="w-full h-full rounded-none" /> : (
+          <MapContainer center={CENTER} zoom={12} className="w-full h-full animate-fade-in">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <MapResizeHandler />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
@@ -589,6 +592,7 @@ export default function FloodSimulationControl() {
               </Marker>
             ))}
           </MapContainer>
+          )}
         </div>
       </div>
     </div>

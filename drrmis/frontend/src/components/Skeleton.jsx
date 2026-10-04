@@ -1,53 +1,59 @@
-// Reusable skeleton-loading building blocks. Used in place of plain
-// "Loading…" text across the app so pages show a preview of their own
-// layout (gray pulsing blocks) while data is being fetched.
+// Reusable skeleton-loading building blocks.
+//
+// Pages render their REAL layout (headers, search bar, buttons, cards) while
+// loading and swap only the data parts for these placeholders — so the
+// skeleton is always the same shape as what appears, and nothing jumps when
+// the data arrives. The placeholders use a soft shimmer (see .skeleton in
+// index.css) and loaded content fades in (.animate-fade-in).
 
-// Base building block — a single pulsing gray bar/box. Compose these to
-// match whatever shape a specific page needs.
+// Base building block — one shimmering gray bar/box.
 export function Skeleton({ className = '' }) {
-  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  return <div className={`skeleton rounded ${className}`} />
 }
 
-// A full table's worth of skeleton rows, matching the app's standard
-// table-cell spacing. `columns` controls how many cells per row.
-export function SkeletonTableRows({ columns = 5, rows = 5 }) {
+// Varied widths so rows look like real text, not identical stripes.
+const CELL_WIDTHS = ['w-20', 'w-28', 'w-24', 'w-16', 'w-32', 'w-20', 'w-24', 'w-14', 'w-28', 'w-20', 'w-16']
+
+// Table rows matching the app's table-cell spacing, row for row: each
+// placeholder sits in a 20px line (same as text-sm), so rows have the same
+// height as real ones.
+export function SkeletonTableRows({ columns = 5, rows = 6, actions = false }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, r) => (
-        <tr key={r} className="border-t border-gray-100">
-          {Array.from({ length: columns }).map((_, c) => (
-            <td key={c} className="table-cell">
-              <Skeleton className={`h-4 ${c === 0 ? 'w-20' : 'w-full max-w-32'}`} />
-            </td>
-          ))}
+        <tr key={r}>
+          {Array.from({ length: columns }).map((_, c) => {
+            const isActions = actions && c === columns - 1
+            return (
+              <td key={c} className="table-cell">
+                <div className="h-5 flex items-center gap-2">
+                  {isActions
+                    ? <><Skeleton className="h-4 w-4" /><Skeleton className="h-4 w-4" /></>
+                    : <Skeleton className={`h-3.5 ${CELL_WIDTHS[(c + r) % CELL_WIDTHS.length]} max-w-full`} />}
+                </div>
+              </td>
+            )
+          })}
         </tr>
       ))}
     </>
   )
 }
 
-// A row of summary/stat cards, matching the "card p-4 text-center" pattern
-// used on the Dashboard and Resident Management pages.
-export function SkeletonStatCards({ count = 4 }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="card p-4 text-center">
-          <Skeleton className="h-5 w-5 mx-auto mb-2 rounded-full" />
-          <Skeleton className="h-7 w-12 mx-auto mb-2" />
-          <Skeleton className="h-3 w-20 mx-auto" />
-        </div>
-      ))}
-    </div>
-  )
+// Placeholder for a big number inside a stat card (same height as text-2xl).
+export function SkeletonNumber({ className = 'w-10' }) {
+  return <div className="h-8 flex items-center justify-center"><Skeleton className={`h-6 ${className}`} /></div>
 }
 
-// A vertical list of skeleton rows — for sidebar lists (e.g. barangay names).
+// A vertical list of rows — for sidebar lists (e.g. barangay names).
+// Each row has the same height as a real list button (px-2 py-1.5 text-sm).
 export function SkeletonList({ rows = 6 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-0.5">
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-5 w-full" />
+        <div key={i} className="px-2 py-1.5 h-8 flex items-center">
+          <Skeleton className={`h-3.5 ${['w-32', 'w-24', 'w-28', 'w-36', 'w-20'][i % 5]}`} />
+        </div>
       ))}
     </div>
   )
@@ -55,5 +61,5 @@ export function SkeletonList({ rows = 6 }) {
 
 // A rectangular placeholder for map/chart areas.
 export function SkeletonBlock({ className = 'h-64 w-full' }) {
-  return <Skeleton className={className} />
+  return <Skeleton className={`rounded-xl ${className}`} />
 }

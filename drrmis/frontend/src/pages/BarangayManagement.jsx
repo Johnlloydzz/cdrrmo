@@ -108,19 +108,6 @@ export default function BarangayManagement() {
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
-  if (loading) return (
-    <div className="space-y-4">
-      <div className="card p-4"><div className="h-9 bg-gray-100 rounded max-w-xs animate-pulse" /></div>
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['Barangay','Population','Flood Susceptibility (CDRA)','Landslide Susceptibility (CDRA)','Boundary','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
-          </thead>
-          <tbody><SkeletonTableRows columns={6} rows={6} /></tbody>
-        </table>
-      </div>
-    </div>
-  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
@@ -138,7 +125,8 @@ export default function BarangayManagement() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>{['Barangay','Captain','Contact','Population (live)','Flood Susceptibility (CDRA)','Landslide Susceptibility (CDRA)','Boundary','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
+              {loading ? <SkeletonTableRows columns={8} actions={true} /> : (<>
               {filtered.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium"><span className="flex items-center gap-1.5"><Building2 size={13} className="text-primary-500" />{b.name}</span></td>
@@ -157,6 +145,7 @@ export default function BarangayManagement() {
                 </tr>
               ))}
               {filtered.length === 0 && <tr><td colSpan={8} className="table-cell text-center text-gray-400 py-6">No barangays found.</td></tr>}
+              </>)}
             </tbody>
           </table>
         </div>

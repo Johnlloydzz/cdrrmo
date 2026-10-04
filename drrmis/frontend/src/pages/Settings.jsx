@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Save, Database, Phone } from 'lucide-react'
+import { Skeleton } from '../components/Skeleton'
+
+// Same height as an .input box, so nothing shifts when the value loads.
+const InputSkeleton = () => <Skeleton className="h-[38px] w-full rounded-lg" />
 import { apiGet, apiPut } from '../utils/api'
 
 export default function Settings({ currentUser }) {
@@ -19,6 +23,7 @@ export default function Settings({ currentUser }) {
   const [barangaySaving, setBarangaySaving] = useState(false)
   const [barangaySaved, setBarangaySaved] = useState(false)
   const [barangayError, setBarangayError] = useState('')
+  const [brgyLoading, setBrgyLoading] = useState(isBarangayOfficial && !!currentUser?.barangay_id)
 
   useEffect(() => {
     apiGet('/settings/system-info').then(setSystem).catch(err => setError(err.message)).finally(() => setLoading(false))
@@ -26,6 +31,7 @@ export default function Settings({ currentUser }) {
       apiGet(`/barangays/${currentUser.barangay_id}`)
         .then(b => setMyBarangay({ captain_name: b.captain_name || '', contact_number: b.contact_number || '' }))
         .catch(() => {})
+        .finally(() => setBrgyLoading(false))
     }
   }, [])
 
@@ -57,19 +63,6 @@ export default function Settings({ currentUser }) {
     }
   }
 
-  if (loading) return (
-    <div className="max-w-3xl">
-      <div className="card p-6 space-y-4">
-        <div className="h-5 w-40 bg-gray-100 rounded animate-pulse" />
-        <div className="h-9 bg-gray-100 rounded animate-pulse" />
-        <div className="grid grid-cols-2 gap-4">
-          <div className="h-9 bg-gray-100 rounded animate-pulse" />
-          <div className="h-9 bg-gray-100 rounded animate-pulse" />
-        </div>
-      </div>
-    </div>
-  )
-
   return (
     <div className="max-w-3xl space-y-4">
       {isBarangayOfficial && (
@@ -85,11 +78,11 @@ export default function Settings({ currentUser }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Captain Name</label>
-              <input className="input" value={myBarangay.captain_name} onChange={e => setMyBarangay({ ...myBarangay, captain_name: e.target.value })} placeholder="e.g. Juan Dela Cruz" />
+              {brgyLoading ? <InputSkeleton /> : <input className="input" value={myBarangay.captain_name} onChange={e => setMyBarangay({ ...myBarangay, captain_name: e.target.value })} placeholder="e.g. Juan Dela Cruz" />}
             </div>
             <div>
               <label className="label">Emergency Contact Number</label>
-              <input className="input" type="tel" value={myBarangay.contact_number} onChange={e => setMyBarangay({ ...myBarangay, contact_number: e.target.value })} placeholder="09XXXXXXXXX" />
+              {brgyLoading ? <InputSkeleton /> : <input className="input" type="tel" value={myBarangay.contact_number} onChange={e => setMyBarangay({ ...myBarangay, contact_number: e.target.value })} placeholder="09XXXXXXXXX" />}
             </div>
           </div>
           <div className="flex justify-end mt-5">
@@ -110,19 +103,19 @@ export default function Settings({ currentUser }) {
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="label">System Name</label>
-            <input className="input" value={system.name} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, name: e.target.value })} />
+            {loading ? <InputSkeleton /> : <input className="input" value={system.name} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, name: e.target.value })} />}
           </div>
           <div>
             <label className="label">Address</label>
-            <input className="input" value={system.address} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, address: e.target.value })} />
+            {loading ? <InputSkeleton /> : <input className="input" value={system.address} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, address: e.target.value })} />}
           </div>
           <div>
             <label className="label">Contact Number</label>
-            <input className="input" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value })} />
+            {loading ? <InputSkeleton /> : <input className="input" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value })} />}
           </div>
           <div className="col-span-2">
             <label className="label">Email</label>
-            <input className="input" type="email" value={system.email} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, email: e.target.value })} />
+            {loading ? <InputSkeleton /> : <input className="input" type="email" value={system.email} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, email: e.target.value })} />}
           </div>
         </div>
       </div>

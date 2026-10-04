@@ -90,22 +90,6 @@ export default function HouseholdManagement({ currentUser }) {
     } catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
-  if (loading) return (
-    <div className="space-y-4">
-      <div className="card p-4 flex gap-3 items-center justify-between">
-        <div className="h-9 bg-gray-100 rounded flex-1 max-w-xs animate-pulse" />
-        {canAdd && <div className="h-9 w-40 bg-gray-100 rounded animate-pulse" />}
-      </div>
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Members'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
-          </thead>
-          <tbody><SkeletonTableRows columns={canAdd ? 5 : 6} rows={5} /></tbody>
-        </table>
-      </div>
-    </div>
-  )
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
@@ -126,7 +110,8 @@ export default function HouseholdManagement({ currentUser }) {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Members', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
+              {loading ? <SkeletonTableRows columns={5} actions={canAdd} /> : (<>
               {filtered.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{h.household_id}</td>
@@ -148,6 +133,7 @@ export default function HouseholdManagement({ currentUser }) {
                 </tr>
               ))}
               {filtered.length === 0 && <tr><td colSpan={6} className="table-cell text-center text-gray-400 py-6">No households found.</td></tr>}
+              </>)}
             </tbody>
           </table>
         </div>

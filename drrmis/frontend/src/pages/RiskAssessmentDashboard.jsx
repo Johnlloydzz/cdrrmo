@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane 
 import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves } from 'lucide-react'
 import { apiGet } from '../utils/api'
-import { Skeleton, SkeletonList, SkeletonBlock } from '../components/Skeleton'
+import { Skeleton, SkeletonBlock } from '../components/Skeleton'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -262,20 +262,15 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     apiGet(`/residents?household_id=${h.id}`).then(setResidents).catch(() => {}).finally(() => setResidentsLoading(false))
   }
 
+  // Loading: the page's real layout (title, card labels, search box) with
+  // shimmer placeholders only where data goes — same sizes as the loaded page.
   if (loading) return (
     <div className="h-full flex flex-col gap-3 overflow-hidden">
       <div className="flex-shrink-0">
-        <div className="h-5 w-64 bg-gray-100 rounded animate-pulse mb-2" />
-        <div className="h-3.5 w-96 max-w-full bg-gray-100 rounded animate-pulse" />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-shrink-0">
-        {[0, 1, 2].map(i => (
-          <div key={i} className="card p-4 text-center">
-            <Skeleton className="h-5 w-5 mx-auto mb-2 rounded-full" />
-            <Skeleton className="h-7 w-12 mx-auto mb-2" />
-            <Skeleton className="h-3 w-32 mx-auto" />
-          </div>
-        ))}
+        <h1 className="text-lg font-semibold text-gray-800">Risk Assessment Dashboard</h1>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Projected households and population within high flood-risk zones, based on CDRA-aligned purok classification (geofencing).
+        </p>
       </div>
       {wakingUp && (
         <div className="card p-3 text-center text-xs text-gray-400 flex items-center justify-center gap-2 flex-shrink-0">
@@ -283,10 +278,35 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           Waking up the server… (up to a minute after a period of inactivity)
         </div>
       )}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
+        {[
+          [Waves, 'text-blue-500', 'Barangays in Risk Zone'],
+          [AlertTriangle, 'text-red-500', 'Total Households in High-Risk Zones'],
+          [AlertTriangle, 'text-red-500', 'Population in High-Risk Zones'],
+        ].map(([Icon, color, label]) => (
+          <div key={label} className="card p-3 text-center">
+            <Icon size={18} className={`mx-auto mb-1 ${color}`} />
+            <div className="h-7 flex items-center justify-center"><Skeleton className="h-5 w-12" /></div>
+            <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
       <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0">
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 order-2 lg:order-2">
-          <div className="card p-3"><div className="h-9 bg-gray-100 rounded animate-pulse" /></div>
-          <div className="card p-3"><SkeletonList rows={7} /></div>
+          <div className="card p-3">
+            <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Search size={13} /> Search</h3>
+            <input className="input text-sm py-1.5" placeholder="Search barangay…" disabled />
+          </div>
+          <div className="card p-3">
+            <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Building2 size={13} /> Barangays</h3>
+            <div className="space-y-0.5 max-h-52 overflow-hidden">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="px-2 py-1.5 h-8 flex items-center">
+                  <Skeleton className={`h-3.5 ${['w-32', 'w-24', 'w-28', 'w-36', 'w-20'][i % 5]}`} />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="lg:flex-1 rounded-xl overflow-hidden order-1 lg:order-1">
           <SkeletonBlock className="h-[50vh] lg:h-full w-full" />
@@ -297,7 +317,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
-    <div className="h-full flex flex-col gap-3 overflow-hidden">
+    <div className="h-full flex flex-col gap-3 overflow-hidden animate-fade-in">
       <div className="flex-shrink-0">
         <h1 className="text-lg font-semibold text-gray-800">Risk Assessment Dashboard</h1>
         <p className="text-xs text-gray-500 mt-0.5">
