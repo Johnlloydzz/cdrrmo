@@ -472,8 +472,12 @@ export default function FloodSimulationControl() {
               const level = b[susceptKey] || 'Low'
               const color = colorMap[level] || colorMap.Low
               const areaStr = isFlood ? b.flood_area_geojson : b.landslide_area_geojson
+              // `hazard` is part of the key: react-leaflet's <GeoJSON> never
+              // replaces its shape after mounting (only colors update), so
+              // without it switching Flood ⇄ Landslide kept the OTHER
+              // hazard's adjusted area on screen.
               return (
-                <React.Fragment key={`${b.id}-${b.updated_at}`}>
+                <React.Fragment key={`${hazard}-${b.id}-${b.updated_at}`}>
                   <GeoJSON
                     data={areaStr ? withHole(geo, areaStr) : geo}
                     pathOptions={{ color: '#555', weight: 0.5, fillColor: areaStr ? colorMap.Low : color, fillOpacity: 0.55 }}
@@ -488,7 +492,7 @@ export default function FloodSimulationControl() {
               let area
               try { area = JSON.parse(areaStr) } catch { return null }
               return (
-                <GeoJSON key={`f-area-${b.id}-${b.updated_at}`} data={area}
+                <GeoJSON key={`f-area-${hazard}-${b.id}-${b.updated_at}`} data={area}
                   pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip></GeoJSON>
               )
