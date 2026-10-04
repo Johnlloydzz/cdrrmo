@@ -307,6 +307,15 @@ export default function FloodSimulationControl() {
         >
           <Mountain size={isDisplayMode ? 13 : 16} /> Landslide
         </button>
+        {/* Big-screen display has no header, so its way back lives here. */}
+        {isDisplayMode && (
+          <Link
+            to="/flood-control"
+            className="ml-auto flex items-center gap-1.5 rounded-lg font-medium border px-3 py-1.5 text-xs bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+          >
+            <ArrowLeft size={13} /> Back
+          </Link>
+        )}
       </div>
 
       {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
