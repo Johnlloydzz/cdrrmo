@@ -1,9 +1,9 @@
 import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
-import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2 } from 'lucide-react'
+import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft } from 'lucide-react'
 import { prepareSessionHandoff } from '../utils/storage'
 import { apiGet, apiPut } from '../utils/api'
 
@@ -267,10 +267,17 @@ export default function FloodSimulationControl() {
   if (loading) return <div className="card p-10 text-center text-gray-400">Loading…</div>
 
   return (
-    <div className={isDisplayMode ? 'h-screen w-full overflow-hidden flex flex-col p-3 gap-2' : 'space-y-4'}>
+    // Both URLs are full pages without the app's sidebar/header:
+    // /flood-control keeps the side panel; /flood-control/display is map only.
+    <div className={isDisplayMode
+      ? 'h-screen w-full overflow-hidden flex flex-col p-3 gap-2'
+      : 'min-h-screen lg:h-screen w-full lg:overflow-hidden flex flex-col p-4 gap-3 bg-gray-50'}>
       {!isDisplayMode && (
       <div className="flex items-start justify-between gap-3 flex-wrap flex-shrink-0">
         <div>
+          <Link to="/" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 mb-1">
+            <ArrowLeft size={13} /> Back to system
+          </Link>
           <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
             {isFlood ? <Waves size={20} className="text-blue-500" /> : <Mountain size={20} className="text-amber-600" />}
             Flood & Landslide Simulation Control
@@ -303,7 +310,7 @@ export default function FloodSimulationControl() {
       </div>
 
       {/* Map — same layout as Hazard Map & Geofencing: sidebar list + map */}
-      <div className={`flex flex-col lg:flex-row gap-4 ${isDisplayMode ? 'flex-1 min-h-0' : 'lg:h-[520px]'}`}>
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Side panel (Barangays list, Flood Level Controls) — hidden on the
             big-screen display, which shows only the map. Hidden with CSS
             rather than removed, so its background checks keep running. */}

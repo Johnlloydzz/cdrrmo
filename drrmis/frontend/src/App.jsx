@@ -112,6 +112,18 @@ function App() {
         <Route path="/request-password-reset" element={<RequestPasswordReset />} />
         <Route path="/request-account" element={<RequestAccount />} />
 
+        {/* Flood Simulation Control — its own full page, WITHOUT the app's
+            sidebar/header (CDRRMO only; a "Back to system" link returns to
+            the main app). */}
+        <Route
+          path="/flood-control"
+          element={
+            currentUser
+              ? <Protected currentUser={currentUser}><FloodSimulationControl /></Protected>
+              : <Navigate to="/login" replace />
+          }
+        />
+
         {/* Fullscreen "big screen" display mode for the Flood Simulation
             Control — same page, same login/role requirement, but rendered
             without the sidebar/header for wall-mounted monitors. */}
@@ -150,7 +162,6 @@ function App() {
 
           {/* Web-Based Hazard Mapping + Geofencing Module */}
           <Route path="map" element={<G><GISMap /></G>} />
-          <Route path="flood-control" element={<G><FloodSimulationControl /></G>} />
 
           {/* User Management Module — CDRRMO Personnel only */}
           <Route path="users"    element={<G><UserManagement currentUser={currentUser} /></G>} />
