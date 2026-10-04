@@ -1,38 +1,67 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Shield, ArrowLeft } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import { apiGet, apiPost } from '../../utils/api'
 import DropdownSelect from '../../components/DropdownSelect'
+import AuthCard, { FieldLabel, FieldError, SubmitButton, SuccessPanel } from '../../components/AuthCard'
 
 // Philippine mobile number: 11 digits starting with 09, and not a dummy
 // like 09999999999 / 09000000000 (same digit repeated).
 const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
+const isEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
 const emptyForm = { name: '', email: '', contact: '', barangay_id: '', position: '', message: '' }
 
+// Field-by-field checks, so each problem shows under its own field.
+function validate(f) {
+  const e = {}
+  if (!f.name.trim()) e.name = 'Enter your full name.'
+  if (!f.email.trim()) e.email = 'Enter your email address.'
+  else if (!isEmail(f.email.trim())) e.email = 'Enter a valid email, e.g. juan@gmail.com.'
+  if (!f.contact) e.contact = 'Enter your mobile number.'
+  else if (!/^0(9|$)/.test(f.contact)) e.contact = 'Must be a Philippine mobile number starting with 09.'
+  else if (f.contact.length !== 11) e.contact = `Must be exactly 11 digits (${f.contact.length}/11).`
+  else if (!isPhMobile(f.contact)) e.contact = 'Enter a real mobile number.'
+  if (!f.barangay_id) e.barangay_id = 'Pick your barangay.'
+  return e
+}
+
 export default function RequestAccount() {
   const [barangays, setBarangays] = useState([])
+  const [loadingBarangays, setLoadingBarangays] = useState(true)
   const [form, setForm] = useState(emptyForm)
+  const [errors, setErrors] = useState({})
+  const [touched, setTouched] = useState(false) // show field errors after the first Submit
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const formRef = useRef(null)
 
-  useEffect(() => { apiGet('/account-requests/barangays').then(setBarangays).catch(() => {}) }, [])
+  useEffect(() => {
+    apiGet('/account-requests/barangays').then(setBarangays).catch(() => {}).finally(() => setLoadingBarangays(false))
+  }, [])
+
+  // After the first Submit, errors update live as the user fixes each field.
+  const set = (key, value) => {
+    const next = { ...form, [key]: value }
+    setForm(next)
+    if (touched) setErrors(validate(next))
+    if (error) setError('')
+  }
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!form.name.trim() || !form.email.trim() || !form.contact || !form.barangay_id) {
-      setError('Name, email, contact number, and barangay are required.')
-      return
-    }
-    if (!isPhMobile(form.contact)) {
-      setError('Enter a valid Philippine mobile number: 11 digits starting with 09 (e.g. 09123456789).')
+    const errs = validate(form)
+    setErrors(errs)
+    setTouched(true)
+    if (Object.keys(errs).length) {
+      // Take the user straight to the first field that needs fixing.
+      const first = ['name', 'email', 'contact', 'barangay_id'].find(k => errs[k])
+      formRef.current?.querySelector(`[data-field="${first}"]`)?.focus()
       return
     }
     setError('')
     setLoading(true)
     try {
-      await apiPost('/account-requests', form)
+      await apiPost('/account-requests', { ...form, name: form.name.trim(), email: form.email.trim() })
       setDone(true)
     } catch (err) {
       setError(err.message)
@@ -41,90 +70,83 @@ export default function RequestAccount() {
     }
   }
 
+  const inputCls = (key) => `input py-2 text-sm ${errors[key] ? 'border-red-400 focus:ring-red-200' : ''}`
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center p-3">
-      <div className="w-full max-w-lg">
-        <div className="text-center mb-2">
-          <div className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white shadow-lg mb-1">
-            <Shield size={16} className="text-primary-700" />
-          </div>
-          <h1 className="text-sm font-bold text-white leading-tight">PDRA</h1>
-          <p className="text-blue-200 text-[10px]">Gingoog City CDRRMO</p>
-        </div>
+    <AuthCard maxWidth="max-w-lg">
+      {!done ? (
+        <>
+          <h1 className="text-lg font-semibold text-gray-900">Request an Account</h1>
+          <p className="text-sm text-gray-500 mt-0.5 mb-4">
+            For Barangay Officials only. Fill this out and CDRRMO will create your account for your barangay.
+          </p>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-5">
-          <Link to="/login" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 mb-2">
-            <ArrowLeft size={12} /> Back to Login
-          </Link>
-
-          {!done ? (
-            <>
-              <h2 className="text-base font-semibold mb-0.5">Request an Account</h2>
-              <p className="text-xs text-gray-500 mb-3">
-                For Barangay Officials only. Fill this out and CDRRMO will create your account for your barangay.
-              </p>
-
-              {error && (
-                <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">{error}</div>
-              )}
-
-              <form onSubmit={submit} className="space-y-2">
-                <div className="grid sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="label text-xs">Full Name</label>
-                    <input className="input py-1.5 text-sm" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Juan Dela Cruz" />
-                  </div>
-                  <div>
-                    <label className="label text-xs">Email Address</label>
-                    <input className="input py-1.5 text-sm" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
-                  </div>
-                  <div>
-                    <label className="label text-xs">Contact Number</label>
-                    <input className="input py-1.5 text-sm" type="tel" inputMode="numeric" maxLength={11} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="09XXXXXXXXX" />
-                    {form.contact && !/^09\d{9}$/.test(form.contact) && (
-                      <p className="text-xs text-amber-600 mt-1">{!/^0(9|$)/.test(form.contact) ? 'Must be a Philippine mobile number starting with 09.' : `Must be exactly 11 digits (${form.contact.length}/11).`}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="label text-xs">Barangay</label>
-                    <DropdownSelect
-                      className="input py-1.5 text-sm"
-                      value={form.barangay_id}
-                      placeholder="Select your barangay…"
-                      options={barangays.map(b => ({ value: b.id, label: b.name }))}
-                      onChange={v => setForm({ ...form, barangay_id: v })}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="label text-xs">Position (optional)</label>
-                    <input className="input py-1.5 text-sm" value={form.position} onChange={e => setForm({ ...form, position: e.target.value })} placeholder="e.g. Barangay Secretary" />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="label text-xs">Message (optional)</label>
-                    <textarea className="input py-1.5 text-sm" rows={1} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Anything CDRRMO should know…" />
-                  </div>
-                </div>
-                <button type="submit" disabled={loading} className="btn-primary w-full py-2 text-sm">
-                  {loading ? 'Submitting…' : 'Submit Request'}
-                </button>
-              </form>
-            </>
-          ) : (
-            <div className="text-center py-3">
-              <div className="w-11 h-11 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-base font-semibold mb-1">Request Sent!</h2>
-              <p className="text-xs text-gray-500 mb-3">
-                CDRRMO will review your request and reach out to <strong>{form.email}</strong> once your account is ready.
-              </p>
-              <Link to="/login" className="btn-primary inline-block text-sm py-1.5 px-4">Back to Login</Link>
-            </div>
+          {error && (
+            <div role="alert" className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 animate-slide-down-in">{error}</div>
           )}
-        </div>
-      </div>
-    </div>
+
+          <form ref={formRef} onSubmit={submit} className="space-y-3" noValidate>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <FieldLabel htmlFor="ra-name" required>Full Name</FieldLabel>
+                <input id="ra-name" data-field="name" className={inputCls('name')} value={form.name}
+                  onChange={e => set('name', e.target.value)} placeholder="Juan Dela Cruz"
+                  autoComplete="name" aria-invalid={!!errors.name} aria-describedby="ra-name-err" />
+                <FieldError id="ra-name-err">{errors.name}</FieldError>
+              </div>
+              <div>
+                <FieldLabel htmlFor="ra-email" required>Email Address</FieldLabel>
+                <input id="ra-email" data-field="email" className={inputCls('email')} type="email" value={form.email}
+                  onChange={e => set('email', e.target.value)} placeholder="you@example.com"
+                  autoComplete="email" inputMode="email" aria-invalid={!!errors.email} aria-describedby="ra-email-err" />
+                <FieldError id="ra-email-err">{errors.email}</FieldError>
+              </div>
+              <div>
+                <FieldLabel htmlFor="ra-contact" required hint={form.contact ? `${form.contact.length}/11` : ''}>Contact Number</FieldLabel>
+                <input id="ra-contact" data-field="contact" className={inputCls('contact')} type="tel" inputMode="numeric" maxLength={11}
+                  value={form.contact} onChange={e => set('contact', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  placeholder="09XXXXXXXXX" autoComplete="tel" aria-invalid={!!errors.contact} aria-describedby="ra-contact-err" />
+                <FieldError id="ra-contact-err">{errors.contact}</FieldError>
+              </div>
+              <div>
+                <FieldLabel required>Barangay</FieldLabel>
+                <div data-field="barangay_id" tabIndex={-1} className="rounded-lg focus:outline-none">
+                  <DropdownSelect
+                    className={inputCls('barangay_id')}
+                    value={form.barangay_id}
+                    placeholder={loadingBarangays ? 'Loading barangays…' : 'Select your barangay…'}
+                    options={barangays.map(b => ({ value: b.id, label: b.name }))}
+                    onChange={v => set('barangay_id', v)}
+                  />
+                </div>
+                <FieldError>{errors.barangay_id}</FieldError>
+              </div>
+              <div className="sm:col-span-2">
+                <FieldLabel htmlFor="ra-position" hint="Optional">Position</FieldLabel>
+                <input id="ra-position" className="input py-2 text-sm" value={form.position}
+                  onChange={e => set('position', e.target.value)} placeholder="e.g. Barangay Secretary" autoComplete="organization-title" />
+              </div>
+              <div className="sm:col-span-2">
+                <FieldLabel htmlFor="ra-message" hint="Optional">Message</FieldLabel>
+                <textarea id="ra-message" className="input py-2 text-sm resize-y min-h-[60px]" rows={2} value={form.message}
+                  onChange={e => set('message', e.target.value)} placeholder="Anything CDRRMO should know…" />
+              </div>
+            </div>
+            <SubmitButton loading={loading} loadingText="Submitting…">Submit Request</SubmitButton>
+          </form>
+        </>
+      ) : (
+        <SuccessPanel
+          title="Request sent"
+          steps={[
+            'CDRRMO reviews your request.',
+            'Once approved, your account is created for your barangay.',
+            `CDRRMO sends your login details to ${form.email}.`,
+          ]}
+        >
+          Thanks, {form.name.split(' ')[0] || 'there'}. Here's what happens next:
+        </SuccessPanel>
+      )}
+    </AuthCard>
   )
 }
