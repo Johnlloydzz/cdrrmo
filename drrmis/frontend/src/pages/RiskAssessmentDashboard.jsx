@@ -6,7 +6,7 @@ import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown, ArrowLeft } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { Skeleton, SkeletonBlock, SkeletonList } from '../components/Skeleton'
-import { purokInHazardArea } from '../utils/geofence'
+import { purokInHazardArea, effectiveThreshold } from '../utils/geofence'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -403,11 +403,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             <p className="text-xs text-red-700">
               {floodLevel > 0 ? (
                 <>
-                  <strong>LIVE flood alert — reported water level: {floodLevel} m</strong> (reported by CDRRMO, applied citywide) — puroks with a flood threshold at or below {floodLevel} m are flagged at-risk.
+                  <strong>LIVE flood alert — reported water level: {floodLevel} m</strong> (reported by CDRRMO, applied citywide) — {floodLevel >= 1 ? 'all puroks in flood-prone areas are flagged at-risk (1 m or higher).' : `puroks with a flood threshold of ${floodLevel} m or lower are flagged at-risk.`}
                 </>
               ) : (
                 <>
-                  <strong>LIVE flood alert</strong> (real-time rainfall + river data) — puroks with a flood threshold of 1 m or lower are flagged at-risk:
+                  <strong>LIVE flood alert</strong> (real-time rainfall + river data, treated as 1 m) — all puroks in flood-prone areas of these barangays are flagged at-risk:
                   {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => (
                     <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'flooding detected'}</span>
                   ))}
@@ -586,7 +586,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       const puroks = selectedBarangay.puroks || []
                       // A barangay classified LOW flood susceptibility has no at-risk puroks.
                       const lowBarangay = (selectedBarangay.flood_susceptibility || 'Low') === 'Low'
-                      const atRisk = lowBarangay ? 0 : puroks.filter(p => purokInHazardArea(p, selectedBarangay.flood_area_geojson) && (floodLevel > 0 ? floodLevel >= p.flood_threshold_m : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= p.flood_threshold_m : p.flood_risk === 'High')).length
+                      const atRisk = lowBarangay ? 0 : puroks.filter(p => purokInHazardArea(p, selectedBarangay.flood_area_geojson) && (floodLevel > 0 ? floodLevel >= effectiveThreshold(p.flood_threshold_m) : autoFloodedIds.includes(selectedBarangay.id) ? 1 >= effectiveThreshold(p.flood_threshold_m) : p.flood_risk === 'High')).length
                       return `${atRisk} / ${puroks.length}`
                     })()}
                   </p>
@@ -727,7 +727,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 // ...and only puroks inside the barangay's drawn flood area
                 // (the violet shape) can be at risk.
                 const outsideArea = !purokInHazardArea(p, selectedBarangay.flood_area_geojson)
-                const atRisk = !lowBarangay && !outsideArea && activeLevel > 0 && activeLevel >= p.flood_threshold_m
+                const atRisk = !lowBarangay && !outsideArea && activeLevel > 0 && activeLevel >= effectiveThreshold(p.flood_threshold_m)
                 return (
                   <GeoJSON
                     key={`purok-${p.id}`}

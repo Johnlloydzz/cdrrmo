@@ -11,6 +11,14 @@ function pointInRing(lng, lat, ring) {
   return inside
 }
 
+// Water at 1 m or more floods every purok in a flood-prone area; a purok's
+// own threshold only matters below 1 m. Same rule as the backend.
+export const RED_LEVEL_M = 1
+export function effectiveThreshold(t) {
+  const n = Number(t)
+  return Math.min(isNaN(n) || n <= 0 ? RED_LEVEL_M : n, RED_LEVEL_M)
+}
+
 // A purok's representative point: center of its drawn boundary, else its
 // geocoded lat/lng, else null.
 export function purokPoint(p) {

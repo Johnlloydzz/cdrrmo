@@ -48,6 +48,16 @@ function insideHazardArea(h, areaStr) {
   } catch { return true }
 }
 
+// Water at 1 m or more floods EVERY purok in a flood-prone area (red). A
+// purok's own threshold only matters below that — e.g. a low-lying purok set
+// to 0.5 m is already flooded at 0.5 m. So the effective threshold is the
+// purok's threshold, capped at 1 m.
+const RED_LEVEL_M = 1
+function effectiveThreshold(t) {
+  const n = Number(t)
+  return Math.min(isNaN(n) || n <= 0 ? RED_LEVEL_M : n, RED_LEVEL_M)
+}
+
 // Current flood situation, in priority order:
 //  1. A flood level reported by CDRRMO (Flood Simulation Control) — real,
 //     citywide, compared with each purok's own flood threshold.
@@ -88,9 +98,9 @@ function withHouseholdRisk(rows, ctx) {
     return {
       ...h,
       in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && insideHazardArea(loc, barangay_flood_area) && (manualActive
-        ? floodLevel >= h.flood_threshold_m
+        ? floodLevel >= effectiveThreshold(h.flood_threshold_m)
         : autoBarangayIds.includes(h.barangay_id)
-          ? 1 >= h.flood_threshold_m
+          ? RED_LEVEL_M >= effectiveThreshold(h.flood_threshold_m)
           : h.purok_flood_risk === 'High'),
       // Landslide has no measured value like flood depth — always the static
       // official CDRA classification.
@@ -106,4 +116,4 @@ const RISK_COLUMNS = `b.flood_susceptibility as barangay_flood_susceptibility, b
   p.landslide_risk as purok_landslide_risk, p.latitude as purok_point_lat, p.longitude as purok_point_lng,
   p.boundary_geojson as purok_boundary`
 
-module.exports = { loadRiskContext, withHouseholdRisk, RISK_COLUMNS, purokPoint, insideHazardArea }
+module.exports = { loadRiskContext, withHouseholdRisk, RISK_COLUMNS, purokPoint, insideHazardArea, effectiveThreshold, RED_LEVEL_M }
