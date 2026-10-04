@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin } from 'lucide-react'
 import { apiPost } from '../../utils/api'
@@ -14,6 +14,32 @@ const HAZARDS = [
   { icon: CloudRain, label: 'STORM', bg: 'bg-teal-600' },
   { icon: AlertTriangle, label: 'EMERGENCY', bg: 'bg-red-600' },
 ]
+
+// Optimized logo: small WebP (~35 KB, preloaded in index.html) with the
+// original PNG as a fallback. Fixed width/height reserve its space so the
+// page never shifts, and it fades in smoothly once decoded instead of
+// popping in. Looks exactly the same as a plain <img>.
+function Logo({ alt, className, size }) {
+  const img = useRef(null)
+  const [loaded, setLoaded] = useState(false)
+  // Already in the browser cache → no fade needed.
+  useEffect(() => { if (img.current?.complete) setLoaded(true) }, [])
+  return (
+    <picture>
+      <source srcSet="/cdrrmo-logo-256.webp" type="image/webp" />
+      <img
+        ref={img}
+        src="/cdrrmo-logo.png"
+        alt={alt}
+        width={size}
+        height={size}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        className={`${className} transition-opacity duration-500 ease-out ${loaded ? 'opacity-100' : 'opacity-0'}`}
+      />
+    </picture>
+  )
+}
 
 export default function Login({ onLogin }) {
   // After logging out:
@@ -128,8 +154,8 @@ export default function Login({ onLogin }) {
           <path d="M0 220 L0 180 L120 140 L210 180 L300 130 L390 180 L480 140 L570 180 L660 150 L800 180 L800 220 Z" fill="#0a1836" opacity="0.85" />
         </svg>
 
-        <div className="relative z-10 flex flex-col items-center">
-          <img src="/cdrrmo-logo.png" alt="Gingoog City CDRRMO" className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg mb-6" />
+        <div className="relative z-10 flex flex-col items-center animate-login-rise">
+          <Logo alt="Gingoog City CDRRMO" size={112} className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg mb-6" />
 
           <h1 className="text-white text-xl md:text-2xl font-bold leading-snug max-w-sm">
             PDRA — Pre-Disaster Risk Assessment for Gingoog City
@@ -160,16 +186,16 @@ export default function Login({ onLogin }) {
 
       {/* Right — sign-in card */}
       <div className="flex-1 bg-gray-50 flex items-center justify-center p-4 py-10">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm animate-login-rise-late">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="flex flex-col items-center text-center">
-              <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-16 h-16 object-contain mb-3" />
+              <Logo alt="CDRRMO" size={64} className="w-16 h-16 object-contain mb-3" />
               <h2 className="text-xl font-bold text-gray-900">Sign In</h2>
               <p className="text-sm text-gray-400 mt-1">Continue to your account.</p>
             </div>
 
             {sessionExpired && !error && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2 animate-slide-down-in">
                 <span className="text-amber-500">⏱</span> Your session expired. Please sign in again.
               </div>
             )}
@@ -179,7 +205,7 @@ export default function Login({ onLogin }) {
                   <div>
                     <label className="label">Username</label>
                     <div className="relative">
-                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors" />
                       <input
                         name="username"
                         value={form.username}
@@ -194,7 +220,7 @@ export default function Login({ onLogin }) {
                   <div>
                     <label className="label">Password</label>
                     <div className="relative">
-                      <Lock size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${error ? 'text-red-400' : 'text-gray-400'}`} />
+                      <Lock size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${error ? 'text-red-400' : 'text-gray-400'}`} />
                       <input
                         name="password"
                         type={showPw ? 'text' : 'password'}
@@ -210,13 +236,13 @@ export default function Login({ onLogin }) {
                       <button
                         type="button"
                         onClick={() => setShowPw(!showPw)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                       >
                         {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
                     {error && (
-                      <p className="text-sm text-red-600 mt-2 flex items-center gap-1.5">
+                      <p className="text-sm text-red-600 mt-2 flex items-center gap-1.5 animate-slide-down-in">
                         <span className="text-red-500">⚠</span> {error}
                       </p>
                     )}
@@ -237,7 +263,7 @@ export default function Login({ onLogin }) {
                       />
                       <span className="text-sm text-gray-600">Remember me</span>
                     </label>
-                    <Link to="/request-password-reset" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                    <Link to="/request-password-reset" className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">
                       Forgot password?
                     </Link>
                   </div>
@@ -255,7 +281,7 @@ export default function Login({ onLogin }) {
                 <div className="border-t border-gray-100 mt-6 pt-4 text-center">
                   <p className="text-sm text-gray-500">
                     Don't have an account?{' '}
-                    <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800">
+                    <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800 transition-colors">
                       Request one
                     </Link>
                   </p>
