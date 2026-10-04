@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin, Clock } from 'lucide-react'
+import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin } from 'lucide-react'
 import { apiPost } from '../../utils/api'
 import CookieConsent, { preferencesAllowed } from '../../components/CookieConsent'
 import { setStoredToken } from '../../utils/storage'
@@ -9,22 +9,11 @@ const REMEMBERED_USERNAME_KEY = 'pdra_remembered_username' // last username (alw
 const REMEMBER_ME_KEY = 'pdra_remember_me'                   // '1' if Remember me was checked
 
 const HAZARDS = [
-  { icon: Waves, label: 'Flood', bg: 'bg-sky-500' },
-  { icon: Mountain, label: 'Landslide', bg: 'bg-amber-700' },
-  { icon: CloudRain, label: 'Storm', bg: 'bg-teal-600' },
-  { icon: AlertTriangle, label: 'Emergency', bg: 'bg-red-600' },
+  { icon: Waves, label: 'FLOOD', bg: 'bg-sky-500' },
+  { icon: Mountain, label: 'LANDSLIDE', bg: 'bg-amber-700' },
+  { icon: CloudRain, label: 'STORM', bg: 'bg-teal-600' },
+  { icon: AlertTriangle, label: 'EMERGENCY', bg: 'bg-red-600' },
 ]
-
-// Sharp, small logo (WebP, ~35 KB) with the original PNG as a fallback.
-// Fixed width/height so nothing shifts while it loads.
-function Logo({ className }) {
-  return (
-    <picture>
-      <source srcSet="/cdrrmo-logo-256.webp" type="image/webp" />
-      <img src="/cdrrmo-logo.png" alt="Gingoog City CDRRMO" width="112" height="112" decoding="async" className={className} />
-    </picture>
-  )
-}
 
 export default function Login({ onLogin }) {
   // After logging out:
@@ -50,7 +39,6 @@ export default function Login({ onLogin }) {
   // (the browser may still offer its suggestions then — the user's choice).
   const [pwEditable, setPwEditable] = useState(rememberedBefore)
   const [showPw, setShowPw] = useState(false)
-  const [capsOn, setCapsOn] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
@@ -126,11 +114,12 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
-      {/* Left — branding panel (compact on phones so the form is in view) */}
-      <div className="relative md:w-[46%] md:min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 overflow-hidden flex flex-col items-center justify-center px-8 pt-10 pb-14 md:py-12 text-center">
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Left — branding panel */}
+      <div className="relative md:w-[46%] min-h-[280px] md:min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 overflow-hidden flex flex-col items-center justify-center px-8 py-12 text-center">
+        {/* Ambient mountain/city silhouette */}
         <svg
-          className="absolute bottom-0 left-0 w-full h-24 md:h-56 opacity-90 pointer-events-none"
+          className="absolute bottom-0 left-0 w-full h-40 md:h-56 opacity-90"
           viewBox="0 0 800 220"
           preserveAspectRatio="none"
           aria-hidden="true"
@@ -139,155 +128,146 @@ export default function Login({ onLogin }) {
           <path d="M0 220 L0 180 L120 140 L210 180 L300 130 L390 180 L480 140 L570 180 L660 150 L800 180 L800 220 Z" fill="#0a1836" opacity="0.85" />
         </svg>
 
-        <div className="relative z-10 flex flex-col items-center animate-login-rise">
-          <Logo className="w-16 h-16 md:w-28 md:h-28 object-contain drop-shadow-lg mb-4 md:mb-6" />
+        <div className="relative z-10 flex flex-col items-center">
+          <img src="/cdrrmo-logo.png" alt="Gingoog City CDRRMO" className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg mb-6" />
 
-          <h1 className="text-white text-lg md:text-2xl font-bold leading-snug max-w-sm [text-wrap:balance]">
+          <h1 className="text-white text-xl md:text-2xl font-bold leading-snug max-w-sm">
             PDRA — Pre-Disaster Risk Assessment for Gingoog City
           </h1>
 
-          <p className="hidden sm:block text-blue-200 text-sm mt-5 max-w-xs leading-relaxed">
+          <p className="text-blue-200 text-sm mt-6 max-w-xs leading-relaxed">
             <span className="font-semibold text-white">Assessing Risk. Protecting Lives.</span><br />
             A centralized platform for identifying at-risk households and assessing disaster risk before it happens in Gingoog City.
           </p>
 
-          <ul className="hidden sm:flex items-start gap-5 mt-8" aria-label="Hazards covered">
+          <div className="flex items-center gap-4 mt-8">
             {HAZARDS.map(({ icon: Icon, label, bg }) => (
-              <li key={label} className="flex flex-col items-center gap-1.5 w-16">
-                <span className={`w-11 h-11 rounded-full ${bg} flex items-center justify-center shadow-md ring-4 ring-white/5`}>
-                  <Icon size={18} className="text-white" aria-hidden="true" />
-                </span>
-                <span className="text-[11px] font-medium text-blue-100">{label}</span>
-              </li>
+              <div key={label} className="flex flex-col items-center gap-1.5">
+                <div className={`w-11 h-11 rounded-full ${bg} flex items-center justify-center shadow-md`}>
+                  <Icon size={18} className="text-white" />
+                </div>
+                <span className="text-[10px] font-semibold tracking-wide text-blue-100">{label}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
 
-        <div className="relative z-10 hidden md:flex items-center gap-1 text-blue-300 text-xs mt-10">
-          <MapPin size={12} aria-hidden="true" />
+        <div className="relative z-10 flex items-center gap-1 text-blue-300 text-xs mt-10">
+          <MapPin size={12} />
           Gingoog City, Misamis Oriental, Philippines
         </div>
       </div>
 
       {/* Right — sign-in card */}
-      <main className="flex-1 flex items-start md:items-center justify-center px-4 -mt-8 md:mt-0 pb-28 md:py-10">
-        <div className="w-full max-w-sm animate-login-rise-late">
-          <div className="bg-white rounded-2xl shadow-xl shadow-blue-950/5 border border-gray-100 p-7 sm:p-8">
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-gray-900">Sign in</h2>
-              <p className="text-sm text-gray-500 mt-1">Use the account given to you by CDRRMO.</p>
+      <div className="flex-1 bg-gray-50 flex items-center justify-center p-4 py-10">
+        <div className="w-full max-w-sm">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+            <div className="flex flex-col items-center text-center">
+              <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-16 h-16 object-contain mb-3" />
+              <h2 className="text-xl font-bold text-gray-900">Sign In</h2>
+              <p className="text-sm text-gray-400 mt-1">Continue to your account.</p>
             </div>
 
             {sessionExpired && !error && (
-              <div role="status" className="mt-5 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2 animate-slide-down-in">
-                <Clock size={15} className="text-amber-500 flex-shrink-0" aria-hidden="true" /> Your session expired. Please sign in again.
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-center gap-2">
+                <span className="text-amber-500">⏱</span> Your session expired. Please sign in again.
               </div>
             )}
 
-            <form onSubmit={submit} className="space-y-5 mt-6" noValidate>
-              <div>
-                <label htmlFor="login-username" className="label">Username</label>
-                <div className="relative group">
-                  <User size={16} aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-primary-600" />
-                  <input
-                    id="login-username"
-                    name="username"
-                    value={form.username}
-                    onChange={handle}
-                    className="input pl-9 py-2.5"
-                    placeholder="Enter your username"
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
+            <>
+                <form onSubmit={submit} className="space-y-5 mt-6">
+                  <div>
+                    <label className="label">Username</label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        name="username"
+                        value={form.username}
+                        onChange={handle}
+                        className="input pl-9"
+                        placeholder="Enter your username"
+                        autoComplete="username"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <label htmlFor="login-password" className="label">Password</label>
-                <div className="relative group">
-                  <Lock size={16} aria-hidden="true" className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${error ? 'text-red-400' : 'text-gray-400 group-focus-within:text-primary-600'}`} />
-                  <input
-                    id="login-password"
-                    name="password"
-                    type={showPw ? 'text' : 'password'}
-                    value={form.password}
-                    onChange={handle}
-                    onKeyUp={e => setCapsOn(e.getModifierState?.('CapsLock') || false)}
-                    onBlur={() => setCapsOn(false)}
-                    className={`input pl-9 pr-10 py-2.5 ${error ? 'border-red-400 focus:ring-red-200' : ''}`}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    autoFocus={!!form.username && rememberedBefore}
-                    readOnly={!pwEditable}
-                    onFocus={() => setPwEditable(true)}
-                    aria-invalid={!!error}
-                    aria-describedby={error ? 'login-error' : undefined}
-                  />
+                  <div>
+                    <label className="label">Password</label>
+                    <div className="relative">
+                      <Lock size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${error ? 'text-red-400' : 'text-gray-400'}`} />
+                      <input
+                        name="password"
+                        type={showPw ? 'text' : 'password'}
+                        value={form.password}
+                        onChange={handle}
+                        className={`input pl-9 pr-10 ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-200' : ''}`}
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        autoFocus={!!form.username && rememberedBefore}
+                        readOnly={!pwEditable}
+                        onFocus={() => setPwEditable(true)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPw(!showPw)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {error && (
+                      <p className="text-sm text-red-600 mt-2 flex items-center gap-1.5">
+                        <span className="text-red-500">⚠</span> {error}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <label
+                      className={`flex items-center gap-2 ${prefsOk ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      title={prefsOk ? '' : 'Turned off — you chose "Essential only" cookies.'}
+                    >
+                      <input
+                        type="checkbox"
+                        name="remember"
+                        checked={prefsOk && form.remember}
+                        onChange={handle}
+                        disabled={!prefsOk}
+                        className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-600">Remember me</span>
+                    </label>
+                    <Link to="/request-password-reset" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                      Forgot password?
+                    </Link>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => setShowPw(!showPw)}
-                    aria-label={showPw ? 'Hide password' : 'Show password'}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary w-full flex items-center justify-center gap-2"
                   >
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    {loading ? 'Signing in…' : 'Sign in'}
                   </button>
-                </div>
-                {capsOn && (
-                  <p className="text-xs text-amber-700 mt-1.5 animate-slide-down-in">Caps Lock is on.</p>
-                )}
-                {error && (
-                  <p id="login-error" role="alert" className="text-sm text-red-600 mt-2 flex items-center gap-1.5 animate-slide-down-in">
-                    <AlertTriangle size={14} className="flex-shrink-0" aria-hidden="true" /> {error}
+                </form>
+
+                <div className="border-t border-gray-100 mt-6 pt-4 text-center">
+                  <p className="text-sm text-gray-500">
+                    Don't have an account?{' '}
+                    <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800">
+                      Request one
+                    </Link>
                   </p>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label
-                  className={`flex items-center gap-2 select-none ${prefsOk ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
-                  title={prefsOk ? '' : 'Turned off because cookies were declined.'}
-                >
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    checked={prefsOk && form.remember}
-                    onChange={handle}
-                    disabled={!prefsOk}
-                    className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-600">Remember me</span>
-                </label>
-                <Link to="/request-password-reset" className="text-sm text-primary-600 hover:text-primary-700 font-medium rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  Forgot password?
-                </Link>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary w-full py-2.5 flex items-center justify-center gap-2 shadow-sm shadow-primary-600/20 transition-all active:scale-[0.99] disabled:opacity-80 disabled:cursor-wait"
-              >
-                {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
-                {loading ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-
-            <div className="border-t border-gray-100 mt-6 pt-4 text-center">
-              <p className="text-sm text-gray-500">
-                Don't have an account?{' '}
-                <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  Request one
-                </Link>
-              </p>
-            </div>
+                </div>
+              </>
           </div>
 
           <p className="text-center text-gray-400 text-xs mt-6">
             © {new Date().getFullYear()} Gingoog City CDRRMO. All rights reserved.
           </p>
         </div>
-      </main>
+      </div>
 
       <CookieConsent onChange={(value) => {
         const ok = value !== 'essential'
