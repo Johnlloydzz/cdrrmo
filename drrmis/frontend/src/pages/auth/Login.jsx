@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin } from 'lucide-react'
 import { apiPost } from '../../utils/api'
+import CookieConsent, { preferencesAllowed } from '../../components/CookieConsent'
 import { setStoredToken } from '../../utils/storage'
 
 const REMEMBERED_USERNAME_KEY = 'pdra_remembered_username' // last username (always kept)
@@ -20,12 +21,17 @@ export default function Login({ onLogin }) {
   //  - the PASSWORD is filled in (by the browser's own password manager) only
   //    if Remember me was checked last time — otherwise it stays blank.
   // The app itself never stores the password.
+  // Preference storage (username, Remember me) only with cookie consent.
+  const [prefsOk, setPrefsOk] = useState(preferencesAllowed)
   const [rememberedBefore] = useState(() => {
+    if (!preferencesAllowed()) return false
     try { return localStorage.getItem(REMEMBER_ME_KEY) === '1' } catch { return false }
   })
   const [form, setForm] = useState(() => {
     let saved = ''
-    try { saved = localStorage.getItem(REMEMBERED_USERNAME_KEY) || '' } catch { /* storage blocked */ }
+    if (preferencesAllowed()) {
+      try { saved = localStorage.getItem(REMEMBERED_USERNAME_KEY) || '' } catch { /* storage blocked */ }
+    }
     return { username: saved, password: '', remember: rememberedBefore }
   })
   // Without Remember me, the password box starts read-only so the browser
@@ -69,17 +75,22 @@ export default function Login({ onLogin }) {
       const data = await apiPost('/auth/login', {
         username,
         password,
-        remember: form.remember,
+        remember: prefsOk && form.remember,
       })
       try {
-        localStorage.setItem(REMEMBERED_USERNAME_KEY, username)
-        if (form.remember) localStorage.setItem(REMEMBER_ME_KEY, '1')
-        else localStorage.removeItem(REMEMBER_ME_KEY)
+        if (prefsOk) {
+          localStorage.setItem(REMEMBERED_USERNAME_KEY, username)
+          if (form.remember) localStorage.setItem(REMEMBER_ME_KEY, '1')
+          else localStorage.removeItem(REMEMBER_ME_KEY)
+        } else {
+          localStorage.removeItem(REMEMBERED_USERNAME_KEY)
+          localStorage.removeItem(REMEMBER_ME_KEY)
+        }
       } catch { /* storage blocked */ }
       // Remember me → ask the browser to save this login in ITS password
       // manager (Chrome shows "Save password?"). The app itself never stores
       // the password. Not awaited, so signing in isn't delayed.
-      if (form.remember && window.PasswordCredential && navigator.credentials?.store) {
+      if (prefsOk && form.remember && window.PasswordCredential && navigator.credentials?.store) {
         try {
           navigator.credentials.store(new window.PasswordCredential({
             id: username,
@@ -88,7 +99,7 @@ export default function Login({ onLogin }) {
           })).catch(() => {})
         } catch { /* not supported */ }
       }
-      setStoredToken(data.token, form.remember)
+      setStoredToken(data.token, prefsOk && form.remember)
       onLogin(data.user, form.remember)
     } catch (err) {
       // The backend intentionally returns a generic "Invalid credentials."
@@ -212,12 +223,16 @@ export default function Login({ onLogin }) {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label
+                      className={`flex items-center gap-2 ${prefsOk ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                      title={prefsOk ? '' : 'Turned off — you chose "Essential only" cookies.'}
+                    >
                       <input
                         type="checkbox"
                         name="remember"
-                        checked={form.remember}
+                        checked={prefsOk && form.remember}
                         onChange={handle}
+                        disabled={!prefsOk}
                         className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
                       />
                       <span className="text-sm text-gray-600">Remember me</span>
@@ -253,6 +268,19 @@ export default function Login({ onLogin }) {
           </p>
         </div>
       </div>
+
+      <CookieConsent onChange={(value) => {
+        const ok = value !== 'essential'
+        setPrefsOk(ok)
+        if (!ok) {
+          // Essential only: forget the saved username / Remember me choice.
+          try {
+            localStorage.removeItem(REMEMBERED_USERNAME_KEY)
+            localStorage.removeItem(REMEMBER_ME_KEY)
+          } catch { /* storage blocked */ }
+          setForm(f => ({ ...f, remember: false }))
+        }
+      }} />
     </div>
   )
 }
