@@ -6,7 +6,7 @@ import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown, ArrowLeft } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { Skeleton, SkeletonBlock, SkeletonList } from '../components/Skeleton'
-import { purokInHazardArea, effectiveThreshold } from '../utils/geofence'
+import { purokInHazardArea, effectiveThreshold, RED_LEVEL_M } from '../utils/geofence'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -403,11 +403,11 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             <p className="text-xs text-red-700">
               {floodLevel > 0 ? (
                 <>
-                  <strong>LIVE flood alert — reported water level: {floodLevel} m</strong> (reported by CDRRMO, applied citywide) — {floodLevel >= 1 ? 'all puroks in flood-prone areas are flagged at-risk (1 m or higher).' : `puroks with a flood threshold of ${floodLevel} m or lower are flagged at-risk.`}
+                  <strong>LIVE flood alert — reported water level: {floodLevel} m</strong> (reported by CDRRMO, applied citywide) — {floodLevel >= RED_LEVEL_M ? `all puroks in flood-prone areas are flagged at-risk (${RED_LEVEL_M} m or higher).` : `below ${RED_LEVEL_M} m — no purok is flagged at-risk yet.`}
                 </>
               ) : (
                 <>
-                  <strong>LIVE flood alert</strong> (real-time rainfall + river data, treated as 1 m) — all puroks in flood-prone areas of these barangays are flagged at-risk:
+                  <strong>LIVE flood alert</strong> (real-time rainfall + river data, treated as a 1 m flood) — all puroks in flood-prone areas of these barangays are flagged at-risk:
                   {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => (
                     <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'flooding detected'}</span>
                   ))}
