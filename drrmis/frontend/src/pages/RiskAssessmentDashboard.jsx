@@ -3,9 +3,9 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
 import L from 'leaflet'
-import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown } from 'lucide-react'
+import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown, ArrowLeft } from 'lucide-react'
 import { apiGet } from '../utils/api'
-import { Skeleton, SkeletonBlock } from '../components/Skeleton'
+import { Skeleton, SkeletonBlock, SkeletonList } from '../components/Skeleton'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -112,6 +112,15 @@ function FitToBoundary({ geojsonLayer }) {
   return null
 }
 
+// Age in years from a YYYY-MM-DD birthdate (null if unknown).
+function ageOf(birthdate) {
+  if (!birthdate) return null
+  const b = new Date(birthdate), t = new Date()
+  let a = t.getFullYear() - b.getFullYear()
+  if (t.getMonth() < b.getMonth() || (t.getMonth() === b.getMonth() && t.getDate() < b.getDate())) a--
+  return isNaN(a) ? null : a
+}
+
 export default function RiskAssessmentDashboard({ currentUser }) {
   const [summary, setSummary] = useState([])
   const [barangays, setBarangays] = useState([])
@@ -141,6 +150,30 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   // to see its at-risk households -> pick a household to see its family.
   const [showRiskBarangays, setShowRiskBarangays] = useState(false)
   const riskDropdownRef = useRef(null)
+  // Drill-down inside the dropdown: barangay -> its puroks -> households
+  // (head of family) -> members of THAT household only.
+  const [rzBarangay, setRzBarangay] = useState(null)
+  const [rzPurok, setRzPurok] = useState(null)
+  const [rzHousehold, setRzHousehold] = useState(null)
+  const [rzResidents, setRzResidents] = useState([])
+  const [rzResLoading, setRzResLoading] = useState(false)
+  const rzLevel = rzHousehold ? 'residents' : rzPurok ? 'households' : rzBarangay ? 'puroks' : 'barangays'
+  const rzBack = () => {
+    if (rzHousehold) { setRzHousehold(null); setRzResidents([]) }
+    else if (rzPurok) setRzPurok(null)
+    else setRzBarangay(null)
+  }
+  const openRzHousehold = (h) => {
+    setRzHousehold(h); setRzResidents([]); setRzResLoading(true)
+    apiGet(`/residents?household_id=${h.id}`)
+      .then(rows => setRzResidents(rows.filter(r => String(r.household_id) === String(h.id))))
+      .catch(() => {})
+      .finally(() => setRzResLoading(false))
+  }
+  // Start from the top again whenever the dropdown closes.
+  useEffect(() => {
+    if (!showRiskBarangays) { setRzBarangay(null); setRzPurok(null); setRzHousehold(null); setRzResidents([]) }
+  }, [showRiskBarangays])
   // Close the "Barangays in Risk Zone" dropdown on an outside click or Esc.
   useEffect(() => {
     if (!showRiskBarangays) return
@@ -189,6 +222,22 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const visibleHouseholds = currentUser?.role === 'Barangay Official'
     ? households.filter(h => h.barangay_name === currentUser.barangay)
     : households
+
+  // Drill-down data for the "Barangays in Risk Zone" dropdown — only at-risk
+  // households (the same geofence flag used everywhere on this page).
+  const rzBarangayObj = barangays.find(b => b.id === rzBarangay) || null
+  const rzAtRiskHouseholds = visibleHouseholds.filter(h => h.in_flood_risk_zone && h.barangay_id === rzBarangay)
+  const rzPuroks = Object.values(rzAtRiskHouseholds.reduce((acc, h) => {
+    const key = h.purok_id || 'none'
+    const g = acc[key] || (acc[key] = { id: key, name: h.purok_name || '—', households: 0, population: 0 })
+    g.households += 1
+    g.population += Number(h.member_count || 0)
+    return acc
+  }, {})).sort((a, b) => b.population - a.population || String(a.name).localeCompare(String(b.name)))
+  const rzPurokGroup = rzPuroks.find(g => g.id === rzPurok) || null
+  const rzPurokHouseholds = rzAtRiskHouseholds
+    .filter(h => (h.purok_id || 'none') === rzPurok)
+    .sort((a, b) => String(a.head_family).localeCompare(String(b.head_family)))
 
   const totals = visible.reduce((acc, s) => ({
     households: acc.households + (s.total_households || 0),
@@ -382,37 +431,92 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           </button>
           <div className={`absolute left-0 right-0 top-full mt-1 z-[1100] origin-top transition-all duration-150 ${showRiskBarangays ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-95 pointer-events-none'}`}>
             <div className="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-              <div className="px-4 py-2 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Barangays in Risk Zone ({barangaysInRiskZoneCount})
-              </div>
-              <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
-                {barangaysInRiskZoneCount === 0
+              {/* Header: title at the top level, or a back button + where you are */}
+              {rzLevel === 'barangays' ? (
+                <div className="px-4 py-2 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Barangays in Risk Zone ({barangaysInRiskZoneCount})
+                </div>
+              ) : (
+                <button type="button" onClick={rzBack} className="w-full px-3 py-2 border-b border-gray-100 flex items-center gap-2 text-left hover:bg-gray-50">
+                  <ArrowLeft size={14} className="text-gray-400 flex-shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-gray-800 text-sm truncate">
+                      {rzLevel === 'puroks' && rzBarangayObj?.name}
+                      {rzLevel === 'households' && `Purok ${rzPurokGroup?.name || ''}`}
+                      {rzLevel === 'residents' && `${rzHousehold?.household_id} · ${rzHousehold?.head_family}`}
+                    </span>
+                    <span className="block text-[11px] text-gray-400 truncate">
+                      {rzLevel === 'puroks' && 'At-risk puroks'}
+                      {rzLevel === 'households' && `${rzBarangayObj?.name} · at-risk households`}
+                      {rzLevel === 'residents' && `Purok ${rzHousehold?.purok_name || ''} · members of this household`}
+                    </span>
+                  </span>
+                  {rzLevel === 'puroks' && <AlertTriangle size={15} className="text-red-500 flex-shrink-0 ml-auto" />}
+                </button>
+              )}
+
+              <div key={rzLevel + (rzBarangay || '') + (rzPurok || '') + (rzHousehold?.id || '')} className="max-h-72 overflow-y-auto divide-y divide-gray-100 animate-fade-in">
+                {/* 1. Barangays */}
+                {rzLevel === 'barangays' && (barangaysInRiskZoneCount === 0
                   ? <p className="text-center text-gray-400 py-6 text-sm">No barangays currently in a risk zone.</p>
-                  : <>
-                {visible.filter(s => (s.at_risk_households || 0) > 0).map(s => {
-                  const b = barangays.find(bb => bb.id === s.barangay_id)
-                  return (
-                    <button
-                      key={s.barangay_id}
-                      type="button"
-                      onClick={() => {
-                        if (b) setSelectedBarangay(b)
-                        setFilterAtRiskOnly(true)
-                        setShowRiskBarangays(false)
-                        setShowHouseholds(true)
-                        setExpandedHousehold(null)
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left"
-                    >
-                      <span>
-                        <span className="block font-medium text-gray-800 text-sm">{s.barangay_name}</span>
-                        <span className="block text-xs text-gray-400">{s.at_risk_households} at-risk household{s.at_risk_households === 1 ? '' : 's'}</span>
-                      </span>
-                      <AlertTriangle size={15} className="text-red-500 flex-shrink-0" />
-                    </button>
-                  )
-                })}
-                  </>}
+                  : visible.filter(s => (s.at_risk_households || 0) > 0).map(s => {
+                      const b = barangays.find(bb => bb.id === s.barangay_id)
+                      return (
+                        <button key={s.barangay_id} type="button"
+                          onClick={() => { setRzBarangay(s.barangay_id); if (b) setSelectedBarangay(b) }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left">
+                          <span>
+                            <span className="block font-medium text-gray-800 text-sm">{s.barangay_name}</span>
+                            <span className="block text-xs text-gray-400">{s.at_risk_households} at-risk household{s.at_risk_households === 1 ? '' : 's'}</span>
+                          </span>
+                          <AlertTriangle size={15} className="text-red-500 flex-shrink-0" />
+                        </button>
+                      )
+                    }))}
+
+                {/* 2. Puroks of that barangay, with population */}
+                {rzLevel === 'puroks' && (rzPuroks.length === 0
+                  ? <p className="text-center text-gray-400 py-6 text-sm">No at-risk puroks.</p>
+                  : rzPuroks.map(g => (
+                      <button key={g.id} type="button" onClick={() => setRzPurok(g.id)}
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left">
+                        <span>
+                          <span className="block font-medium text-gray-800 text-sm">Purok {g.name}</span>
+                          <span className="block text-xs text-gray-400">{g.households} household{g.households === 1 ? '' : 's'}</span>
+                        </span>
+                        <span className="text-right flex-shrink-0">
+                          <span className="block text-sm font-bold text-red-600">{g.population}</span>
+                          <span className="block text-[10px] text-gray-400 uppercase">Population</span>
+                        </span>
+                      </button>
+                    )))}
+
+                {/* 3. Households (head of family) in that purok */}
+                {rzLevel === 'households' && rzPurokHouseholds.map(h => (
+                  <button key={h.id} type="button" onClick={() => openRzHousehold(h)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left">
+                    <span>
+                      <span className="block font-medium text-gray-800 text-sm">{h.head_family}</span>
+                      <span className="block text-xs text-gray-400 font-mono">{h.household_id}</span>
+                    </span>
+                    <span className="text-xs text-gray-500 flex-shrink-0">{h.member_count ?? 0} member{Number(h.member_count) === 1 ? '' : 's'}</span>
+                  </button>
+                ))}
+
+                {/* 4. Members of that ONE household only */}
+                {rzLevel === 'residents' && (rzResLoading
+                  ? <SkeletonList rows={3} />
+                  : rzResidents.length === 0
+                    ? <p className="text-center text-gray-400 py-6 text-sm">No members registered yet.</p>
+                    : rzResidents.map(r => (
+                        <div key={r.id} className="px-4 py-2.5 flex items-center justify-between">
+                          <span>
+                            <span className="block font-medium text-gray-800 text-sm">{r.name}</span>
+                            <span className="block text-xs text-gray-400">{r.relation_to_head || '—'}{r.sex ? ` · ${r.sex}` : ''}</span>
+                          </span>
+                          <span className="text-xs text-gray-500 flex-shrink-0">{ageOf(r.birthdate) ?? '—'} yrs</span>
+                        </div>
+                      )))}
               </div>
             </div>
           </div>
