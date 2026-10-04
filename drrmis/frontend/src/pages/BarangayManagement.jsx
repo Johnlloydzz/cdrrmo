@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import { Search, Pencil, Building2, Waves, Mountain, RotateCcw, Home } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
 import PolygonEditor, { geojsonToLatLngs, latLngsToGeojson, simplifyPoints } from '../components/editor'
-import { SkeletonTableRows } from '../components/Skeleton'
+import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 // Badge colors matched to the official MGB Landslide and Flood Susceptibility Map legend.
 // Landslide: brown (Very High) → red (High) → green (Moderate) → yellow (Low)
@@ -54,6 +54,8 @@ function initialArea(b, key) {
 export default function BarangayManagement() {
   const [barangays, setBarangays] = useState([])
   const [loading, setLoading] = useState(true)
+  // Skeleton shows as many rows as this user saw here last time.
+  const skeletonRows = useSkeletonRows('barangays', barangays.length, loading)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -127,7 +129,7 @@ export default function BarangayManagement() {
               <tr>{['Barangay','Captain','Contact','Population (live)','Flood Susceptibility (CDRA)','Landslide Susceptibility (CDRA)','Boundary','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={8} actions={true} /> : (<>
+              {loading ? <SkeletonTableRows columns={8} actions={true} rows={skeletonRows} /> : (<>
               {filtered.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium"><span className="flex items-center gap-1.5"><Building2 size={13} className="text-primary-500" />{b.name}</span></td>
@@ -150,7 +152,7 @@ export default function BarangayManagement() {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t text-xs text-gray-500">{filtered.length} of {barangays.length} barangays</div>
+        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <>{filtered.length} of {barangays.length} barangays</>}</div>
       </div>
 
       {showModal && createPortal(

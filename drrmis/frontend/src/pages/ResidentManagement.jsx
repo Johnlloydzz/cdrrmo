@@ -7,7 +7,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 // Philippine mobile number: 11 digits starting with 09, and not a dummy
 // like 09999999999 / 09000000000 (same digit repeated).
 const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
-import { SkeletonNumber, SkeletonTableRows } from '../components/Skeleton'
+import { Skeleton, SkeletonNumber, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 const emptyForm = { household_id: '', last_name: '', first_name: '', middle_name: '', birthdate: '', relation_to_head: '', sex: '', contact_number: '' }
 
@@ -39,6 +39,8 @@ export default function ResidentManagement({ currentUser }) {
   // The purok the resident lives in (saved) — also narrows the Household list below.
   const [purokFilter, setPurokFilter] = useState('')
   const [loading, setLoading] = useState(true)
+  // Skeleton shows as many rows as this user saw here last time.
+  const skeletonRows = useSkeletonRows('residents', residents.length, loading)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -142,7 +144,7 @@ export default function ResidentManagement({ currentUser }) {
               <tr>{['Res. ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={10} actions={canAdd} /> : (<>
+              {loading ? <SkeletonTableRows columns={10} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
@@ -170,7 +172,7 @@ export default function ResidentManagement({ currentUser }) {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t text-xs text-gray-500">{filtered.length} of {residents.length} residents</div>
+        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <>{filtered.length} of {residents.length} residents</>}</div>
       </div>
 
       {showModal && createPortal(

@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Search, Plus, Pencil, Trash2, MapPin, Undo2, RotateCcw } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
-import { SkeletonTableRows } from '../components/Skeleton'
+import { SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 const RISK = { High: 'badge-red', Medium: 'badge-orange', Low: 'badge-green' }
 const GINGOOG_CENTER = [8.8231, 125.1109]
@@ -114,6 +114,8 @@ export default function PurokManagement({ currentUser }) {
   const [barangays, setBarangays] = useState([])
   const [barangaysError, setBarangaysError] = useState('')
   const [loading, setLoading] = useState(true)
+  // Skeleton shows as many rows as this user saw here last time.
+  const skeletonRows = useSkeletonRows('puroks', puroks.length, loading)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -233,7 +235,7 @@ export default function PurokManagement({ currentUser }) {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Flood Risk','Flood Threshold (m)','Landslide Risk','Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={(isCdrrmo ? 6 : 5) + (canAdd ? 1 : 0)} actions={canAdd} /> : (<>
+              {loading ? <SkeletonTableRows columns={(isCdrrmo ? 6 : 5) + (canAdd ? 1 : 0)} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{p.name}</td>

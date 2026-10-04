@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
-import { SkeletonTableRows } from '../components/Skeleton'
+import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '' }
 
@@ -13,6 +13,8 @@ export default function HouseholdManagement({ currentUser }) {
   const [barangays, setBarangays] = useState([])
   const [puroks, setPuroks] = useState([])
   const [loading, setLoading] = useState(true)
+  // Skeleton shows as many rows as this user saw here last time.
+  const skeletonRows = useSkeletonRows('households', households.length, loading)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -111,7 +113,7 @@ export default function HouseholdManagement({ currentUser }) {
               <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Members', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={5} actions={canAdd} /> : (<>
+              {loading ? <SkeletonTableRows columns={5} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
                   <td className="table-cell font-mono text-primary-700">{h.household_id}</td>
@@ -137,7 +139,7 @@ export default function HouseholdManagement({ currentUser }) {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t text-xs text-gray-500">{filtered.length} of {households.length} households</div>
+        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <>{filtered.length} of {households.length} households</>}</div>
       </div>
 
       {showModal && createPortal(

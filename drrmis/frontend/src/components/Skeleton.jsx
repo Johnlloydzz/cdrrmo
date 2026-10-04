@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+import { getStoredUser } from '../utils/storage'
+
 // Reusable skeleton-loading building blocks.
 //
 // Pages render their REAL layout (headers, search bar, buttons, cards) while
@@ -12,7 +15,10 @@ export function Skeleton({ className = '' }) {
 }
 
 // Varied widths so rows look like real text, not identical stripes.
-const CELL_WIDTHS = ['w-20', 'w-28', 'w-24', 'w-16', 'w-32', 'w-20', 'w-24', 'w-14', 'w-28', 'w-20', 'w-16']
+// Kept short (40–96 px) so the placeholder rows are never wider than the
+// real data — a wider skeleton stretched the table and showed a sideways
+// scrollbar that disappeared once the rows loaded.
+const CELL_WIDTHS = ['w-14', 'w-20', 'w-16', 'w-10', 'w-24', 'w-12', 'w-16', 'w-10', 'w-20', 'w-14', 'w-12']
 
 // Table rows matching the app's table-cell spacing, row for row: each
 // placeholder sits in a 20px line (same as text-sm), so rows have the same
@@ -62,4 +68,29 @@ export function SkeletonList({ rows = 6 }) {
 // A rectangular placeholder for map/chart areas.
 export function SkeletonBlock({ className = 'h-64 w-full' }) {
   return <Skeleton className={`rounded-xl ${className}`} />
+}
+// How many placeholder rows to show: the number of rows this same user saw
+// on this page last time. So a barangay with 3 residents gets 3 skeleton
+// rows, one with 40 gets a full table, and CDRRMO gets as many as the city
+// list had. Remembered per user (per barangay for officials) on this
+// device; the first visit uses `fallback`. Capped at `max` because rows
+// below the screen aren't visible anyway.
+export function useSkeletonRows(page, count, loading, { fallback = 5, max = 12 } = {}) {
+  const key = (() => {
+    const u = getStoredUser()
+    return `pdra_skel_rows:${u?.id ?? 'anon'}:${u?.barangay_id ?? 'all'}:${page}`
+  })()
+  const [rows] = useState(() => {
+    try {
+      const n = parseInt(localStorage.getItem(key), 10)
+      return Number.isFinite(n) ? n : fallback
+    } catch { return fallback }
+  })
+  // Remember the real count once the data has loaded.
+  useEffect(() => {
+    if (loading) return
+    try { localStorage.setItem(key, String(count)) } catch { /* storage blocked */ }
+  }, [loading, count, key])
+  // An empty list still shows one row (where "No … found" will appear).
+  return Math.min(Math.max(rows, 1), max)
 }

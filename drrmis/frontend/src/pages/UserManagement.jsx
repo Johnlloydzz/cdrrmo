@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound, Copy } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
-import { SkeletonTableRows } from '../components/Skeleton'
+import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 const STATUS_BADGE = { Active: 'badge-green', Inactive: 'badge-gray', Suspended: 'badge-red' }
 const ROLES = ['CDRRMO Personnel', 'Barangay Official']
@@ -14,6 +14,8 @@ export default function UserManagement() {
   const [requests, setRequests] = useState([])
   const [pwRequests, setPwRequests] = useState([])
   const [loading, setLoading] = useState(true)
+  // Skeleton shows as many rows as this user saw here last time.
+  const skeletonRows = useSkeletonRows('users', users.length, loading)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -207,7 +209,7 @@ export default function UserManagement() {
               <tr>{['Name','Username','Email','Role','Barangay','Online','Status','Last Login','Actions'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={9} actions={true} /> : (<>
+              {loading ? <SkeletonTableRows columns={9} actions={true} rows={skeletonRows} /> : (<>
               {filtered.map(u => (
                 <tr key={u.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium"><span className="flex items-center gap-1.5"><UserCog size={13} className="text-primary-500" />{u.name}</span></td>
@@ -246,7 +248,7 @@ export default function UserManagement() {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">{filtered.length} of {users.length} accounts</div>
+        <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <>{filtered.length} of {users.length} accounts</>}</div>
       </div>
 
       {showModal && createPortal(
