@@ -24,8 +24,14 @@ function fetchWithTimeout(url, options, timeoutMs) {
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
+// Sign-in endpoint: never sends an old token, and a 401 from it always means
+// wrong username/password — never "session expired". (An old, expired token
+// can still be sitting in the browser when someone comes back after a long
+// time and mistypes their password.)
+const isLoginEndpoint = (endpoint) => endpoint.startsWith('/auth/login')
+
 async function request(endpoint, options = {}, { onColdStart } = {}) {
-  const token = getStoredToken()
+  const token = isLoginEndpoint(endpoint) ? null : getStoredToken()
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
