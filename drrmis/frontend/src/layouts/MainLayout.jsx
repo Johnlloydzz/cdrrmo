@@ -4,26 +4,7 @@ import Sidebar from '../components/Sidebar'
 import NotificationPanel, { useNotifications } from '../components/NotificationPanel'
 import ProfilePanel from '../components/ProfilePanel'
 import { Menu, Bell, ChevronDown } from 'lucide-react'
-import { Skeleton } from '../components/Skeleton'
 
-// Generic page placeholder while a page's code is downloading.
-function PageSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="card p-4"><Skeleton className="h-[38px] w-full rounded-lg" /></div>
-      <div className="card p-0 overflow-hidden">
-        <div className="bg-gray-50 border-b border-gray-200 px-4 py-3"><Skeleton className="h-3 w-1/2" /></div>
-        <div className="divide-y divide-gray-100">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="px-4 py-3 h-11 flex items-center gap-6">
-              <Skeleton className="h-3.5 w-20" /><Skeleton className="h-3.5 w-32" /><Skeleton className="h-3.5 w-24" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 const pageTitles = {
   '/': 'Dashboard',
@@ -147,10 +128,11 @@ export default function MainLayout({ onLogout, currentUser }) {
 
         {/* ── Page content ── */}
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {/* Opening a page for the first time downloads its code; meanwhile
-              the sidebar/header stay put and only this area shows a soft
-              placeholder (instead of the whole screen going blank). */}
-          <Suspense fallback={<PageSkeleton />}>
+          {/* Page code is preloaded right after sign-in (see App.jsx), so this
+              fallback is rarely seen. It's left empty on purpose: each page
+              shows its OWN skeleton, and a generic one here would flash first
+              and then be replaced — the "double loading" effect. */}
+          <Suspense fallback={null}>
             <Outlet />
           </Suspense>
         </main>

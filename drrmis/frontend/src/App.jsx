@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy, useMemo, useState, Component } from 'react'
+import { Suspense, lazy, useMemo, useState, useEffect, Component } from 'react'
 
 // After a new deploy, page files get new names (e.g. GISMap-5RWd.js), so a
 // tab that was already open before the deploy asks for old files that no
@@ -8,7 +8,9 @@ import { Suspense, lazy, useMemo, useState, Component } from 'react'
 // up the new version. The sessionStorage flag prevents an endless reload
 // loop if the failure is something else (e.g. no internet).
 const RELOAD_FLAG = 'pdra_chunk_reload'
+const pagePreloaders = []
 function lazyWithReload(factory) {
+  pagePreloaders.push(factory)
   return lazy(() => factory()
     .then(module => { sessionStorage.removeItem(RELOAD_FLAG); return module })
     .catch(err => {
@@ -71,6 +73,15 @@ const FloodSimulationControl  = lazyWithReload(() => import('./pages/FloodSimula
 const UserManagement          = lazyWithReload(() => import('./pages/UserManagement'))
 const Settings                = lazyWithReload(() => import('./pages/Settings'))
 
+// Download every page's code in the background right after sign-in, so
+// opening a page later is instant — no extra loading flash before the page's
+// own skeleton. Runs when the browser is idle so it never slows the first page.
+function preloadAllPages() {
+  const run = () => pagePreloaders.forEach(load => load().catch(() => {}))
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 3000 })
+  else setTimeout(run, 1500)
+}
+
 // Wraps a page element with RoleGuard so direct URL access is also blocked
 function Protected({ currentUser, children }) {
   return <RoleGuard currentUser={currentUser}>{children}</RoleGuard>
@@ -96,8 +107,20 @@ function App() {
     setCurrentUser(null)
   }
 
-  const G = ({ children }) => <Protected currentUser={currentUser}>{children}</Protected>
-  const routeFallback = useMemo(() => <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading...</div>, [])
+  useEffect(() => { if (currentUser) preloadAllPages() }, [currentUser])
+
+  // Memoized: a component defined fresh on every render would make React
+  // remount (and re-load) the whole page each time App re-renders.
+  const G = useMemo(() => function Guarded({ children }) {
+    return <Protected currentUser={currentUser}>{children}</Protected>
+  }, [currentUser])
+  // Shown only on the very first load of a full-screen page (login-less
+  // routes, Flood Simulation Control) — a small spinner, no text flash.
+  const routeFallback = useMemo(() => (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ), [])
 
   return (
     <BrowserRouter>
