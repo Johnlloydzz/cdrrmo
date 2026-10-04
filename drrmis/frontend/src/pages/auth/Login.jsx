@@ -28,6 +28,24 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false)
   const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
 
+  // If this browser has a saved password for this site (and Remember me was
+  // used), fill the form from it right away — so it's just "Sign in".
+  // Uses the browser's Credential Management API (Chrome, Edge); other
+  // browsers simply skip this and still autofill from their own manager.
+  useEffect(() => {
+    if (!window.PasswordCredential || !navigator.credentials?.get) return
+    let remembered = ''
+    try { remembered = localStorage.getItem(REMEMBERED_USERNAME_KEY) || '' } catch { /* storage blocked */ }
+    if (!remembered) return
+    navigator.credentials.get({ password: true, mediation: 'optional' })
+      .then(cred => {
+        if (cred && cred.type === 'password' && cred.password) {
+          setForm(f => ({ ...f, username: cred.id, password: cred.password, remember: true }))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     if (sessionExpired) {
       window.history.replaceState({}, '', window.location.pathname)
@@ -57,6 +75,18 @@ export default function Login({ onLogin }) {
         if (form.remember) localStorage.setItem(REMEMBERED_USERNAME_KEY, form.username)
         else localStorage.removeItem(REMEMBERED_USERNAME_KEY)
       } catch { /* storage blocked */ }
+      // Remember me → ask the browser to save this login in ITS password
+      // manager (Chrome shows "Save password?"). The app itself never stores
+      // the password. Not awaited, so signing in isn't delayed.
+      if (form.remember && window.PasswordCredential && navigator.credentials?.store) {
+        try {
+          navigator.credentials.store(new window.PasswordCredential({
+            id: form.username,
+            password: form.password,
+            name: data.user?.name || form.username,
+          })).catch(() => {})
+        } catch { /* not supported */ }
+      }
       setStoredToken(data.token, form.remember)
       onLogin(data.user, form.remember)
     } catch (err) {
