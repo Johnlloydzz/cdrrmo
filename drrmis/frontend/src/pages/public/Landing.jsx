@@ -283,7 +283,7 @@ export default function Landing() {
                 {[
                   'Click “Request an account”.',
                   'Fill in your name, email, mobile number and barangay.',
-                  'Submit — CDRRMO reviews it and contacts you with your login details.',
+                  'Submit — once CDRRMO approves it, your login details are emailed to you.',
                 ].map((t, i) => (
                   <li key={t} className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">{i + 1}</span>

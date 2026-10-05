@@ -1,7 +1,22 @@
+const { sendAccountEmail, isEmailConfigured } = require('../utils/mailer')
 const router = require('express').Router()
 const bcrypt = require('bcryptjs')
 const { all, get, run } = require('../db/database')
 const { authenticate, authorize } = require('../middleware/auth')
+
+// Sends the username + password to the user's email. Never throws: returns
+// { email_sent, email_error } for the User Management screen.
+async function emailLoginDetails(user, username, password, isReset) {
+  if (!user?.email) return { email_sent: false, email_error: 'This account has no email address.' }
+  if (!isEmailConfigured()) return { email_sent: false, email_error: 'Email is not set up on the server yet.' }
+  try {
+    await sendAccountEmail(user.email, user.name, username, password, { isReset })
+    return { email_sent: true }
+  } catch (err) {
+    console.error('Account email failed:', err.message)
+    return { email_sent: false, email_error: err.message }
+  }
+}
 
 router.use(authenticate)
 
@@ -38,7 +53,11 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
       [name, username, email, hash, role, barangay_id || null, status || 'Active']
     )
     const user = await get('SELECT id, name, username, email, role, barangay_id, status FROM users WHERE id = ?', [r.lastID])
-    res.status(201).json(user)
+    // Email the login details. The account is created either way; the
+    // response says whether the email went out so CDRRMO can relay the
+    // details by hand if it didn't.
+    const email_result = await emailLoginDetails(user, username, password, false)
+    res.status(201).json({ ...user, ...email_result })
   } catch (err) {
     if (err.message.includes('UNIQUE')) return res.status(400).json({ error: 'Username or email already exists' })
     res.status(500).json({ error: err.message })
@@ -60,7 +79,12 @@ router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
         [name, email, role, barangay_id, status, req.params.id]
       )
     }
-    res.json(await get('SELECT id, name, username, email, role, barangay_id, status FROM users WHERE id = ?', [req.params.id]))
+    const user = await get('SELECT id, name, username, email, role, barangay_id, status FROM users WHERE id = ?', [req.params.id])
+    // A new password was set → email it to the account holder.
+    const email_result = password && password.trim()
+      ? await emailLoginDetails(user, user.username, password, true)
+      : {}
+    res.json({ ...user, ...email_result })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound, Copy } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserCog, Inbox, Check, X, KeyRound, Copy, MailCheck, MailX } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
@@ -109,16 +109,18 @@ export default function UserManagement() {
       if (editing) {
         const payload = { name: form.name, email: form.email, role: form.role, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null, status: form.status }
         if (form.password.trim()) payload.password = form.password
-        await apiPut(`/users/${editing}`, payload)
+        const saved = await apiPut(`/users/${editing}`, payload)
         if (fromPwRequestId) await apiPut(`/password-reset-requests/${fromPwRequestId}/resolve`, {})
         // Any time a password was actually set here — whether from a
         // Password Reset Request or a plain Edit User — show it on screen
         // once so CDRRMO can relay it to the account holder themselves.
         // Passwords are hashed in the database, so this is the only moment
         // it's ever visible again.
-        if (form.password.trim()) setResetSuccess({ name: form.name, username: form.username, password: form.password })
+        if (form.password.trim()) setResetSuccess({ mode: 'reset', name: form.name, username: form.username, password: form.password, email: form.email, emailSent: !!saved?.email_sent, emailError: saved?.email_error })
       } else {
-        await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
+        const created = await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
+        // The server emails the login details; show the result either way.
+        setResetSuccess({ mode: 'created', name: form.name, username: form.username, password: form.password, email: form.email, emailSent: !!created?.email_sent, emailError: created?.email_error })
       }
       setShowModal(false)
       setFromRequestId(null)
@@ -256,10 +258,10 @@ export default function UserManagement() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <h3 className="text-lg font-semibold mb-1">{editing ? 'Edit User' : 'Add User'}</h3>
             {fromRequestId && !editing && (
-              <p className="text-xs text-primary-600 mb-4">Prefilled from an approved account request. Set a username and password to finish.</p>
+              <p className="text-xs text-primary-600 mb-4">Prefilled from an approved account request. Set a username and password — the login details are emailed to them when you save.</p>
             )}
             {fromPwRequestId && (
-              <p className="text-xs text-primary-600 mb-4">Resetting this account's password. Type a new one below, then relay it to the official yourself.</p>
+              <p className="text-xs text-primary-600 mb-4">Resetting this account's password. Type a new one below — it's emailed to them when you save.</p>
             )}
             {!fromRequestId && !fromPwRequestId && <div className="mb-5" />}
             <div className="grid grid-cols-2 gap-4">
@@ -293,18 +295,29 @@ export default function UserManagement() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div className="flex items-center gap-2 mb-1">
               <KeyRound size={18} className="text-primary-600" />
-              <h3 className="text-lg font-semibold">Password Reset</h3>
+              <h3 className="text-lg font-semibold">{resetSuccess.mode === 'created' ? 'Account Created' : 'Password Reset'}</h3>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
-              Send this new password to <strong>{resetSuccess.name}</strong> yourself — call, text, Viber, or in person. This is the only time it will be shown.
-            </p>
+            {resetSuccess.emailSent ? (
+              <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 flex gap-2">
+                <MailCheck size={17} className="text-green-600 flex-shrink-0 mt-0.5" />
+                <span>The login details were emailed to <strong>{resetSuccess.email}</strong>. You can also give them yourself if needed.</span>
+              </div>
+            ) : (
+              <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 flex gap-2">
+                <MailX size={17} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <span>
+                  The email could not be sent{resetSuccess.emailError ? ` (${resetSuccess.emailError})` : ''}. Send these login details to <strong>{resetSuccess.name}</strong> yourself — call, text, Viber, or in person.
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mb-3">This is the only time the password will be shown.</p>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2">
               <p className="text-xs text-gray-500 mb-1">Username</p>
               <p className="font-mono text-sm text-gray-800">{resetSuccess.username}</p>
             </div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs text-gray-500 mb-1">New Password</p>
+                <p className="text-xs text-gray-500 mb-1">{resetSuccess.mode === 'created' ? 'Password' : 'New Password'}</p>
                 <p className="font-mono text-lg font-semibold text-gray-900 tracking-wide">{resetSuccess.password}</p>
               </div>
               <button

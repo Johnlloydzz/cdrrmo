@@ -141,7 +141,7 @@ export default function RequestAccount() {
           steps={[
             'CDRRMO reviews your request.',
             'Once approved, CDRRMO creates your account for your barangay.',
-            `CDRRMO contacts you at ${form.contact} or ${form.email} with your username and password.`,
+            `Your username and password are emailed to ${form.email}. Check your Spam folder too.`,
           ]}
         >
           Thanks, {form.name.split(' ')[0] || 'there'}. Here's what happens next:
