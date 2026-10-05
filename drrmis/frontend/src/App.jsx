@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Suspense, lazy, useMemo, useState, useEffect, Component } from 'react'
 
 // After a new deploy, page files get new names (e.g. GISMap-5RWd.js), so a
@@ -54,6 +54,7 @@ class AppErrorBoundary extends Component {
 import MainLayout        from './layouts/MainLayout'
 import RoleGuard         from './components/RoleGuard'
 import Login             from './pages/auth/Login'
+import Landing           from './pages/public/Landing'
 import RequestAccount    from './pages/auth/RequestAccount'
 import RequestPasswordReset from './pages/auth/RequestPasswordReset'
 import ChangePassword    from './pages/auth/ChangePassword'
@@ -92,6 +93,13 @@ function Protected({ currentUser, children }) {
 function defaultRouteFor(user) {
   if (!user) return '/login'
   return user.role === 'CDRRMO Personnel' ? '/' : '/households'
+}
+
+// Signed out: the bare site address shows the staff landing page; any other
+// protected page (e.g. /households) goes to the sign-in page as before.
+function LoggedOutRoot() {
+  const { pathname } = useLocation()
+  return pathname === '/' ? <Landing /> : <Navigate to="/login" replace />
 }
 
 function App() {
@@ -165,7 +173,7 @@ function App() {
           element={
             currentUser
               ? <MainLayout onLogout={handleLogout} currentUser={currentUser} />
-              : <Navigate to="/login" replace />
+              : <LoggedOutRoot />
           }
         >
           {/* Risk Assessment Dashboard Module — CDRRMO Personnel only */}
