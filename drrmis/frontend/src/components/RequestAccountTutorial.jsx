@@ -22,12 +22,12 @@ const SAMPLE = {
 const SCENES = [
   { view: 'landing', say: 'To get a PDRA account, open the PDRA website and click "Request an account".' },
   { view: 'form', field: 'name', type: SAMPLE.name, say: 'Type your full name.' },
-  { view: 'form', field: 'email', type: SAMPLE.email, say: 'Enter your email address. CDRRMO will send your login details here.' },
-  { view: 'form', field: 'contact', type: SAMPLE.contact, say: 'Enter your mobile number. It must be eleven digits and start with zero nine.' },
+  { view: 'form', field: 'email', type: SAMPLE.email, say: 'Enter your email address, so CDRRMO can reach you.' },
+  { view: 'form', field: 'contact', type: SAMPLE.contact, say: 'Enter your mobile number. It must be eleven digits and start with zero nine. CDRRMO may call or text you here.' },
   { view: 'form', field: 'barangay', type: SAMPLE.barangay, say: 'Choose your barangay from the list.' },
   { view: 'form', field: 'position', type: SAMPLE.position, say: 'Your position is optional, but it helps CDRRMO confirm who you are.' },
   { view: 'form', field: 'submit', say: 'Check your details, then click "Submit Request".' },
-  { view: 'done', say: 'Done! CDRRMO will review your request. Once approved, your login details are sent to your email.' },
+  { view: 'done', say: 'Done! CDRRMO will review your request. Once your account is ready, CDRRMO will contact you with your login details.' },
 ]
 
 const FIELD_ORDER = ['name', 'email', 'contact', 'barangay', 'position']
@@ -203,7 +203,7 @@ export default function RequestAccountTutorial() {
                 <Check size={20} className="text-green-600" aria-hidden="true" />
               </div>
               <p className="mt-2 text-xs sm:text-lg font-semibold text-gray-900">Request sent</p>
-              <p className="mt-1 text-[9px] sm:text-sm text-gray-500">CDRRMO reviews your request, then emails your login details to {SAMPLE.email}.</p>
+              <p className="mt-1 text-[9px] sm:text-sm text-gray-500">CDRRMO reviews your request, then contacts you with your login details.</p>
             </div>
           </div>
         )}

@@ -140,8 +140,8 @@ export default function RequestAccount() {
           title="Request sent"
           steps={[
             'CDRRMO reviews your request.',
-            'Once approved, your account is created for your barangay.',
-            `CDRRMO sends your login details to ${form.email}.`,
+            'Once approved, CDRRMO creates your account for your barangay.',
+            `CDRRMO contacts you at ${form.contact} or ${form.email} with your username and password.`,
           ]}
         >
           Thanks, {form.name.split(' ')[0] || 'there'}. Here's what happens next:
