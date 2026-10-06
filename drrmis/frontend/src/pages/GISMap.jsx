@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
-import { SkeletonList } from '../components/Skeleton'
+import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 
 // Fix Leaflet default icons in Vite
 delete L.Icon.Default.prototype._getIconUrl
@@ -553,7 +553,13 @@ export default function GISMap() {
 
       {/* Map */}
       <div className="h-[70vh] lg:h-auto lg:flex-1 rounded-xl overflow-hidden shadow-sm border border-gray-200 relative order-1 lg:order-1">
-        <MapContainer center={CENTER} zoom={13} className="w-full h-full" zoomControl={true}>
+        {/* While the barangay boundaries load: a shimmer block where the map
+            goes (same as the Dashboard and Flood Simulation Control), then the
+            map fades in with its layers already in place. */}
+        {barangaysLoading ? (
+          <SkeletonBlock className="w-full h-full rounded-none" />
+        ) : (
+        <MapContainer center={CENTER} zoom={13} className="w-full h-full animate-fade-in" zoomControl={true}>
           <MapResizeHandler />
           <TileLayer
             key={activeLayer}
@@ -736,13 +742,14 @@ export default function GISMap() {
           ))}
 
         </MapContainer>
+        )}
 
         {/* Map toolbar overlay */}
-        <div className="absolute bottom-3 right-3 z-[400] flex flex-col gap-2">
+        {!barangaysLoading && <div className="absolute bottom-3 right-3 z-[400] flex flex-col gap-2 animate-fade-in">
           <button className="bg-white shadow rounded-lg p-2 hover:bg-gray-50" title="My Location">
             <Navigation size={16} className="text-gray-600" />
           </button>
-        </div>
+        </div>}
 
       </div>
     </div>
