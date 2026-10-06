@@ -1,24 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, MailCheck } from 'lucide-react'
 import { apiPost } from '../../utils/api'
+import AuthCard, { FieldLabel, FieldError, SubmitButton, SuccessPanel } from '../../components/AuthCard'
+
+// Forgot password — self-service with a 6-digit code sent to the account's
+// email (no need to wait for CDRRMO):
+//   1. username or email  →  2. code from email  →  3. new password  →  done
+// If the user can't open their email, "Ask CDRRMO instead" leads to the old
+// request-a-reset form.
+
+const RESEND_SECONDS = 60
 
 export default function ForgotPassword() {
-  const [step, setStep] = useState('email')
-  const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState('')
-  const [passwords, setPasswords] = useState({ newPassword: '', confirm: '' })
-  const [loading, setLoading] = useState(false)
+  const [step, setStep] = useState('identify') // identify | code | password | done
+  const [identifier, setIdentifier] = useState('')
+  const [code, setCode] = useState('')
+  const [pw, setPw] = useState({ next: '', confirm: '' })
+  const [showPw, setShowPw] = useState(false)
+  const [fieldError, setFieldError] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+  const codeRef = useRef(null)
+  const idRef = useRef(null)
 
-  const sendOTP = async (e) => {
-    e.preventDefault()
-    if (!email) { setError('Enter your email address.'); return }
-    setError('')
+  // Resend countdown
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [cooldown])
+
+  useEffect(() => { if (step === 'code') codeRef.current?.focus() }, [step])
+
+  const resetErrors = () => { setFieldError(''); setError('') }
+
+  const sendCode = async (e) => {
+    e?.preventDefault()
+    if (!identifier.trim()) { setFieldError('Enter your username or email.'); idRef.current?.focus(); return }
+    resetErrors()
     setLoading(true)
     try {
-      await apiPost('/auth/forgot-password', { email })
-      setStep('otp')
+      await apiPost('/auth/forgot-password', { identifier: identifier.trim() })
+      setCode('')
+      setStep('code')
+      setCooldown(RESEND_SECONDS)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -26,29 +53,29 @@ export default function ForgotPassword() {
     }
   }
 
-  const verifyOTP = async (e) => {
+  const verifyCode = async (e) => {
     e.preventDefault()
-    if (otp.length < 6) { setError('Enter the 6-digit OTP.'); return }
-    setError('')
+    if (!/^\d{6}$/.test(code)) { setFieldError('Enter the 6-digit code from your email.'); codeRef.current?.focus(); return }
+    resetErrors()
     setLoading(true)
     try {
-      await apiPost('/auth/verify-otp', { email, otp })
-      setStep('reset')
+      await apiPost('/auth/verify-otp', { identifier: identifier.trim(), otp: code })
+      setStep('password')
     } catch (err) {
-      setError(err.message)
+      setFieldError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const resetPassword = async (e) => {
+  const savePassword = async (e) => {
     e.preventDefault()
-    if (passwords.newPassword.length < 8) { setError('Password must be at least 8 characters.'); return }
-    if (passwords.newPassword !== passwords.confirm) { setError('Passwords do not match.'); return }
-    setError('')
+    if (pw.next.length < 8) { setFieldError('Use at least 8 characters.'); return }
+    if (pw.next !== pw.confirm) { setFieldError('The passwords don’t match.'); return }
+    resetErrors()
     setLoading(true)
     try {
-      await apiPost('/auth/reset-password', { email, otp, newPassword: passwords.newPassword })
+      await apiPost('/auth/reset-password', { identifier: identifier.trim(), otp: code, newPassword: pw.next })
       setStep('done')
     } catch (err) {
       setError(err.message)
@@ -57,89 +84,119 @@ export default function ForgotPassword() {
     }
   }
 
+  const strong = pw.next.length >= 8 && /[A-Za-z]/.test(pw.next) && /\d/.test(pw.next)
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-lg mb-4">
-            <Shield size={32} className="text-primary-700" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">PDRA</h1>
-          <p className="text-blue-200 text-sm mt-1">Gingoog City CDRRMO</p>
+    <AuthCard maxWidth="max-w-md">
+      {/* Step dots */}
+      {step !== 'done' && (
+        <div className="flex items-center gap-1.5 mb-3" aria-hidden="true">
+          {['identify', 'code', 'password'].map((s, i) => (
+            <span key={s} className={`h-1.5 rounded-full transition-all duration-300 ${s === step ? 'w-6 bg-primary-600' : i < ['identify', 'code', 'password'].indexOf(step) ? 'w-3 bg-primary-300' : 'w-3 bg-gray-200'}`} />
+          ))}
         </div>
+      )}
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <Link to="/login" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5">
-            <ArrowLeft size={14} /> Back to Login
-          </Link>
+      {error && (
+        <div role="alert" className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 animate-slide-down-in">{error}</div>
+      )}
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-          )}
-
-          {step === 'email' && (
-            <>
-              <h2 className="text-xl font-semibold mb-1">Forgot Password</h2>
-              <p className="text-sm text-gray-500 mb-6">Enter your email to receive a one-time password.</p>
-              <form onSubmit={sendOTP} className="space-y-4">
-                <div>
-                  <label className="label">Email Address</label>
-                  <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
-                </div>
-                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Sending…' : 'Send OTP'}</button>
-              </form>
-              <p className="text-center text-xs text-gray-500 mt-4">
-                Can't receive the code? <Link to="/request-password-reset" className="text-primary-600 font-medium hover:text-primary-800">Request a manual reset</Link>
-              </p>
-            </>
-          )}
-
-          {step === 'otp' && (
-            <>
-              <h2 className="text-xl font-semibold mb-1">Enter OTP</h2>
-              <p className="text-sm text-gray-500 mb-6">A 6-digit code was sent to <strong>{email}</strong>. Check your inbox (and spam folder).</p>
-              <form onSubmit={verifyOTP} className="space-y-4">
-                <div>
-                  <label className="label">One-Time Password</label>
-                  <input className="input text-center text-2xl tracking-widest" maxLength={6} value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ''))} placeholder="000000" />
-                </div>
-                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Verifying…' : 'Verify OTP'}</button>
-              </form>
-            </>
-          )}
-
-          {step === 'reset' && (
-            <>
-              <h2 className="text-xl font-semibold mb-1">Reset Password</h2>
-              <p className="text-sm text-gray-500 mb-6">Enter your new password.</p>
-              <form onSubmit={resetPassword} className="space-y-4">
-                <div>
-                  <label className="label">New Password</label>
-                  <input className="input" type="password" value={passwords.newPassword} onChange={e => setPasswords({ ...passwords, newPassword: e.target.value })} placeholder="Min. 8 characters" />
-                </div>
-                <div>
-                  <label className="label">Confirm Password</label>
-                  <input className="input" type="password" value={passwords.confirm} onChange={e => setPasswords({ ...passwords, confirm: e.target.value })} placeholder="Repeat new password" />
-                </div>
-                <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Saving…' : 'Reset Password'}</button>
-              </form>
-            </>
-          )}
-
-          {step === 'done' && (
-            <div className="text-center py-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-semibold mb-2">Password Reset!</h2>
-              <p className="text-sm text-gray-500 mb-6">Your password has been updated successfully.</p>
-              <Link to="/login" className="btn-primary inline-block">Back to Login</Link>
+      {step === 'identify' && (
+        <div key="identify" className="animate-fade-in">
+          <h1 className="text-lg font-semibold text-gray-900">Forgot your password?</h1>
+          <p className="text-sm text-gray-500 mt-0.5 mb-4">Enter your username or email. We’ll email you a 6-digit code to reset it.</p>
+          <form onSubmit={sendCode} className="space-y-3" noValidate>
+            <div>
+              <FieldLabel htmlFor="fp-id" required>Username or Email</FieldLabel>
+              <input id="fp-id" ref={idRef}
+                className={`input py-2 text-sm ${fieldError ? 'border-red-400 focus:ring-red-200' : ''}`}
+                value={identifier}
+                onChange={e => { setIdentifier(e.target.value); resetErrors() }}
+                placeholder="e.g. brgy.sanjuan or juan@gmail.com"
+                autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus
+                aria-invalid={!!fieldError} aria-describedby="fp-id-err" />
+              <FieldError id="fp-id-err">{fieldError}</FieldError>
             </div>
-          )}
+            <SubmitButton loading={loading} loadingText="Sending code…">Send Code</SubmitButton>
+          </form>
+          <p className="text-xs text-gray-500 text-center mt-4">
+            Can’t open your email?{' '}
+            <Link to="/request-password-reset" className="font-medium text-primary-600 hover:text-primary-700">Ask CDRRMO to reset it</Link>
+          </p>
         </div>
-      </div>
-    </div>
+      )}
+
+      {step === 'code' && (
+        <div key="code" className="animate-fade-in">
+          <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center mb-3">
+            <MailCheck size={20} className="text-primary-600" aria-hidden="true" />
+          </div>
+          <h1 className="text-lg font-semibold text-gray-900">Check your email</h1>
+          <p className="text-sm text-gray-500 mt-0.5 mb-4">
+            If <span className="font-medium text-gray-700">{identifier}</span> has a PDRA account, we sent a 6-digit code to its email. It expires in 10 minutes. Check your Spam folder too.
+          </p>
+          <form onSubmit={verifyCode} className="space-y-3" noValidate>
+            <div>
+              <FieldLabel htmlFor="fp-code" required>6-digit code</FieldLabel>
+              <input id="fp-code" ref={codeRef}
+                className={`input py-2.5 text-center text-xl font-semibold tracking-[0.5em] tabular-nums ${fieldError ? 'border-red-400 focus:ring-red-200' : ''}`}
+                value={code}
+                onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); resetErrors() }}
+                inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="••••••"
+                aria-invalid={!!fieldError} aria-describedby="fp-code-err" />
+              <FieldError id="fp-code-err">{fieldError}</FieldError>
+            </div>
+            <SubmitButton loading={loading} loadingText="Checking…">Verify Code</SubmitButton>
+          </form>
+          <div className="flex items-center justify-between text-xs mt-4">
+            <button type="button" onClick={() => { setStep('identify'); resetErrors() }} className="text-gray-500 hover:text-gray-700">Use a different account</button>
+            <button type="button" onClick={() => sendCode()} disabled={cooldown > 0 || loading}
+              className="font-medium text-primary-600 hover:text-primary-700 disabled:text-gray-400 disabled:cursor-not-allowed tabular-nums">
+              {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 'password' && (
+        <div key="password" className="animate-fade-in">
+          <h1 className="text-lg font-semibold text-gray-900">Set a new password</h1>
+          <p className="text-sm text-gray-500 mt-0.5 mb-4">Use at least 8 characters, with letters and numbers.</p>
+          <form onSubmit={savePassword} className="space-y-3" noValidate>
+            <div>
+              <FieldLabel htmlFor="fp-new" required hint={pw.next ? (strong ? 'Good' : 'Too weak') : ''}>New Password</FieldLabel>
+              <div className="relative">
+                <input id="fp-new" type={showPw ? 'text' : 'password'}
+                  className={`input py-2 pr-10 text-sm ${fieldError ? 'border-red-400 focus:ring-red-200' : ''}`}
+                  value={pw.next} onChange={e => { setPw({ ...pw, next: e.target.value }); resetErrors() }}
+                  autoComplete="new-password" autoFocus />
+                <button type="button" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="h-1 mt-1.5 rounded-full bg-gray-100 overflow-hidden" aria-hidden="true">
+                <div className={`h-full transition-all duration-300 ${strong ? 'w-full bg-green-500' : pw.next.length >= 4 ? 'w-1/2 bg-amber-400' : pw.next ? 'w-1/4 bg-red-400' : 'w-0'}`} />
+              </div>
+            </div>
+            <div>
+              <FieldLabel htmlFor="fp-confirm" required>Confirm Password</FieldLabel>
+              <input id="fp-confirm" type={showPw ? 'text' : 'password'}
+                className={`input py-2 text-sm ${fieldError ? 'border-red-400 focus:ring-red-200' : ''}`}
+                value={pw.confirm} onChange={e => { setPw({ ...pw, confirm: e.target.value }); resetErrors() }}
+                autoComplete="new-password" aria-describedby="fp-pw-err" />
+              <FieldError id="fp-pw-err">{fieldError}</FieldError>
+            </div>
+            <SubmitButton loading={loading} loadingText="Saving…">Reset Password</SubmitButton>
+          </form>
+        </div>
+      )}
+
+      {step === 'done' && (
+        <SuccessPanel title="Password reset">
+          Your password was changed. You can now sign in with your new password.
+        </SuccessPanel>
+      )}
+    </AuthCard>
   )
 }

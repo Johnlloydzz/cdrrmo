@@ -88,6 +88,7 @@ const tables = [
     otp        TEXT    NOT NULL,
     expires_at TEXT    NOT NULL,
     used       INTEGER DEFAULT 0,
+    attempts   INTEGER DEFAULT 0,
     created_at TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 

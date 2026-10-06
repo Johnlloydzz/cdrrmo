@@ -81,82 +81,116 @@ router.get('/me', authenticate, async (req, res) => {
   }
 })
 
-// POST /api/auth/forgot-password — generates a 6-digit OTP, emails it, and
-// stores it (hashed nowhere needed — it's short-lived and single-use) with a
-// 10-minute expiry. Always responds the same way whether or not the email
-// exists, so this endpoint can't be used to check which emails are registered.
+// ── Forgot password: 6-digit code by email ─────────────────────────────────
+// 1. /forgot-password  — username or email → a code is emailed (10 min)
+// 2. /verify-otp       — check the code (max 5 wrong tries per code)
+// 3. /reset-password   — set the new password; the code is used up
+//
+// Times are stored in Philippine time ("YYYY-MM-DD HH:MM:SS", same as the rest
+// of the database) so they compare correctly with datetime('now', '+8 hours').
+const OTP_MINUTES = 10
+const OTP_MAX_ATTEMPTS = 5
+const OTP_MAX_PER_15_MIN = 3
+
+const crypto = require('crypto')
+const findUser = (identifier) => get(
+  "SELECT id, name, email, status FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
+  [identifier, identifier]
+)
+// Latest unused, unexpired code for a user.
+const activeCode = (userId) => get(
+  `SELECT * FROM password_resets WHERE user_id = ? AND used = 0 AND expires_at > datetime('now', '+8 hours') ORDER BY id DESC LIMIT 1`,
+  [userId]
+)
+// Checks a code for a user. Wrong guesses count against the latest code; after
+// OTP_MAX_ATTEMPTS it stops working and a new code must be requested.
+async function checkCode(userId, otp) {
+  const record = await activeCode(userId)
+  if (!record) return { ok: false, error: 'This code has expired. Request a new one.' }
+  if ((record.attempts || 0) >= OTP_MAX_ATTEMPTS) return { ok: false, error: 'Too many wrong tries. Request a new code.' }
+  if (String(record.otp) !== String(otp).trim()) {
+    await run('UPDATE password_resets SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?', [record.id])
+    const left = OTP_MAX_ATTEMPTS - (record.attempts || 0) - 1
+    return { ok: false, error: left > 0 ? `Wrong code. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong tries. Request a new code.' }
+  }
+  return { ok: true, record }
+}
+
+// POST /api/auth/forgot-password  { identifier }  (username or email)
 router.post('/forgot-password', async (req, res) => {
   try {
-    const { email } = req.body
-    if (!email) return res.status(400).json({ error: 'Email is required.' })
+    const identifier = String(req.body.identifier || req.body.email || '').trim()
+    if (!identifier) return res.status(400).json({ error: 'Enter your username or email.' })
 
-    const user = await get('SELECT id, name, email FROM users WHERE email = ?', [email])
-    if (user) {
-      const otp = String(Math.floor(100000 + Math.random() * 900000)) // 6 digits
-      const expiresAt = new Date(Date.now() + 10 * 60000).toISOString()
-      await run('INSERT INTO password_resets (user_id, otp, expires_at) VALUES (?, ?, ?)', [user.id, otp, expiresAt])
-      try {
-        await sendOtpEmail(user.email, user.name, otp)
-      } catch (mailErr) {
-        console.error('Failed to send OTP email:', mailErr.message)
-        return res.status(500).json({ error: 'Could not send the reset email right now. Please try again shortly.' })
-      }
+    const generic = { message: 'If that account exists, a code has been sent to its email.' }
+    const user = await findUser(identifier)
+    // Same answer for unknown / inactive accounts — so this can't be used to
+    // find out which usernames or emails exist.
+    if (!user || !user.email || (user.status && user.status !== 'Active')) return res.json(generic)
+
+    const recent = await get(
+      `SELECT COUNT(*) AS c FROM password_resets WHERE user_id = ? AND created_at > datetime('now', '+8 hours', '-15 minutes')`,
+      [user.id]
+    )
+    if ((recent?.c || 0) >= OTP_MAX_PER_15_MIN) {
+      return res.status(429).json({ error: 'Too many code requests. Please wait 15 minutes, then try again.' })
     }
-    // Same response either way — don't reveal whether the email is registered.
-    res.json({ message: 'If that email is registered, a one-time code has been sent.' })
+
+    // Only the newest code works.
+    await run('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0', [user.id])
+    const otp = String(crypto.randomInt(100000, 1000000)) // 6 digits, cryptographically random
+    await run(
+      `INSERT INTO password_resets (user_id, otp, expires_at) VALUES (?, ?, datetime('now', '+8 hours', '+${OTP_MINUTES} minutes'))`,
+      [user.id, otp]
+    )
+    try {
+      await sendOtpEmail(user.email, user.name, otp)
+    } catch (mailErr) {
+      console.error('Failed to send OTP email:', mailErr.message)
+      return res.status(500).json({ error: 'Could not send the code right now. Please try again shortly.' })
+    }
+    res.json(generic)
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// POST /api/auth/verify-otp — checks the code without consuming it, so the
-// frontend can give immediate feedback before showing the new-password step.
+// POST /api/auth/verify-otp  { identifier, otp }
 router.post('/verify-otp', async (req, res) => {
   try {
-    const { email, otp } = req.body
-    if (!email || !otp) return res.status(400).json({ error: 'Email and code are required.' })
-
-    const user = await get('SELECT id FROM users WHERE email = ?', [email])
-    if (!user) return res.status(400).json({ error: 'Invalid or expired code.' })
-
-    const record = await get(
-      `SELECT * FROM password_resets WHERE user_id = ? AND otp = ? AND used = 0 AND expires_at > datetime('now', '+8 hours') ORDER BY id DESC LIMIT 1`,
-      [user.id, otp]
-    )
-    if (!record) return res.status(400).json({ error: 'Invalid or expired code.' })
-
+    const identifier = String(req.body.identifier || req.body.email || '').trim()
+    const { otp } = req.body
+    if (!identifier || !otp) return res.status(400).json({ error: 'Enter the 6-digit code.' })
+    const user = await findUser(identifier)
+    if (!user) return res.status(400).json({ error: 'This code has expired. Request a new one.' })
+    const check = await checkCode(user.id, otp)
+    if (!check.ok) return res.status(400).json({ error: check.error })
     res.json({ message: 'Code verified.' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// POST /api/auth/reset-password — re-checks the code (defense in depth) and,
-// if valid, actually updates the password and marks the code used so it
-// can't be replayed.
+// POST /api/auth/reset-password  { identifier, otp, newPassword }
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body
-    if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields are required.' })
-    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' })
+    const identifier = String(req.body.identifier || req.body.email || '').trim()
+    const { otp, newPassword } = req.body
+    if (!identifier || !otp || !newPassword) return res.status(400).json({ error: 'All fields are required.' })
+    if (String(newPassword).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' })
 
-    const user = await get('SELECT id FROM users WHERE email = ?', [email])
-    if (!user) return res.status(400).json({ error: 'Invalid or expired code.' })
-
-    const record = await get(
-      `SELECT * FROM password_resets WHERE user_id = ? AND otp = ? AND used = 0 AND expires_at > datetime('now', '+8 hours') ORDER BY id DESC LIMIT 1`,
-      [user.id, otp]
-    )
-    if (!record) return res.status(400).json({ error: 'Invalid or expired code.' })
+    const user = await findUser(identifier)
+    if (!user) return res.status(400).json({ error: 'This code has expired. Request a new one.' })
+    const check = await checkCode(user.id, otp)
+    if (!check.ok) return res.status(400).json({ error: check.error })
 
     const hash = await bcrypt.hash(newPassword, 12)
-    await run('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\', \'+8 hours\') WHERE id = ?', [hash, user.id])
-    await run('UPDATE password_resets SET used = 1 WHERE id = ?', [record.id])
-
+    await run("UPDATE users SET password_hash = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?", [hash, user.id])
+    await run('UPDATE password_resets SET used = 1 WHERE user_id = ?', [user.id])
     res.json({ message: 'Password has been reset successfully.' })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-module.exports = router 
+module.exports = router

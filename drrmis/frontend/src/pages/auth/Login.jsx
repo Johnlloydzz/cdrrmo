@@ -263,7 +263,7 @@ export default function Login({ onLogin }) {
                       />
                       <span className="text-sm text-gray-600">Remember me</span>
                     </label>
-                    <Link to="/request-password-reset" className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">
+                    <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors">
                       Forgot password?
                     </Link>
                   </div>

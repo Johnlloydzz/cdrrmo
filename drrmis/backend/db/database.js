@@ -44,6 +44,8 @@ async function all(sql, params = []) {
 // production database (e.g. Render) in sync automatically on each deploy,
 // without needing manual shell access to run a one-off migration script.
 const EXPECTED_COLUMNS = {
+  // Wrong-code tries per reset code (locked after 5).
+  password_resets: { attempts: `INTEGER DEFAULT 0` },
   users: { name: `TEXT`, email: `TEXT`, barangay_id: `INTEGER REFERENCES barangays(id)`, status: `TEXT DEFAULT 'Active'`, last_login: `TEXT`, last_active: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
   barangays: { risk_level: `TEXT DEFAULT 'Low'`, flood_susceptibility: `TEXT DEFAULT 'Low'`, landslide_susceptibility: `TEXT DEFAULT 'Low'`, population: `INTEGER DEFAULT 0`, boundary_geojson: `TEXT`, created_at: `TEXT`, updated_at: `TEXT`, captain_name: `TEXT`, contact_number: `TEXT`, flood_area_geojson: `TEXT`, landslide_area_geojson: `TEXT`, residential_area_geojson: `TEXT` },
   puroks: { flood_risk: `TEXT DEFAULT 'Low'`, flood_threshold_m: `REAL DEFAULT 1.0`, landslide_risk: `TEXT DEFAULT 'Low'`, latitude: `REAL`, longitude: `REAL`, created_at: `TEXT`, boundary_geojson: `TEXT` },

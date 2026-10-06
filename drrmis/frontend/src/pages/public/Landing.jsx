@@ -338,10 +338,10 @@ export default function Landing() {
             <div className="rounded-2xl border border-gray-100 p-6">
               <ShieldCheck size={20} className="text-primary-700" aria-hidden="true" />
               <h3 className="mt-3 font-semibold text-gray-900">Need access or help?</h3>
-              <p className="mt-1 text-sm text-gray-600 leading-relaxed">Barangay Officials can request an account. Forgot your password? CDRRMO can reset it for you.</p>
+              <p className="mt-1 text-sm text-gray-600 leading-relaxed">Barangay Officials can request an account. Forgot your password? Reset it with a code sent to your email.</p>
               <div className="mt-3 flex flex-col gap-1.5 text-sm">
                 <Link to="/request-account" className="font-medium text-primary-700 hover:text-primary-800">Request an account →</Link>
-                <Link to="/request-password-reset" className="font-medium text-primary-700 hover:text-primary-800">Request a password reset →</Link>
+                <Link to="/forgot-password" className="font-medium text-primary-700 hover:text-primary-800">Reset your password →</Link>
               </div>
             </div>
           </div>
