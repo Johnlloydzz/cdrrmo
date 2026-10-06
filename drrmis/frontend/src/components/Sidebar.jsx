@@ -99,7 +99,7 @@ export default function Sidebar({ onLogout, currentUser, mobileOpen, onClose }) 
         {/* Current user info */}
         <div className="px-4 py-3 border-b border-primary-700 flex items-center gap-3">
           <div className={`w-9 h-9 rounded-full ${ROLE_COLORS[role]?.bg || 'bg-gray-500'} flex items-center justify-center flex-shrink-0`}>
-            <span className="text-white text-xs font-bold">{currentUser?.avatar || 'U'}</span>
+            <span className="text-white text-xs font-bold">{currentUser?.avatar || (currentUser?.name || 'U').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}</span>
           </div>
           <div className="overflow-hidden">
             <p className="text-white text-sm font-medium truncate">{currentUser?.name || 'User'}</p>

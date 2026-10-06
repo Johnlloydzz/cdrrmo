@@ -103,7 +103,7 @@ export default function MainLayout({ onLogout, currentUser }) {
                 aria-label="Profile menu"
               >
                 <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-bold">{currentUser?.avatar || 'U'}</span>
+                  <span className="text-white text-xs font-bold">{currentUser?.avatar || (currentUser?.name || 'U').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}</span>
                 </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-sm font-medium text-gray-800 leading-tight">{currentUser?.name || 'User'}</p>
