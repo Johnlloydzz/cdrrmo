@@ -9,12 +9,29 @@ const { authenticate } = require('../middleware/auth')
 router.use(authenticate)
 
 // Computes an age bracket label from a birthdate string (YYYY-MM-DD)
-function computeAgeBracket(birthdate) {
-  if (!birthdate) return null
+// Exact age in years today (birthday-aware), or null.
+function ageToday(birthdate) {
   const dob = new Date(birthdate)
-  if (isNaN(dob)) return null
-  const ageMs = Date.now() - dob.getTime()
-  const age = Math.floor(ageMs / (1000 * 60 * 60 * 24 * 365.25))
+  if (!birthdate || isNaN(dob)) return null
+  const now = new Date()
+  let age = now.getFullYear() - dob.getFullYear()
+  const m = now.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--
+  return age
+}
+
+// A birthdate must be a real date, not in the future, and not before 1900.
+function birthdateError(birthdate) {
+  const dob = new Date(birthdate)
+  if (isNaN(dob)) return 'Enter a valid birthdate.'
+  if (dob > new Date()) return 'Birthdate can’t be in the future.'
+  if (dob.getFullYear() < 1900) return 'Enter a valid birthdate.'
+  return null
+}
+
+function computeAgeBracket(birthdate) {
+  const age = ageToday(birthdate)
+  if (age == null) return null
   if (age <= 12) return 'Child (1-12)'
   if (age <= 17) return 'Teen (13-17)'
   if (age <= 59) return 'Adult (18-59)'
@@ -51,7 +68,11 @@ router.get('/', async (req, res) => {
     if (unassigned === '1') sql += ' AND r.household_id IS NULL'
     if (relation) { sql += ' AND r.relation_to_head = ?'; params.push(relation) }
     if (search) { sql += ' AND r.name LIKE ?'; params.push(`%${search}%`) }
-    res.json(await all(sql, params))
+    // Age brackets are recomputed from the birthdate on every read, so a
+    // child who turns 13 moves to "Teen" automatically (the stored value is
+    // only from when the record was last saved).
+    const rows = await all(sql, params)
+    res.json(rows.map(r => ({ ...r, age_bracket: computeAgeBracket(r.birthdate) || r.age_bracket })))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -76,6 +97,7 @@ router.post('/', async (req, res) => {
     if (!last_name?.trim() || !first_name?.trim() || !birthdate) {
       return res.status(400).json({ error: 'Last name, first name, and birthdate are required' })
     }
+    if (birthdateError(birthdate)) return res.status(400).json({ error: birthdateError(birthdate) })
     if (contact_number && !isPhMobile(String(contact_number))) {
       return res.status(400).json({ error: 'Enter a valid Philippine mobile number: 11 digits starting with 09.' })
     }
@@ -124,6 +146,10 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only edit residents in your own barangay.' })
     }
     const { last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
+    if (!last_name?.trim() || !first_name?.trim() || !birthdate) {
+      return res.status(400).json({ error: 'Last name, first name, and birthdate are required' })
+    }
+    if (birthdateError(birthdate)) return res.status(400).json({ error: birthdateError(birthdate) })
     if (contact_number && !isPhMobile(String(contact_number))) {
       return res.status(400).json({ error: 'Enter a valid Philippine mobile number: 11 digits starting with 09.' })
     }
@@ -162,6 +188,16 @@ router.delete('/:id', async (req, res) => {
     )
     if (!existing || existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only delete residents in your own barangay.' })
+    }
+    // The Head of Family can't be deleted while their household exists —
+    // it would leave the household with a Head who isn't registered.
+    const headOf = await get(
+      `SELECT h.household_id FROM residents r JOIN households h ON h.id = r.household_id
+       WHERE r.id = ? AND r.relation_to_head = 'Head'`,
+      [req.params.id]
+    )
+    if (headOf) {
+      return res.status(400).json({ error: `This resident is the Head of Family of ${headOf.household_id}. Change that household's Head (or delete the household) first.` })
     }
     const result = await run('DELETE FROM residents WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })

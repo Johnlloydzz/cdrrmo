@@ -115,6 +115,17 @@ router.delete('/:id', async (req, res) => {
     if (existing.barangay_id !== req.user.barangay_id) {
       return res.status(403).json({ error: 'You can only delete puroks in your own barangay.' })
     }
+    // Don't leave households/residents pointing at a purok that's gone.
+    const inUse = await get(
+      `SELECT (SELECT COUNT(*) FROM households WHERE purok_id = ?) AS hh,
+              (SELECT COUNT(*) FROM residents WHERE purok_id = ?) AS res`,
+      [req.params.id, req.params.id]
+    )
+    if ((inUse?.hh || 0) > 0 || (inUse?.res || 0) > 0) {
+      return res.status(400).json({
+        error: `This purok still has ${inUse.hh} household(s) and ${inUse.res} resident(s). Move them to another purok first.`,
+      })
+    }
     const result = await run('DELETE FROM puroks WHERE id = ?', [req.params.id])
     if (result.changes === 0) return res.status(404).json({ error: 'Not found' })
     res.json({ message: 'Deleted' })

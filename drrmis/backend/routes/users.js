@@ -20,7 +20,8 @@ async function emailLoginDetails(user, username, password, isReset) {
 
 router.use(authenticate)
 
-router.get('/', async (req, res) => {
+// User list and details include every account's email — CDRRMO only.
+router.get('/', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const { search, role } = req.query
     let sql = `SELECT u.id, u.name, u.username, u.email, u.role, u.barangay_id, b.name as barangay_name, u.status, u.last_login, u.last_active, u.created_at,
@@ -34,7 +35,7 @@ router.get('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const row = await get('SELECT id, name, username, email, role, barangay_id, status, last_login FROM users WHERE id = ?', [req.params.id])
     if (!row) return res.status(404).json({ error: 'Not found' })

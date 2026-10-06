@@ -78,8 +78,19 @@ async function checkHouseholdCode(raw, excludeId = null) {
 }
 
 // POST /api/households
+// The purok must exist and be in the household's barangay.
+async function checkPurok(purok_id, barangay_id) {
+  if (!purok_id) return 'Pick the purok where this household lives.'
+  const p = await get('SELECT barangay_id FROM puroks WHERE id = ?', [purok_id])
+  if (!p || p.barangay_id !== barangay_id) return 'Pick a purok in your own barangay.'
+  return null
+}
+
 router.post('/', async (req, res) => {
   try {
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to household records.' })
+    }
     const { purok_id, head_resident_id } = req.body
     // Barangay Officials can only register households under their own barangay,
     // regardless of what barangay_id is sent in the request body.
@@ -87,6 +98,8 @@ router.post('/', async (req, res) => {
     if (!barangay_id || !purok_id || !head_resident_id) {
       return res.status(400).json({ error: 'Barangay, purok, and Head of Family are required.' })
     }
+    const purokError = await checkPurok(purok_id, barangay_id)
+    if (purokError) return res.status(400).json({ error: purokError })
     // Residents are registered first; the Head is picked from them.
     const { resident: head, error } = await validateHead(head_resident_id, barangay_id)
     if (error) return res.status(400).json({ error })
@@ -121,6 +134,8 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'You can only edit households in your own barangay.' })
     }
     const { purok_id, head_resident_id } = req.body
+    const purokError = await checkPurok(purok_id, existing.barangay_id)
+    if (purokError) return res.status(400).json({ error: purokError })
     // Household number: blank keeps the current one.
     let household_code = (await get('SELECT household_id FROM households WHERE id = ?', [req.params.id]))?.household_id
     if (String(req.body.household_code || '').trim()) {
