@@ -2,11 +2,10 @@
 // reflect what's actually happening.
 //
 // 1. Manually-reported flood level (typed in on Flood Simulation Control):
-//    if nobody updates it for FLOOD_LEVEL_EXPIRY_HOURS (default 12h), it's
-//    reset to 0 automatically. Otherwise a simulation someone forgot to
-//    "Reset to Normal" keeps the whole system showing warnings for days.
-//    CDRRMO can always re-enter it if the flood is still ongoing — every
-//    update restarts the countdown.
+//    KEPT until CDRRMO changes it or presses "Reset to Normal" — it never
+//    disappears on its own. (An optional auto-reset can be switched on by
+//    setting FLOOD_LEVEL_EXPIRY_HOURS on the server, e.g. 12; it's off by
+//    default.)
 //
 // 2. Auto-detected flooded barangays (set by the scheduled server-side
 //    check every ~10 min): if that list hasn't been refreshed in
@@ -19,14 +18,15 @@
 const { get, run } = require('./database')
 
 async function expireStaleFloodData() {
-  const levelHours = parseFloat(process.env.FLOOD_LEVEL_EXPIRY_HOURS) || 12
+  // Off unless FLOOD_LEVEL_EXPIRY_HOURS is set to a positive number.
+  const levelHours = parseFloat(process.env.FLOOD_LEVEL_EXPIRY_HOURS) || 0
   const autoMinutes = parseFloat(process.env.AUTO_FLOOD_EXPIRY_MINUTES) || 30
 
   const level = await get(
     `SELECT value, (julianday(datetime('now', '+8 hours')) - julianday(updated_at)) * 24 AS age_hours
      FROM system_settings WHERE key = 'current_flood_level_m'`
   )
-  if (level && parseFloat(level.value) > 0 && level.age_hours != null && level.age_hours >= levelHours) {
+  if (levelHours > 0 && level && parseFloat(level.value) > 0 && level.age_hours != null && level.age_hours >= levelHours) {
     await run(`UPDATE system_settings SET value = '0', updated_at = datetime('now', '+8 hours') WHERE key = 'current_flood_level_m'`)
   }
 

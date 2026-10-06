@@ -473,7 +473,7 @@ export default function FloodSimulationControl() {
                       <p className="text-xs text-gray-500 mt-2">No flood level reported.</p>
                     )}
                     {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
-                    {floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Resets automatically after 12 hours without an update.</p>}
+                    {floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Stays in effect until you change it or press Reset to Normal.</p>}
 
                     {autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
