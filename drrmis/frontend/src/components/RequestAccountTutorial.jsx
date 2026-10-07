@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Pause, RotateCcw, Volume2, VolumeX, MousePointer2, Check, ChevronDown } from 'lucide-react'
 
 // "How to request an account" tutorial, played like a short video.
@@ -33,6 +33,25 @@ const SCENES = [
 const FIELD_ORDER = ['name', 'email', 'contact', 'barangay', 'position']
 const TYPE_MS = 55 // per character
 
+// Expected length of a scene (ms) — drives the time display and the line.
+function sceneMs(s, voiced) {
+  const words = s.say.split(' ').length
+  const readMs = Math.max(2500, words * 330)
+  const typeMs = s.type ? 600 + s.type.length * TYPE_MS : 0
+  const talkMs = voiced ? 120 + words * 400 : 0
+  return Math.max(readMs, typeMs, talkMs) + 700
+}
+const sceneOffsets = (voiced) => {
+  const out = []; let t = 0
+  SCENES.forEach(s => { out.push(t); t += sceneMs(s, voiced) })
+  return { offsets: out, total: t }
+}
+// 65000 → "1:05"
+const clock = (ms) => {
+  const sec = Math.max(0, Math.round(ms / 1000))
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+}
+
 // A clear English voice if the device has one.
 function pickVoice() {
   const voices = window.speechSynthesis?.getVoices?.() || []
@@ -51,6 +70,9 @@ export default function RequestAccountTutorial() {
   const [typed, setTyped] = useState({}) // field -> text shown so far
   const timers = useRef([])
   const runId = useRef(0) // bumps on every pause/seek so stale callbacks stop
+  const utterRef = useRef(null) // keeps the current narration alive (Chrome GC bug)
+  const sceneClock = useRef({ start: 0, ms: 1 }) // when the current scene began + its expected length
+  const [elapsed, setElapsed] = useState(0) // ms watched so far (shown like a video's time)
 
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
   const stopSpeech = () => { if (canSpeak) window.speechSynthesis.cancel() }
@@ -91,23 +113,67 @@ export default function RequestAccountTutorial() {
       }
     }
 
-    // Narration (or a reading-time pause when muted / no voice)
+    // Narration. A scene never ends before its caption could be read, even if
+    // the voice fails or ends early, so the video doesn't cut ahead.
+    const words = s.say.split(' ').length
+    const readMs = Math.max(2500, words * 330)
+    let readDone = false
+    let voiceDone = isMuted || !canSpeak
+    const finish = () => {
+      if (id !== runId.current || speechDone || !readDone || !voiceDone) return
+      speechDone = true; next()
+    }
+    timers.current.push(setTimeout(() => { readDone = true; finish() }, readMs))
+
+    // Expected length of this scene, used to move the time and line smoothly.
+    sceneClock.current = { start: performance.now(), ms: sceneMs(s, !isMuted && canSpeak) }
+
     if (!isMuted && canSpeak) {
       const u = new SpeechSynthesisUtterance(s.say)
       const v = pickVoice()
       if (v) { u.voice = v; u.lang = v.lang } else u.lang = 'en-US'
       u.rate = 0.98
-      const finish = () => { if (!speechDone) { speechDone = true; next() } }
-      u.onend = finish
-      u.onerror = finish
-      window.speechSynthesis.speak(u)
+      const voiceEnd = () => { if (id === runId.current) { voiceDone = true; finish() } }
+      u.onend = voiceEnd
+      u.onerror = voiceEnd
+      // Chrome drops speech whose utterance object gets garbage-collected
+      // (it stops mid-sentence) — keep a reference while it plays.
+      utterRef.current = u
+      // Chrome also skips an utterance spoken right after cancel(); wait a beat.
+      timers.current.push(setTimeout(() => {
+        if (id !== runId.current) return
+        window.speechSynthesis.resume()
+        window.speechSynthesis.speak(u)
+      }, 120))
       // Safety net: some browsers never fire onend (e.g. no voice installed).
-      timers.current.push(setTimeout(finish, Math.max(4000, s.say.split(' ').length * 450) + 3000))
-    } else {
-      const ms = Math.max(2500, s.say.split(' ').length * 330)
-      timers.current.push(setTimeout(() => { speechDone = true; next() }, ms))
+      timers.current.push(setTimeout(voiceEnd, Math.max(4000, words * 450) + 3000))
     }
   }, [canSpeak])
+
+  const timeline = useMemo(() => sceneOffsets(!muted && canSpeak), [muted, canSpeak])
+  const progress = Math.min(1, elapsed / timeline.total)
+
+  // Progress line: moves continuously while playing (like a video player).
+  useEffect(() => {
+    if (!playing) return
+    let raf
+    const tick = () => {
+      const { start, ms } = sceneClock.current
+      const within = Math.min(0.98, (performance.now() - start) / ms)
+      setElapsed(timeline.offsets[scene] + within * ms)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing, scene, timeline])
+
+  // Finished the last scene → line full.
+  useEffect(() => {
+    if (!playing && started && scene === SCENES.length - 1 && runId.current > 0) {
+      const { start, ms } = sceneClock.current
+      if (performance.now() - start >= ms - 800) setElapsed(timeline.total)
+    }
+  }, [playing, started, scene, timeline])
 
   // Voices load late in some browsers.
   useEffect(() => {
@@ -127,8 +193,8 @@ export default function RequestAccountTutorial() {
     if (playing) pause()
     else start(scene === SCENES.length - 1 ? 0 : scene)
   }
-  const restart = () => start(0)
-  const seek = (i) => { if (playing) { setStarted(true); playScene(i, muted) } else { runId.current++; clearTimers(); stopSpeech(); setStarted(true); setScene(i); setTyped({ ...filledBefore(i), ...(SCENES[i].type ? { [SCENES[i].field]: SCENES[i].type } : {}) }) } }
+  const restart = () => { setElapsed(0); start(0) }
+  const seek = (i) => { if (playing) { setStarted(true); playScene(i, muted) } else { runId.current++; clearTimers(); stopSpeech(); setStarted(true); setScene(i); setElapsed(timeline.offsets[i]); setTyped({ ...filledBefore(i), ...(SCENES[i].type ? { [SCENES[i].field]: SCENES[i].type } : {}) }) } }
   const toggleMute = () => {
     const m = !muted
     setMuted(m)
@@ -236,21 +302,41 @@ export default function RequestAccountTutorial() {
           <RotateCcw size={16} aria-hidden="true" />
         </button>
 
-        {/* Progress: one segment per step, click to jump */}
-        <div className="flex-1 flex gap-1" role="group" aria-label="Tutorial steps">
-          {SCENES.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => seek(i)}
-              aria-label={`Step ${i + 1}`}
-              aria-current={i === scene ? 'step' : undefined}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${i < scene || (i === scene && started) ? 'bg-primary-400' : 'bg-white/20 hover:bg-white/35'}`}
-            />
-          ))}
+        {/* Progress: one continuous line with a dot, like a video player.
+            Click anywhere on it to jump to that step. */}
+        <div
+          className="group flex-1 relative h-4 flex items-center cursor-pointer"
+          role="slider"
+          aria-label="Tutorial progress"
+          aria-valuemin={1}
+          aria-valuemax={SCENES.length}
+          aria-valuenow={scene + 1}
+          tabIndex={0}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            const t = Math.min(0.999, Math.max(0, (e.clientX - r.left) / r.width)) * timeline.total
+            let i = 0
+            while (i + 1 < SCENES.length && timeline.offsets[i + 1] <= t) i++
+            seek(i)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' && scene < SCENES.length - 1) seek(scene + 1)
+            if (e.key === 'ArrowLeft' && scene > 0) seek(scene - 1)
+          }}
+        >
+          {/* Track → red fill → dot at the fill's end. The dot lives inside the
+              fill, so the two always move as one and can't drift apart. */}
+          <div className="relative w-full h-1 group-hover:h-1.5 transition-[height] duration-150 rounded-full bg-white/20">
+            <div className="absolute inset-y-0 left-0 bg-red-600 rounded-full" style={{ width: `${progress * 100}%` }}>
+              <span
+                className="absolute right-0 top-1/2 w-3 h-3 group-hover:w-3.5 group-hover:h-3.5 rounded-full bg-red-600 shadow translate-x-1/2 -translate-y-1/2 transition-[width,height] duration-150"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
         </div>
 
-        <span className="text-xs text-gray-400 tabular-nums w-9 text-right">{scene + 1}/{SCENES.length}</span>
+        <span className="text-xs text-gray-300 tabular-nums whitespace-nowrap">{clock(elapsed)} / {clock(timeline.total)}</span>
         <button
           type="button"
           onClick={toggleMute}

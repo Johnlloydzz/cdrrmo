@@ -96,7 +96,7 @@ export default function RequestAccount() {
     <AuthCard maxWidth="max-w-lg">
       {!done ? (
         <>
-          <h1 className="text-lg font-semibold text-gray-900">Request an Account</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Request Access</h1>
           <p className="text-sm text-gray-500 mt-0.5 mb-4">
             For Barangay Officials only. Fill this out and CDRRMO will create your account for your barangay.
           </p>
