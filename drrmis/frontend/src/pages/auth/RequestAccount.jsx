@@ -35,8 +35,28 @@ export default function RequestAccount() {
   const [done, setDone] = useState(false)
   const formRef = useRef(null)
 
+  // Barangay list stays live without reloading the page: refreshed when the
+  // tab is focused again and every 15 seconds while it's open, so a barangay
+  // freed up by CDRRMO (account deleted / request rejected) shows up again.
   useEffect(() => {
-    apiGet('/account-requests/barangays').then(setBarangays).catch(() => {}).finally(() => setLoadingBarangays(false))
+    let alive = true
+    const load = () => {
+      if (document.visibilityState === 'hidden') return
+      apiGet('/account-requests/barangays')
+        .then(rows => { if (alive) setBarangays(rows) })
+        .catch(() => {})
+        .finally(() => { if (alive) setLoadingBarangays(false) })
+    }
+    load()
+    const timer = setInterval(load, 15000)
+    window.addEventListener('focus', load)
+    document.addEventListener('visibilitychange', load)
+    return () => {
+      alive = false
+      clearInterval(timer)
+      window.removeEventListener('focus', load)
+      document.removeEventListener('visibilitychange', load)
+    }
   }, [])
 
   // After the first Submit, errors update live as the user fixes each field.
