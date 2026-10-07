@@ -1,10 +1,10 @@
 import React from 'react'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, Pane } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, useMapEvents, Pane } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft } from 'lucide-react'
+import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft, X } from 'lucide-react'
 import { prepareSessionHandoff } from '../utils/storage'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { apiGet, apiPut } from '../utils/api'
@@ -73,6 +73,15 @@ function getCentroid(geojson) {
   } catch { return null }
 }
 
+// Left-click on an empty part of the map (sea, outside any barangay) clears
+// the selected barangay. Clicks on a barangay or purok shape are tagged by
+// their own handlers (markHandled) so they don't count as "empty".
+const markHandled = (e) => { if (e?.originalEvent) e.originalEvent._pdraHandled = true }
+function ClearOnMapClick({ onClear }) {
+  useMapEvents({ click: (e) => { if (!e.originalEvent?._pdraHandled) onClear() } })
+  return null
+}
+
 function FlyToBarangay({ target }) {
   const map = useMap()
   useEffect(() => { if (target) map.flyTo(target, 15, { duration: 0.8 }) }, [target, map])
@@ -117,6 +126,13 @@ export default function FloodSimulationControl() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedBarangay, setSelectedBarangay] = useState(null)
+  // Esc clears the selected barangay.
+  useEffect(() => {
+    if (!selectedBarangay) return
+    const onKey = (e) => { if (e.key === 'Escape') setSelectedBarangay(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedBarangay])
 
   const [expanded, setExpanded] = useState(null)
   const [residents, setResidents] = useState([])
@@ -492,12 +508,32 @@ export default function FloodSimulationControl() {
           </div>
         </div>
 
-        <div className={`flood-map-container ${isDisplayMode ? 'h-full flex-1' : 'h-[70vh] lg:h-auto lg:flex-1'} rounded-xl overflow-hidden shadow-sm border border-gray-200 lg:order-1`}>
+        <div className={`flood-map-container relative ${isDisplayMode ? 'h-full flex-1' : 'h-[70vh] lg:h-auto lg:flex-1'} rounded-xl overflow-hidden shadow-sm border border-gray-200 lg:order-1`}>
+          {/* Selected barangay chip — ✕ clears it (also: click an empty part
+              of the map, or press Esc). */}
+          {selectedBarangay && !loading && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] animate-fade-in">
+              <div className="flex items-center gap-2 bg-white/95 backdrop-blur border border-gray-200 shadow-md rounded-full pl-3 pr-1 py-1 text-sm">
+                <Building2 size={14} className="text-primary-600" aria-hidden="true" />
+                <span className="font-medium text-gray-800">{selectedBarangay.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBarangay(null)}
+                  className="p-1 rounded-full text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                  aria-label="Clear selected barangay"
+                  title="Clear (Esc)"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
           {/* While loading: a shimmer block exactly where the map goes. */}
           {loading ? <SkeletonBlock className="w-full h-full rounded-none" /> : (
           <MapContainer center={CENTER} zoom={12} className="w-full h-full animate-fade-in">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <MapResizeHandler />
+            <ClearOnMapClick onClear={() => setSelectedBarangay(null)} />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
 
             {barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
@@ -516,7 +552,7 @@ export default function FloodSimulationControl() {
                   <GeoJSON
                     data={areaStr ? withHole(geo, areaStr) : geo}
                     pathOptions={{ color: '#555', weight: 0.5, fillColor: areaStr ? colorMap.Low : color, fillOpacity: 0.55 }}
-                    eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                    eventHandlers={{ click: (e) => { markHandled(e); setSelectedBarangay(b) } }}
                   >
                     <Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip>
                   </GeoJSON>
@@ -529,7 +565,7 @@ export default function FloodSimulationControl() {
               return (
                 <GeoJSON key={`f-area-${hazard}-${b.id}-${b.updated_at}`} data={area}
                   pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip></GeoJSON>
+                  eventHandlers={{ click: (e) => { markHandled(e); setSelectedBarangay(b) } }}><Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip></GeoJSON>
               )
             })()}
   {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
@@ -539,7 +575,7 @@ export default function FloodSimulationControl() {
                   try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
                   return (
                     <GeoJSON data={res} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
-                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
+                      eventHandlers={{ click: (e) => { markHandled(e); setSelectedBarangay(b) } }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
                   )
                 })()}
                 </React.Fragment>
@@ -558,6 +594,7 @@ export default function FloodSimulationControl() {
                     key={`purok-${p.id}`}
                     data={geo}
                     pathOptions={{ color: '#2563eb', weight: 1.5, fillOpacity: 0, dashArray: '4, 3' }}
+                    eventHandlers={{ click: markHandled }}
                   >
                     <Tooltip sticky>{p.name}</Tooltip>
                   </GeoJSON>
