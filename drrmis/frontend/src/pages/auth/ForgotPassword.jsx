@@ -87,7 +87,7 @@ export default function ForgotPassword() {
   const strong = pw.next.length >= 8 && /[A-Za-z]/.test(pw.next) && /\d/.test(pw.next)
 
   return (
-    <AuthCard maxWidth="max-w-md" stagger={false}>
+    <AuthCard maxWidth="max-w-md">
       {/* Step dots */}
       {step !== 'done' && (
         <div className="flex items-center gap-1.5 mb-3" aria-hidden="true">

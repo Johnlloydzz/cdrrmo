@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin } from 'lucide-react'
 import { apiPost } from '../../utils/api'
 import CookieConsent, { preferencesAllowed } from '../../components/CookieConsent'
-import { useSettled } from '../../components/AuthCard'
 import { setStoredToken } from '../../utils/storage'
 
 const REMEMBERED_USERNAME_KEY = 'pdra_remembered_username' // last username (always kept)
@@ -68,7 +67,6 @@ export default function Login({ onLogin }) {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const settled = useSettled()
   const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
 
   // Filling in a saved password is left to the browser's own autofill
@@ -190,14 +188,12 @@ export default function Login({ onLogin }) {
 
       {/* Right — sign-in card */}
       <div className="flex-1 bg-gray-50 flex items-center justify-center p-4 py-10">
-        <div style={{ '--d': '150ms' }} className="land-in w-full max-w-sm">
+        <div className="w-full max-w-sm">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="flex flex-col items-center text-center">
-              <div style={{ '--d': '250ms' }} className="land-pop mb-3">
-                <Logo alt="CDRRMO" size={64} className="w-16 h-16 object-contain" />
-              </div>
-              <h2 style={{ '--d': '320ms' }} className="land-in text-xl font-bold text-gray-900">Sign In</h2>
-              <p style={{ '--d': '380ms' }} className="land-in text-sm text-gray-400 mt-1">Continue to your account.</p>
+              <Logo alt="CDRRMO" size={64} className="w-16 h-16 object-contain mb-3" />
+              <h2 className="text-xl font-bold text-gray-900">Sign In</h2>
+              <p className="text-sm text-gray-400 mt-1">Continue to your account.</p>
             </div>
 
             {sessionExpired && !error && (
@@ -207,7 +203,7 @@ export default function Login({ onLogin }) {
             )}
 
             <>
-                <form onSubmit={submit} className={`space-y-5 mt-6 stagger-in${settled ? ' settled' : ''}`} style={{ '--base': '440ms' }}>
+                <form onSubmit={submit} className="space-y-5 mt-6">
                   <div>
                     <label className="label">Username</label>
                     <div className="relative">
