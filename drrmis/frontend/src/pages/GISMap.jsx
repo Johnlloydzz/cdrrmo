@@ -49,13 +49,13 @@ function distanceKm([lat1, lng1], [lat2, lng2]) {
 
 const LAYERS = [
   { id: 'street',    label: 'Street View',   url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
-  // Clean, Google Maps-like street map. Free, no API key. {r} loads sharper
-  // @2x tiles on high-DPI screens; 4 subdomains (a-d) load tiles in parallel.
+  // Clean, Google Maps-like street map from Esri (same free, no-key server as
+  // the Satellite layer).
   {
     id: 'voyager', label: 'Google-style',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains: 'abcd', maxZoom: 20,
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors',
+    maxZoom: 19,
   },
   { id: 'satellite', label: 'Satellite',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
