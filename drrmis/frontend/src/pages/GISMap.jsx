@@ -55,7 +55,9 @@ const LAYERS = [
     id: 'voyager', label: 'Google-style',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors',
-    maxZoom: 19,
+    // Esri has no street detail past ~zoom 16 around Gingoog ("Map data not
+    // yet available"). Fetch tiles up to 16 only; closer zooms enlarge them.
+    maxZoom: 19, maxNativeZoom: 16,
   },
   { id: 'satellite', label: 'Satellite',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
@@ -575,6 +577,7 @@ export default function GISMap() {
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
             {...(layer.subdomains ? { subdomains: layer.subdomains } : {})}
             {...(layer.maxZoom ? { maxZoom: layer.maxZoom } : {})}
+            {...(layer.maxNativeZoom ? { maxNativeZoom: layer.maxNativeZoom } : {})}
             keepBuffer={4}
           />
 
