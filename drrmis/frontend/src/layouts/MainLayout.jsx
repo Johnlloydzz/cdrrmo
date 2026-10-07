@@ -133,7 +133,11 @@ export default function MainLayout({ onLogout, currentUser }) {
               shows its OWN skeleton, and a generic one here would flash first
               and then be replaced — the "double loading" effect. */}
           <Suspense fallback={null}>
-            <Outlet />
+            {/* Soft fade each time you open a page from the sidebar (opacity
+                only, so fixed modals inside pages aren't affected). */}
+            <div key={location.pathname} className="h-full animate-fade-in">
+              <Outlet />
+            </div>
           </Suspense>
         </main>
       </div>

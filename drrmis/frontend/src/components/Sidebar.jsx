@@ -118,21 +118,30 @@ export default function Sidebar({ onLogout, currentUser, mobileOpen, onClose }) 
               <div key={group.label}>
                 <button
                   onClick={() => toggleGroup(group.label)}
+                  aria-expanded={!collapsed[group.label]}
                   className="flex items-center justify-between w-full px-1 mb-1 text-xs font-semibold uppercase tracking-wider text-blue-300 hover:text-white transition-colors"
                 >
                   <span>{group.label}</span>
                   <ChevronDown
                     size={14}
-                    className={`transition-transform ${collapsed[group.label] ? '-rotate-90' : ''}`}
+                    className={`transition-transform duration-300 ${collapsed[group.label] ? '-rotate-90' : ''}`}
                   />
                 </button>
-                {!collapsed[group.label] && (
-                  <div className="space-y-0.5">
-                    {visibleItems.map((item) => (
-                      <NavItem key={item.to} {...item} />
-                    ))}
+                {/* Slides open/closed smoothly instead of popping (height via
+                    grid rows; hidden items can't be tabbed to when closed). */}
+                <div
+                  className={`grid transition-[grid-template-rows,opacity,visibility] duration-300 ease-out ${
+                    collapsed[group.label] ? 'grid-rows-[0fr] opacity-0 invisible' : 'grid-rows-[1fr] opacity-100 visible'
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-0.5">
+                      {visibleItems.map((item) => (
+                        <NavItem key={item.to} {...item} />
+                      ))}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
             )
           })}
