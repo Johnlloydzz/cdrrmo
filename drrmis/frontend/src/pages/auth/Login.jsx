@@ -280,7 +280,7 @@ export default function Login({ onLogin }) {
 
                 <div className="border-t border-gray-100 mt-6 pt-4 text-center">
                   <p className="text-sm text-gray-500">
-                    Barangay Official without an account?{' '}
+                    Don't have an account?{' '}
                     <Link to="/request-account" className="text-primary-600 font-medium hover:text-primary-800 transition-colors">
                       Request access
                     </Link>
