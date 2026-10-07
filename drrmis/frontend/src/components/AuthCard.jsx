@@ -1,33 +1,47 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Check, Shield } from 'lucide-react'
 
 // Shared frame for the public auth pages (Request an Account, Request a
 // Password Reset): blue background, PDRA badge, white card, Back to Login.
-export default function AuthCard({ maxWidth = 'max-w-lg', children }) {
+export default function AuthCard({ maxWidth = 'max-w-lg', stagger = true, children }) {
+  // The card's contents rise in one by one when the page opens; after that
+  // ("settled") anything new — an error, the success panel — uses its own
+  // quick animation instead of waiting in the stagger.
+  const settled = useSettled()
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center px-4 py-8">
       <div className={`w-full ${maxWidth}`}>
-        <div className="text-center mb-4 animate-login-rise">
-          <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white shadow-lg">
+        <div className="text-center mb-4">
+          <div style={{ '--d': '0ms' }} className="land-pop inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white shadow-lg">
             <Shield size={18} className="text-primary-700" aria-hidden="true" />
           </div>
-          <p className="text-sm font-bold text-white mt-2 leading-tight">PDRA</p>
-          <p className="text-blue-200 text-xs">Gingoog City CDRRMO</p>
+          <p style={{ '--d': '80ms' }} className="land-in text-sm font-bold text-white mt-2 leading-tight">PDRA</p>
+          <p style={{ '--d': '130ms' }} className="land-in text-blue-200 text-xs">Gingoog City CDRRMO</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-5 sm:p-7 animate-login-rise-late">
+        <div style={{ '--d': '180ms' }} className="land-in bg-white rounded-2xl shadow-2xl p-5 sm:p-7">
           <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 mb-3">
             <ArrowLeft size={14} aria-hidden="true" /> Back to Login
           </Link>
-          {children}
+          <div className={stagger ? `stagger-in${settled ? ' settled' : ''}` : undefined} style={{ '--base': '300ms' }}>
+            {children}
+          </div>
         </div>
 
-        <p className="text-center text-blue-200/80 text-xs mt-5">
+        <p style={{ '--d': '450ms' }} className="land-in text-center text-blue-200/80 text-xs mt-5">
           © {new Date().getFullYear()} Gingoog City CDRRMO. All rights reserved.
         </p>
       </div>
     </div>
   )
+}
+
+// True ~1.3s after mount — once the entrance stagger has finished.
+export function useSettled(ms = 1300) {
+  const [settled, setSettled] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setSettled(true), ms); return () => clearTimeout(t) }, [ms])
+  return settled
 }
 
 // Field label with a red * for required fields.

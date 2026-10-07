@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Eye, EyeOff, User, Lock, Waves, Mountain, CloudRain, AlertTriangle, MapPin } from 'lucide-react'
 import { apiPost } from '../../utils/api'
 import CookieConsent, { preferencesAllowed } from '../../components/CookieConsent'
+import { useSettled } from '../../components/AuthCard'
 import { setStoredToken } from '../../utils/storage'
 
 const REMEMBERED_USERNAME_KEY = 'pdra_remembered_username' // last username (always kept)
@@ -67,6 +68,7 @@ export default function Login({ onLogin }) {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const settled = useSettled()
   const [sessionExpired] = useState(() => new URLSearchParams(window.location.search).get('expired') === '1')
 
   // Filling in a saved password is left to the browser's own autofill
@@ -154,21 +156,23 @@ export default function Login({ onLogin }) {
           <path d="M0 220 L0 180 L120 140 L210 180 L300 130 L390 180 L480 140 L570 180 L660 150 L800 180 L800 220 Z" fill="#0a1836" opacity="0.85" />
         </svg>
 
-        <div className="relative z-10 flex flex-col items-center animate-login-rise">
-          <Logo alt="Gingoog City CDRRMO" size={112} className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg mb-6" />
+        <div className="relative z-10 flex flex-col items-center">
+          <div style={{ '--d': '0ms' }} className="land-pop mb-6">
+            <Logo alt="Gingoog City CDRRMO" size={112} className="w-24 h-24 md:w-28 md:h-28 object-contain drop-shadow-lg" />
+          </div>
 
-          <h1 className="text-white text-xl md:text-2xl font-bold leading-snug max-w-sm">
+          <h1 style={{ '--d': '120ms' }} className="land-in text-white text-xl md:text-2xl font-bold leading-snug max-w-sm">
             PDRA — Pre-Disaster Risk Assessment for Gingoog City
           </h1>
 
-          <p className="text-blue-200 text-sm mt-6 max-w-xs leading-relaxed">
+          <p style={{ '--d': '200ms' }} className="land-in text-blue-200 text-sm mt-6 max-w-xs leading-relaxed">
             <span className="font-semibold text-white">Assessing Risk. Protecting Lives.</span><br />
             A centralized platform for identifying at-risk households and assessing disaster risk before it happens in Gingoog City.
           </p>
 
           <div className="flex items-center gap-4 mt-8">
-            {HAZARDS.map(({ icon: Icon, label, bg }) => (
-              <div key={label} className="flex flex-col items-center gap-1.5">
+            {HAZARDS.map(({ icon: Icon, label, bg }, i) => (
+              <div key={label} style={{ '--d': `${300 + i * 70}ms` }} className="land-in flex flex-col items-center gap-1.5">
                 <div className={`w-11 h-11 rounded-full ${bg} flex items-center justify-center shadow-md`}>
                   <Icon size={18} className="text-white" />
                 </div>
@@ -178,7 +182,7 @@ export default function Login({ onLogin }) {
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center gap-1 text-blue-300 text-xs mt-10">
+        <div style={{ '--d': '600ms' }} className="land-in relative z-10 flex items-center gap-1 text-blue-300 text-xs mt-10">
           <MapPin size={12} />
           Gingoog City, Misamis Oriental, Philippines
         </div>
@@ -186,12 +190,14 @@ export default function Login({ onLogin }) {
 
       {/* Right — sign-in card */}
       <div className="flex-1 bg-gray-50 flex items-center justify-center p-4 py-10">
-        <div className="w-full max-w-sm animate-login-rise-late">
+        <div style={{ '--d': '150ms' }} className="land-in w-full max-w-sm">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
             <div className="flex flex-col items-center text-center">
-              <Logo alt="CDRRMO" size={64} className="w-16 h-16 object-contain mb-3" />
-              <h2 className="text-xl font-bold text-gray-900">Sign In</h2>
-              <p className="text-sm text-gray-400 mt-1">Continue to your account.</p>
+              <div style={{ '--d': '250ms' }} className="land-pop mb-3">
+                <Logo alt="CDRRMO" size={64} className="w-16 h-16 object-contain" />
+              </div>
+              <h2 style={{ '--d': '320ms' }} className="land-in text-xl font-bold text-gray-900">Sign In</h2>
+              <p style={{ '--d': '380ms' }} className="land-in text-sm text-gray-400 mt-1">Continue to your account.</p>
             </div>
 
             {sessionExpired && !error && (
@@ -201,7 +207,7 @@ export default function Login({ onLogin }) {
             )}
 
             <>
-                <form onSubmit={submit} className="space-y-5 mt-6">
+                <form onSubmit={submit} className={`space-y-5 mt-6 stagger-in${settled ? ' settled' : ''}`} style={{ '--base': '440ms' }}>
                   <div>
                     <label className="label">Username</label>
                     <div className="relative">
