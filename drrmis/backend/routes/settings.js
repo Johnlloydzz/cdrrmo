@@ -39,7 +39,7 @@ router.put('/flood-level', async (req, res) => {
       return res.status(403).json({ error: 'Only CDRRMO Personnel can update the flood water level.' })
     }
     const level = parseFloat(req.body.level_m)
-    if (isNaN(level) || level < 0) return res.status(400).json({ error: 'level_m must be a non-negative number' })
+    if (isNaN(level) || level < 0 || level > 20) return res.status(400).json({ error: 'Flood level must be between 0 and 20 meters.' })
     const source = req.body.source === 'auto' ? 'auto' : 'manual'
     const prevRow = await get("SELECT value FROM system_settings WHERE key = 'current_flood_level_m'")
     const prevLevel = parseFloat(prevRow?.value) || 0

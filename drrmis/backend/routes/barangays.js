@@ -57,6 +57,9 @@ router.get('/:id', async (req, res) => {
 // POST /api/barangays
 router.post('/', async (req, res) => {
   try {
+    if (req.user.role !== 'CDRRMO Personnel') {
+      return res.status(403).json({ error: 'Only CDRRMO Personnel can add barangays.' })
+    }
     const { name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson } = req.body
     if (!name) return res.status(400).json({ error: 'Name is required' })
     const result = await run(
@@ -65,7 +68,10 @@ router.post('/', async (req, res) => {
     )
     const newRow = await get('SELECT * FROM barangays WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) {
+    if (err.message.includes('UNIQUE')) return res.status(400).json({ error: 'A barangay with that name already exists.' })
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // PUT /api/barangays/:id

@@ -14,7 +14,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Enter your username or email.' })
     }
     const user = await get('SELECT id, name, username FROM users WHERE username = ? OR email = ?', [identifier.trim(), identifier.trim()])
-    if (user) {
+    // One open request per account every 15 minutes — stops anyone from
+    // flooding CDRRMO with notifications. Same answer either way.
+    const recent = user && await get(
+      "SELECT id FROM password_reset_requests WHERE user_id = ? AND created_at > datetime('now', '+8 hours', '-15 minutes')",
+      [user.id]
+    )
+    if (user && !recent) {
       await run(
         'INSERT INTO password_reset_requests (user_id, message) VALUES (?, ?)',
         [user.id, message || null]

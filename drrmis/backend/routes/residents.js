@@ -117,8 +117,10 @@ router.post('/', async (req, res) => {
     if (!barangay_id) return res.status(400).json({ error: 'Barangay is required.' })
     const { purok_id, error: purokError } = await resolvePurok(req.body.purok_id, household_id, barangay_id)
     if (purokError) return res.status(400).json({ error: purokError })
-    const count = await get('SELECT COUNT(*) as c FROM residents')
-    const resident_id = `RES-${String((count?.c || 0) + 1).padStart(5, '0')}`
+    // Next free RES-xxxxx: highest existing number + 1. (COUNT+1 reused a
+    // number after a resident was deleted and failed the UNIQUE check.)
+    const maxRow = await get("SELECT MAX(CAST(SUBSTR(resident_id, 5) AS INTEGER)) AS n FROM residents WHERE resident_id LIKE 'RES-%'")
+    const resident_id = `RES-${String((maxRow?.n || 0) + 1).padStart(5, '0')}`
     const age_bracket = computeAgeBracket(birthdate)
     const properLast = toProperCase(last_name), properFirst = toProperCase(first_name), properMiddle = toProperCase(middle_name)
     const name = [properFirst, properMiddle, properLast].filter(Boolean).join(' ')

@@ -20,6 +20,19 @@ async function emailLoginDetails(user, username, password, isReset) {
 
 router.use(authenticate)
 
+// A Barangay Official account needs a barangay, and each barangay has only
+// one official account (same rule as Request Account). Returns an error
+// message or null. `exceptId` = the account being edited.
+async function checkBarangaySlot(role, barangay_id, exceptId = null) {
+  if (role !== 'Barangay Official') return null
+  if (!barangay_id) return 'Pick the barangay for this Barangay Official.'
+  const taken = await get(
+    "SELECT u.id, b.name FROM users u JOIN barangays b ON b.id = u.barangay_id WHERE u.role = 'Barangay Official' AND u.barangay_id = ? AND u.id != ?",
+    [barangay_id, exceptId ?? -1]
+  )
+  return taken ? `Brgy. ${taken.name} already has a Barangay Official account.` : null
+}
+
 // User list and details include every account's email — CDRRMO only.
 router.get('/', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
@@ -48,6 +61,8 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const { name, username, email, password, role, barangay_id, status } = req.body
     if (!name || !username || !email || !password || !role) return res.status(400).json({ error: 'All fields required' })
+    const slotError = await checkBarangaySlot(role, barangay_id)
+    if (slotError) return res.status(400).json({ error: slotError })
     const hash = await bcrypt.hash(password, 12)
     const r = await run(
       'INSERT INTO users (name, username, email, password_hash, role, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -67,7 +82,15 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
 
 router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
-    const { name, email, role, barangay_id, status, password } = req.body
+    const isSelf = String(req.params.id) === String(req.user.id)
+    const { name, email, password } = req.body
+    // You can't demote or deactivate your own account (you'd lock yourself out).
+    const role = isSelf ? req.user.role : req.body.role
+    const status = isSelf ? 'Active' : req.body.status
+    const barangay_id = role === 'CDRRMO Personnel' ? null : (req.body.barangay_id || null)
+    if (!name || !email || !role) return res.status(400).json({ error: 'Name, email and role are required.' })
+    const slotError = await checkBarangaySlot(role, barangay_id, req.params.id)
+    if (slotError) return res.status(400).json({ error: slotError })
     if (password && password.trim()) {
       const hash = await bcrypt.hash(password, 12)
       await run(
@@ -86,7 +109,10 @@ router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
       ? await emailLoginDetails(user, user.username, password, true)
       : {}
     res.json({ ...user, ...email_result })
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) {
+    if (err.message.includes('UNIQUE')) return res.status(400).json({ error: 'That email is already used by another account.' })
+    res.status(500).json({ error: err.message })
+  }
 })
 
 router.delete('/:id', authorize('CDRRMO Personnel'), async (req, res) => {

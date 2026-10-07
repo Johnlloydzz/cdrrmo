@@ -1,23 +1,36 @@
 const jwt = require('jsonwebtoken')
-const { run } = require('../db/database')
+const { get, run } = require('../db/database')
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const header = req.headers.authorization
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' })
   }
   const token = header.split(' ')[1]
+  let decoded
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret')
-    req.user = decoded
-    // Fire-and-forget: stamps this user as "active right now" on every
-    // request, powering the live online/offline indicator in User
-    // Management. Never awaited — must not slow down or block the request.
-    run('UPDATE users SET last_active = datetime(\'now\', \'+8 hours\') WHERE id = ?', [decoded.id]).catch(() => {})
-    next()
+    decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret')
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
+  try {
+    // The account is checked on every request, not just at sign-in: a user
+    // CDRRMO deleted or set to Inactive is signed out right away (instead of
+    // keeping access until their token expires, up to 30 days), and a role or
+    // barangay change applies immediately.
+    const user = await get('SELECT id, name, role, barangay_id, status FROM users WHERE id = ?', [decoded.id])
+    if (!user || (user.status && user.status !== 'Active')) {
+      return res.status(401).json({ error: 'Your account is no longer active. Please contact CDRRMO.' })
+    }
+    req.user = { ...decoded, name: user.name, role: user.role, barangay_id: user.barangay_id }
+  } catch (err) {
+    return res.status(500).json({ error: err.message })
+  }
+  // Fire-and-forget: stamps this user as "active right now" on every
+  // request, powering the live online/offline indicator in User
+  // Management. Never awaited — must not slow down or block the request.
+  run('UPDATE users SET last_active = datetime(\'now\', \'+8 hours\') WHERE id = ?', [decoded.id]).catch(() => {})
+  next()
 }
 
 function authorize(...roles) {
