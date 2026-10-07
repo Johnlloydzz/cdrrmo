@@ -49,6 +49,14 @@ function distanceKm([lat1, lng1], [lat2, lng2]) {
 
 const LAYERS = [
   { id: 'street',    label: 'Street View',   url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png' },
+  // Clean, Google Maps-like street map. Free, no API key. {r} loads sharper
+  // @2x tiles on high-DPI screens; 4 subdomains (a-d) load tiles in parallel.
+  {
+    id: 'voyager', label: 'Google-style',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    subdomains: 'abcd', maxZoom: 20,
+  },
   { id: 'satellite', label: 'Satellite',     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' },
   { id: 'terrain',   label: 'Terrain',       url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png' },
 ]
@@ -565,6 +573,9 @@ export default function GISMap() {
             key={activeLayer}
             url={layer.url}
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
+            {...(layer.subdomains ? { subdomains: layer.subdomains } : {})}
+            {...(layer.maxZoom ? { maxZoom: layer.maxZoom } : {})}
+            keepBuffer={4}
           />
 
           {/* Roads / Rivers reference overlays — free public Esri tiles, no
