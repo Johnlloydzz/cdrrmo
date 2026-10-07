@@ -3,7 +3,7 @@ import {
   LayoutDashboard, MapPin, Home, Users, Shield, AlertTriangle,
   Tent, Package, Truck, CloudRain, Map, Bell, UserCog,
   FileText, BarChart2, ClipboardList, Settings, ChevronDown,
-  Building2, TreePine, LogOut, Archive
+  Building2, TreePine, LogOut, Archive, Waves, Maximize2
 } from 'lucide-react'
 import { useState } from 'react'
 import { ROLE_ACCESS, ROLE_COLORS } from '../data/users'
@@ -14,6 +14,9 @@ const navGroups = [
     items: [
       { to: '/',    icon: LayoutDashboard, label: 'Risk Assessment Dashboard', exact: true },
       { to: '/map', icon: Map,             label: 'Hazard Map & Geofencing' },
+      // Full-page tool (no sidebar) for setting the live flood level and the
+      // big-screen display. Shown only to roles allowed to open it (CDRRMO).
+      { to: '/flood-control', icon: Waves, label: 'Flood Simulation Control', fullPage: true },
     ],
   },
   {
@@ -34,11 +37,12 @@ const navGroups = [
   },
 ]
 
-function NavItem({ to, icon: Icon, label, exact }) {
+function NavItem({ to, icon: Icon, label, exact, fullPage }) {
   return (
     <NavLink
       to={to}
       end={exact}
+      title={fullPage ? 'Opens as a full page. Use “Back to system” to return.' : undefined}
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 ${
           isActive
@@ -47,8 +51,11 @@ function NavItem({ to, icon: Icon, label, exact }) {
         }`
       }
     >
-      <Icon size={18} />
-      <span>{label}</span>
+      <Icon size={18} className="flex-shrink-0" />
+      <span className="flex-1">{label}</span>
+      {fullPage && (
+        <Maximize2 size={13} className="flex-shrink-0 opacity-60" aria-label="Opens as a full page" />
+      )}
     </NavLink>
   )
 }
