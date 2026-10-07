@@ -52,11 +52,6 @@ function withHole(geo, areaStr) {
 }
 
 
-const barangayIcon = new L.DivIcon({
-  className: 'barangay-pin',
-  html: `<div style="background:#1d4ed8;width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
-  iconSize: [14, 14], iconAnchor: [7, 14], popupAnchor: [0, -14],
-})
 const pinIcon = (color) => new L.DivIcon({
   className: '',
   html: `<div style="background:${color};width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
@@ -551,9 +546,9 @@ export default function FloodSimulationControl() {
               )
             })}
 
-            {/* Purok boundaries — real drawn polygons where a Barangay
-                Official has traced one. */}
-            {barangaysWithCentroid.flatMap(b => (b.puroks || [])
+            {/* Purok boundaries — only for the barangay you clicked, same as
+                the Risk Assessment Dashboard (keeps the citywide view clean). */}
+            {selectedBarangay && (barangaysWithCentroid.find(b => b.id === selectedBarangay.id)?.puroks || [])
               .filter(p => p.boundary_geojson)
               .map(p => {
                 let geo
@@ -568,11 +563,7 @@ export default function FloodSimulationControl() {
                   </GeoJSON>
                 )
               })
-            )}
-
-            {barangaysWithCentroid.filter(b => b.centroid).map(b => (
-              <Marker key={`brgy-${b.id}`} position={b.centroid} icon={barangayIcon} eventHandlers={{ click: () => setSelectedBarangay(b) }} />
-            ))}
+            }
 
             {/* Highlighted outline for the selected barangay — same blue
                 style as Hazard Map & Geofencing */}
@@ -592,8 +583,10 @@ export default function FloodSimulationControl() {
             })()}
 
             {/* One pin per PUROK (households aren't pinned individually):
-                red if any of its households is at risk. */}
-            {Object.values(households.reduce((acc, h) => {
+                red if any of its households is at risk. Only for the selected
+                barangay, like the Dashboard. */}
+            {selectedBarangay && Object.values(households.reduce((acc, h) => {
+              if (h.barangay_name !== selectedBarangay.name) return acc
               if (!h.purok_id || h.purok_lat == null || h.purok_lng == null) return acc
               const g = acc[h.purok_id] || (acc[h.purok_id] = { id: h.purok_id, name: h.purok_name, barangay: h.barangay_name, lat: h.purok_lat, lng: h.purok_lng, households: 0, atRisk: 0, members: 0 })
               g.households += 1
