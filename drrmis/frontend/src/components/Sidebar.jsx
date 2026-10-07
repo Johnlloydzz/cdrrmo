@@ -87,9 +87,12 @@ export default function Sidebar({ onLogout, currentUser, mobileOpen, onClose }) 
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-primary-700">
-          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
-            <img src="/cdrrmo-logo.png" alt="CDRRMO" className="w-full h-full object-contain p-0.5" />
-          </div>
+          {/* Logo on the blue sidebar, no white box (client request). Small
+              WebP first (already preloaded), PNG as fallback. */}
+          <picture className="w-10 h-10 flex-shrink-0">
+            <source srcSet="/cdrrmo-logo-256.webp" type="image/webp" />
+            <img src="/cdrrmo-logo.png" alt="CDRRMO" width={40} height={40} decoding="async" className="w-10 h-10 object-contain drop-shadow" />
+          </picture>
           <div className="overflow-hidden">
             <p className="text-white font-bold text-sm leading-tight">PDRA</p>
             <p className="text-blue-200 text-xs truncate">Gingoog City CDRRMO</p>
