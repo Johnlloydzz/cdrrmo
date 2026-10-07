@@ -66,6 +66,8 @@ export default function RequestAccountTutorial() {
   const [started, setStarted] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(!canSpeak)
+  const voiceEndRef = useRef(null) // ends the current narration early (used when muting)
+  const muteRef = useRef(!canSpeak) // read by running scenes, so mute/unmute never restarts the video
   const [scene, setScene] = useState(0)
   const [typed, setTyped] = useState({}) // field -> text shown so far
   const timers = useRef([])
@@ -84,7 +86,7 @@ export default function RequestAccountTutorial() {
     return t
   }
 
-  const playScene = useCallback((index, isMuted) => {
+  const playScene = useCallback((index) => {
     const id = ++runId.current
     clearTimers(); stopSpeech()
     setScene(index)
@@ -97,7 +99,7 @@ export default function RequestAccountTutorial() {
       if (id !== runId.current || !typingDone || !speechDone) return
       timers.current.push(setTimeout(() => {
         if (id !== runId.current) return
-        if (index + 1 < SCENES.length) playScene(index + 1, isMuted)
+        if (index + 1 < SCENES.length) playScene(index + 1)
         else setPlaying(false)
       }, 700))
     }
@@ -115,8 +117,11 @@ export default function RequestAccountTutorial() {
 
     // Narration. A scene never ends before its caption could be read, even if
     // the voice fails or ends early, so the video doesn't cut ahead.
+    // The scene always lasts the same time, voice on or off, so muting never
+    // changes the video's length or makes it jump.
     const words = s.say.split(' ').length
-    const readMs = Math.max(2500, words * 330)
+    const readMs = sceneMs(s, canSpeak) - 700
+    const isMuted = muteRef.current
     let readDone = false
     let voiceDone = isMuted || !canSpeak
     const finish = () => {
@@ -126,7 +131,7 @@ export default function RequestAccountTutorial() {
     timers.current.push(setTimeout(() => { readDone = true; finish() }, readMs))
 
     // Expected length of this scene, used to move the time and line smoothly.
-    sceneClock.current = { start: performance.now(), ms: sceneMs(s, !isMuted && canSpeak) }
+    sceneClock.current = { start: performance.now(), ms: sceneMs(s, canSpeak) }
 
     if (!isMuted && canSpeak) {
       const u = new SpeechSynthesisUtterance(s.say)
@@ -134,6 +139,7 @@ export default function RequestAccountTutorial() {
       if (v) { u.voice = v; u.lang = v.lang } else u.lang = 'en-US'
       u.rate = 0.98
       const voiceEnd = () => { if (id === runId.current) { voiceDone = true; finish() } }
+      voiceEndRef.current = voiceEnd
       u.onend = voiceEnd
       u.onerror = voiceEnd
       // Chrome drops speech whose utterance object gets garbage-collected
@@ -142,6 +148,7 @@ export default function RequestAccountTutorial() {
       // Chrome also skips an utterance spoken right after cancel(); wait a beat.
       timers.current.push(setTimeout(() => {
         if (id !== runId.current) return
+        if (muteRef.current) { voiceEnd(); return } // muted in the meantime
         window.speechSynthesis.resume()
         window.speechSynthesis.speak(u)
       }, 120))
@@ -150,7 +157,7 @@ export default function RequestAccountTutorial() {
     }
   }, [canSpeak])
 
-  const timeline = useMemo(() => sceneOffsets(!muted && canSpeak), [muted, canSpeak])
+  const timeline = useMemo(() => sceneOffsets(canSpeak), [canSpeak])
   const progress = Math.min(1, elapsed / timeline.total)
 
   // Progress line: moves continuously while playing (like a video player).
@@ -187,18 +194,22 @@ export default function RequestAccountTutorial() {
   // Stop everything when leaving the page.
   useEffect(() => () => { runId.current++; clearTimers(); stopSpeech() }, [])
 
-  const start = (from = 0) => { setStarted(true); setPlaying(true); playScene(from, muted) }
+  const start = (from = 0) => { setStarted(true); setPlaying(true); playScene(from) }
   const pause = () => { runId.current++; clearTimers(); stopSpeech(); setPlaying(false) }
   const togglePlay = () => {
     if (playing) pause()
     else start(scene === SCENES.length - 1 ? 0 : scene)
   }
   const restart = () => { setElapsed(0); start(0) }
-  const seek = (i) => { if (playing) { setStarted(true); playScene(i, muted) } else { runId.current++; clearTimers(); stopSpeech(); setStarted(true); setScene(i); setElapsed(timeline.offsets[i]); setTyped({ ...filledBefore(i), ...(SCENES[i].type ? { [SCENES[i].field]: SCENES[i].type } : {}) }) } }
+  const seek = (i) => { if (playing) { setStarted(true); playScene(i) } else { runId.current++; clearTimers(); stopSpeech(); setStarted(true); setScene(i); setElapsed(timeline.offsets[i]); setTyped({ ...filledBefore(i), ...(SCENES[i].type ? { [SCENES[i].field]: SCENES[i].type } : {}) }) } }
+  // Like a video's speaker button: only the voice changes — the picture,
+  // typing and time keep running. Muting stops the voice now; unmuting
+  // brings it back from the next step.
   const toggleMute = () => {
     const m = !muted
     setMuted(m)
-    if (playing) playScene(scene, m) // restart this scene with/without voice
+    muteRef.current = m
+    if (m) { stopSpeech(); voiceEndRef.current?.() }
   }
 
   const s = SCENES[scene]
