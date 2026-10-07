@@ -64,10 +64,15 @@ const EXPECTED_COLUMNS = {
 }
 
 async function selfHealColumns() {
-  for (const [table, columns] of Object.entries(EXPECTED_COLUMNS)) {
-    let existing
-    try { existing = (await all(`PRAGMA table_info(${table})`)).map(r => r.name) }
-    catch { continue }
+  // All tables' column lists fetched at the same time (one wait instead of
+  // one per table) — this runs on every cold start.
+  const tables = Object.entries(EXPECTED_COLUMNS)
+  const infos = await Promise.all(tables.map(([table]) =>
+    all(`PRAGMA table_info(${table})`).then(rows => rows.map(r => r.name)).catch(() => null)
+  ))
+  for (const [i, [table, columns]] of tables.entries()) {
+    const existing = infos[i]
+    if (!existing) continue
     for (const [colName, colDef] of Object.entries(columns)) {
       if (existing.includes(colName)) continue
       try {
@@ -172,15 +177,13 @@ async function migrateResidentsHouseholdOptional() {
 
 async function initDb() {
   const schema = require('./schema')
-  for (const stmt of schema) {
-    await run(stmt)
-  }
+  // All CREATE TABLE IF NOT EXISTS statements in one round trip.
+  await getDb().batch(schema, 'write')
   await selfHealColumns()
   await migrateResidentsHouseholdOptional()
   await seedBarangays()
-  await seedDefaultAdmin()
-  await seedBoundaries()
-  await selfHealPurokNames()
+  // These don't depend on each other — run them at the same time.
+  await Promise.all([seedDefaultAdmin(), seedBoundaries(), selfHealPurokNames()])
   console.log('Database initialized.')
 }
 
@@ -351,11 +354,12 @@ async function seedBoundaries() {
     return
   }
 
-  const barangays = await all('SELECT id, name, boundary_geojson FROM barangays')
+  // Only the barangays still missing a boundary (usually none) — the old
+  // query downloaded every polygon on every cold start.
+  const barangays = await all('SELECT id, name FROM barangays WHERE boundary_geojson IS NULL')
   let restored = 0
 
   for (const b of barangays) {
-    if (b.boundary_geojson) continue // already has one, leave it alone
     const geometry = boundaries[b.name]
     if (!geometry) continue
     await run('UPDATE barangays SET boundary_geojson = ? WHERE id = ?', [JSON.stringify(geometry), b.id])
