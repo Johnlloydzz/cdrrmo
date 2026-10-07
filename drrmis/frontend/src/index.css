@@ -178,3 +178,26 @@
   .animate-login-rise, .animate-login-rise-late, .animate-cookie-up,
   .animate-modal-in, .animate-slide-down-in { animation: none; }
 }
+
+/* ── Landing page entrance ───────────────────────────────────────────────
+   Hero pieces rise in one after another (--d = delay), the header slides
+   down, and each section fades up as it scrolls into view ([data-reveal],
+   toggled by Landing.jsx). Only opacity/transform, so it stays smooth. */
+@keyframes land-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes land-pop  { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
+@keyframes land-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.land-in   { animation: land-rise .7s cubic-bezier(.22, 1, .36, 1) var(--d, 0ms) both; }
+.land-pop  { animation: land-pop .8s cubic-bezier(.22, 1, .36, 1) var(--d, 0ms) both; }
+.land-down { animation: land-down .5s cubic-bezier(.22, 1, .36, 1) both; }
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity .7s cubic-bezier(.22, 1, .36, 1), transform .7s cubic-bezier(.22, 1, .36, 1);
+  transition-delay: var(--d, 0ms);
+  will-change: opacity, transform;
+}
+[data-reveal].is-visible { opacity: 1; transform: none; will-change: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .land-in, .land-pop, .land-down { animation: none; }
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+}

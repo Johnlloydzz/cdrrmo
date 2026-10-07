@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   LayoutDashboard, Map, Users, Waves, Bell, ShieldCheck, Building2, Home,
@@ -104,9 +104,22 @@ function scrollToId(id) {
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false)
   const go = (id) => { setMenuOpen(false); scrollToId(id) }
+  const pageRef = useRef(null)
+
+  // Sections slide/fade in as they scroll into view (each once), so the page
+  // feels alive instead of everything appearing at once.
+  useEffect(() => {
+    const els = pageRef.current?.querySelectorAll('[data-reveal]') || []
+    if (!('IntersectionObserver' in window)) { els.forEach(el => el.classList.add('is-visible')); return }
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target) } })
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' })
+    els.forEach(el => io.observe(el))
+    return () => io.disconnect()
+  }, [])
 
   return (
-    <div className="min-h-screen bg-white text-gray-800">
+    <div ref={pageRef} className="min-h-screen bg-white text-gray-800">
       {/* Government strip */}
       <div className="bg-blue-950 text-blue-200 text-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-1.5 flex items-center justify-between gap-4">
@@ -116,7 +129,7 @@ export default function Landing() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100 land-down">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-3 min-w-0" aria-label="PDRA home">
             <Seal size={40} className="w-10 h-10 object-contain flex-shrink-0" />
@@ -159,17 +172,17 @@ export default function Landing() {
           </svg>
 
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-28 md:pt-24 md:pb-40 grid md:grid-cols-[1.2fr_1fr] gap-12 items-center">
-            <div className="animate-login-rise">
-              <p className="inline-flex items-center gap-2 text-xs font-medium text-blue-100 bg-white/10 border border-white/15 rounded-full px-3 py-1">
+            <div>
+              <p style={{ '--d': '80ms' }} className="land-in inline-flex items-center gap-2 text-xs font-medium text-blue-100 bg-white/10 border border-white/15 rounded-full px-3 py-1">
                 <Lock size={12} aria-hidden="true" /> For authorized government personnel
               </p>
-              <h1 className="mt-5 text-3xl sm:text-4xl md:text-5xl font-bold leading-tight [text-wrap:balance]">
+              <h1 style={{ '--d': '170ms' }} className="land-in mt-5 text-3xl sm:text-4xl md:text-5xl font-bold leading-tight [text-wrap:balance]">
                 Pre-Disaster Risk Assessment for Gingoog City
               </h1>
-              <p className="mt-5 text-blue-100 text-base md:text-lg max-w-xl leading-relaxed">
+              <p style={{ '--d': '260ms' }} className="land-in mt-5 text-blue-100 text-base md:text-lg max-w-xl leading-relaxed">
                 One system for the City Disaster Risk Reduction and Management Office and every barangay — to know who is at risk, and act before disaster strikes.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div style={{ '--d': '350ms' }} className="land-in mt-8 flex flex-wrap gap-3">
                 <Link to="/login" className="inline-flex items-center gap-2 rounded-lg bg-white text-blue-900 font-semibold px-5 py-3 hover:bg-blue-50 transition-all active:scale-[0.98]">
                   Sign in to PDRA <ArrowRight size={16} aria-hidden="true" />
                 </Link>
@@ -179,12 +192,14 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="hidden md:flex flex-col items-center text-center animate-login-rise-late">
-              <Seal size={176} className="w-44 h-44 object-contain drop-shadow-2xl" />
-              <p className="mt-5 text-sm font-semibold tracking-wide">Assessing Risk. Protecting Lives.</p>
+            <div className="hidden md:flex flex-col items-center text-center">
+              <div style={{ '--d': '220ms' }} className="land-pop">
+                <Seal size={176} className="w-44 h-44 object-contain drop-shadow-2xl" />
+              </div>
+              <p style={{ '--d': '420ms' }} className="land-in mt-5 text-sm font-semibold tracking-wide">Assessing Risk. Protecting Lives.</p>
               <ul className="mt-5 flex gap-5" aria-label="Hazards covered">
-                {HAZARDS.map(({ icon: Icon, label }) => (
-                  <li key={label} className="flex flex-col items-center gap-1.5">
+                {HAZARDS.map(({ icon: Icon, label }, i) => (
+                  <li key={label} style={{ '--d': `${500 + i * 80}ms` }} className="land-in flex flex-col items-center gap-1.5">
                     <span className="w-10 h-10 rounded-full bg-white/10 border border-white/15 flex items-center justify-center">
                       <Icon size={17} aria-hidden="true" />
                     </span>
@@ -199,18 +214,20 @@ export default function Landing() {
         {/* Features */}
         <section id="features" className="scroll-mt-20 py-16 md:py-24">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="max-w-2xl">
+            <div data-reveal className="max-w-2xl">
               <p className="text-sm font-semibold text-primary-700">What PDRA does</p>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">Everything disaster preparedness needs, in one place</h2>
             </div>
             <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {FEATURES.map(({ icon: Icon, title, text }) => (
-                <div key={title} className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              {FEATURES.map(({ icon: Icon, title, text }, i) => (
+                <div key={title} data-reveal style={{ '--d': `${(i % 3) * 90}ms` }}>
+                <div className="h-full rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                   <span className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
                     <Icon size={20} aria-hidden="true" />
                   </span>
                   <h3 className="mt-4 font-semibold text-gray-900">{title}</h3>
                   <p className="mt-1.5 text-sm text-gray-600 leading-relaxed">{text}</p>
+                </div>
                 </div>
               ))}
             </div>
@@ -220,13 +237,13 @@ export default function Landing() {
         {/* Roles */}
         <section id="roles" className="scroll-mt-20 py-16 md:py-24 bg-gray-50 border-y border-gray-100">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="max-w-2xl">
+            <div data-reveal className="max-w-2xl">
               <p className="text-sm font-semibold text-primary-700">Who it’s for</p>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">Built for the people who keep Gingoog safe</h2>
             </div>
             <div className="mt-10 grid md:grid-cols-2 gap-5">
-              {ROLES.map(({ icon: Icon, title, lead, items }) => (
-                <div key={title} className="rounded-2xl bg-white border border-gray-100 p-6 md:p-8 shadow-sm">
+              {ROLES.map(({ icon: Icon, title, lead, items }, i) => (
+                <div key={title} data-reveal style={{ '--d': `${i * 110}ms` }} className="rounded-2xl bg-white border border-gray-100 p-6 md:p-8 shadow-sm">
                   <div className="flex items-center gap-3">
                     <span className="w-11 h-11 rounded-xl bg-blue-900 text-white flex items-center justify-center">
                       <Icon size={20} aria-hidden="true" />
@@ -253,13 +270,13 @@ export default function Landing() {
         {/* How it works */}
         <section id="how" className="scroll-mt-20 py-16 md:py-24">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div className="max-w-2xl">
+            <div data-reveal className="max-w-2xl">
               <p className="text-sm font-semibold text-primary-700">How it works</p>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">From barangay records to early action</h2>
             </div>
             <ol className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {STEPS.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} className="relative rounded-2xl border border-gray-100 p-6">
+                <li key={title} data-reveal style={{ '--d': `${i * 90}ms` }} className="relative rounded-2xl border border-gray-100 p-6">
                   <span className="absolute top-5 right-5 text-3xl font-bold text-gray-100 select-none" aria-hidden="true">{i + 1}</span>
                   <Icon size={22} className="text-primary-700" aria-hidden="true" />
                   <h3 className="mt-4 font-semibold text-gray-900">{title}</h3>
@@ -273,7 +290,7 @@ export default function Landing() {
         {/* Tutorial */}
         <section id="tutorial" className="scroll-mt-20 py-16 md:py-24 bg-gray-50 border-y border-gray-100">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-[1fr_1.4fr] gap-10 items-center">
-            <div>
+            <div data-reveal>
               <p className="text-sm font-semibold text-primary-700">Tutorial</p>
               <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">How to request an account</h2>
               <p className="mt-3 text-gray-600 leading-relaxed">
@@ -295,13 +312,15 @@ export default function Landing() {
                 Request access <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
-            <RequestAccountTutorial />
+            <div data-reveal style={{ '--d': '120ms' }}>
+              <RequestAccountTutorial />
+            </div>
           </div>
         </section>
 
         {/* Access & privacy */}
         <section className="py-14 bg-blue-950 text-white">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-[1fr_auto] gap-8 items-center">
+          <div data-reveal className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-[1fr_auto] gap-8 items-center">
             <div>
               <h2 className="text-xl md:text-2xl font-bold">Authorized personnel only</h2>
               <p className="mt-2 text-blue-200 max-w-2xl leading-relaxed">
@@ -322,20 +341,20 @@ export default function Landing() {
         {/* Contact */}
         <section id="contact" className="scroll-mt-20 py-16 md:py-20">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-5">
-            <div className="rounded-2xl border border-red-100 bg-red-50 p-6">
+            <div data-reveal className="rounded-2xl border border-red-100 bg-red-50 p-6">
               <Phone size={20} className="text-red-600" aria-hidden="true" />
               <h3 className="mt-3 font-semibold text-gray-900">In an emergency</h3>
               <p className="mt-1 text-sm text-gray-600">Call the national emergency hotline.</p>
               <a href="tel:911" className="mt-3 inline-block text-2xl font-bold text-red-600 hover:text-red-700">911</a>
             </div>
-            <div className="rounded-2xl border border-gray-100 p-6">
+            <div data-reveal style={{ '--d': '90ms' }} className="rounded-2xl border border-gray-100 p-6">
               <MapPin size={20} className="text-primary-700" aria-hidden="true" />
               <h3 className="mt-3 font-semibold text-gray-900">City Government of Gingoog</h3>
               <p className="mt-1 text-sm text-gray-600 leading-relaxed">
                 Peoples Palace, City Hall Complex<br />Brgy. 22-A, Gingoog City<br />Misamis Oriental 9014
               </p>
             </div>
-            <div className="rounded-2xl border border-gray-100 p-6">
+            <div data-reveal style={{ '--d': '180ms' }} className="rounded-2xl border border-gray-100 p-6">
               <ShieldCheck size={20} className="text-primary-700" aria-hidden="true" />
               <h3 className="mt-3 font-semibold text-gray-900">Need access or help?</h3>
               <p className="mt-1 text-sm text-gray-600 leading-relaxed">Barangay Officials can request an account. Forgot your password? Reset it with a code sent to your email.</p>
