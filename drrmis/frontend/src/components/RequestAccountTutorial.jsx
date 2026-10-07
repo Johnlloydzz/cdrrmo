@@ -66,6 +66,8 @@ export default function RequestAccountTutorial() {
   const [started, setStarted] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(!canSpeak)
+  const draggingRef = useRef(null) // { wasPlaying } while the dot is held
+  const [dragging, setDragging] = useState(false)
   const voiceEndRef = useRef(null) // ends the current narration early (used when muting)
   const muteRef = useRef(!canSpeak) // read by running scenes, so mute/unmute never restarts the video
   const [scene, setScene] = useState(0)
@@ -86,14 +88,26 @@ export default function RequestAccountTutorial() {
     return t
   }
 
-  const playScene = useCallback((index) => {
+  // What the form shows `offset` ms into scene `index` (for dragging/seeking).
+  const typedAt = (index, offset) => {
+    const t = filledBefore(index)
+    const s = SCENES[index]
+    if (s.type) {
+      const k = Math.max(0, Math.min(s.type.length, Math.floor((offset - 600) / TYPE_MS)))
+      if (k > 0) t[s.field] = s.type.slice(0, k)
+    }
+    return t
+  }
+
+  // `offset` = start this many ms into the scene (after dragging the dot).
+  const playScene = useCallback((index, offset = 0) => {
     const id = ++runId.current
     clearTimers(); stopSpeech()
     setScene(index)
-    setTyped(filledBefore(index))
+    setTyped(typedAt(index, offset))
     const s = SCENES[index]
 
-    let typingDone = !s.type
+    let typingDone = !s.type || offset >= 600 + s.type.length * TYPE_MS
     let speechDone = false
     const next = () => {
       if (id !== runId.current || !typingDone || !speechDone) return
@@ -105,13 +119,14 @@ export default function RequestAccountTutorial() {
     }
 
     // Typing animation
-    if (s.type) {
+    if (s.type && !typingDone) {
       for (let i = 1; i <= s.type.length; i++) {
+        if (600 + i * TYPE_MS <= offset) continue // already shown
         timers.current.push(setTimeout(() => {
           if (id !== runId.current) return
           setTyped(t => ({ ...t, [s.field]: s.type.slice(0, i) }))
           if (i === s.type.length) { typingDone = true; next() }
-        }, 600 + i * TYPE_MS))
+        }, 600 + i * TYPE_MS - offset))
       }
     }
 
@@ -120,8 +135,9 @@ export default function RequestAccountTutorial() {
     // The scene always lasts the same time, voice on or off, so muting never
     // changes the video's length or makes it jump.
     const words = s.say.split(' ').length
-    const readMs = sceneMs(s, canSpeak) - 700
-    const isMuted = muteRef.current
+    const readMs = Math.max(800, sceneMs(s, canSpeak) - 700 - offset)
+    // Dropped in mid-sentence (drag): skip that step's voice, captions stay.
+    const isMuted = muteRef.current || offset > 1000
     let readDone = false
     let voiceDone = isMuted || !canSpeak
     const finish = () => {
@@ -131,7 +147,7 @@ export default function RequestAccountTutorial() {
     timers.current.push(setTimeout(() => { readDone = true; finish() }, readMs))
 
     // Expected length of this scene, used to move the time and line smoothly.
-    sceneClock.current = { start: performance.now(), ms: sceneMs(s, canSpeak) }
+    sceneClock.current = { start: performance.now() - offset, ms: sceneMs(s, canSpeak) }
 
     if (!isMuted && canSpeak) {
       const u = new SpeechSynthesisUtterance(s.say)
@@ -165,6 +181,7 @@ export default function RequestAccountTutorial() {
     if (!playing) return
     let raf
     const tick = () => {
+      if (draggingRef.current) { raf = requestAnimationFrame(tick); return }
       const { start, ms } = sceneClock.current
       const within = Math.min(0.98, (performance.now() - start) / ms)
       setElapsed(timeline.offsets[scene] + within * ms)
@@ -202,6 +219,48 @@ export default function RequestAccountTutorial() {
   }
   const restart = () => { setElapsed(0); start(0) }
   const seek = (i) => { if (playing) { setStarted(true); playScene(i) } else { runId.current++; clearTimers(); stopSpeech(); setStarted(true); setScene(i); setElapsed(timeline.offsets[i]); setTyped({ ...filledBefore(i), ...(SCENES[i].type ? { [SCENES[i].field]: SCENES[i].type } : {}) }) } }
+  // Drag the dot (hold left click) like YouTube: it follows the mouse, the
+  // picture/time update live, and playback continues from where you let go.
+  const timeAtPointer = (e, el) => {
+    const r = el.getBoundingClientRect()
+    return Math.min(0.999, Math.max(0, (e.clientX - r.left) / r.width)) * timeline.total
+  }
+  const sceneAtTime = (t) => {
+    let i = 0
+    while (i + 1 < SCENES.length && timeline.offsets[i + 1] <= t) i++
+    return i
+  }
+  const scrubTo = (t) => {
+    const i = sceneAtTime(t)
+    setElapsed(t)
+    setScene(i)
+    setTyped(typedAt(i, t - timeline.offsets[i]))
+  }
+  const onScrubStart = (e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    draggingRef.current = { wasPlaying: playing }
+    runId.current++; clearTimers(); stopSpeech() // hold the video while dragging
+    setStarted(true)
+    setDragging(true)
+    scrubTo(timeAtPointer(e, e.currentTarget))
+  }
+  const onScrubMove = (e) => {
+    if (!draggingRef.current) return
+    scrubTo(timeAtPointer(e, e.currentTarget))
+  }
+  const onScrubEnd = (e) => {
+    const d = draggingRef.current
+    if (!d) return
+    draggingRef.current = null
+    setDragging(false)
+    const t = timeAtPointer(e, e.currentTarget)
+    const i = sceneAtTime(t)
+    scrubTo(t)
+    if (d.wasPlaying) { setPlaying(true); playScene(i, t - timeline.offsets[i]) }
+  }
+
   // Like a video's speaker button: only the voice changes — the picture,
   // typing and time keep running. Muting stops the voice now; unmuting
   // brings it back from the next step.
@@ -316,20 +375,17 @@ export default function RequestAccountTutorial() {
         {/* Progress: one continuous line with a dot, like a video player.
             Click anywhere on it to jump to that step. */}
         <div
-          className="group flex-1 relative h-4 flex items-center cursor-pointer"
+          className="group flex-1 relative h-4 flex items-center cursor-pointer touch-none select-none"
           role="slider"
           aria-label="Tutorial progress"
           aria-valuemin={1}
           aria-valuemax={SCENES.length}
           aria-valuenow={scene + 1}
           tabIndex={0}
-          onClick={(e) => {
-            const r = e.currentTarget.getBoundingClientRect()
-            const t = Math.min(0.999, Math.max(0, (e.clientX - r.left) / r.width)) * timeline.total
-            let i = 0
-            while (i + 1 < SCENES.length && timeline.offsets[i + 1] <= t) i++
-            seek(i)
-          }}
+          onPointerDown={onScrubStart}
+          onPointerMove={onScrubMove}
+          onPointerUp={onScrubEnd}
+          onPointerCancel={onScrubEnd}
           onKeyDown={(e) => {
             if (e.key === 'ArrowRight' && scene < SCENES.length - 1) seek(scene + 1)
             if (e.key === 'ArrowLeft' && scene > 0) seek(scene - 1)
@@ -337,10 +393,10 @@ export default function RequestAccountTutorial() {
         >
           {/* Track → red fill → dot at the fill's end. The dot lives inside the
               fill, so the two always move as one and can't drift apart. */}
-          <div className="relative w-full h-1 group-hover:h-1.5 transition-[height] duration-150 rounded-full bg-white/20">
+          <div className={`relative w-full rounded-full bg-white/20 transition-[height] duration-150 ${dragging ? 'h-1.5' : 'h-1 group-hover:h-1.5'}`}>
             <div className="absolute inset-y-0 left-0 bg-red-600 rounded-full" style={{ width: `${progress * 100}%` }}>
               <span
-                className="absolute right-0 top-1/2 w-3 h-3 group-hover:w-3.5 group-hover:h-3.5 rounded-full bg-red-600 shadow translate-x-1/2 -translate-y-1/2 transition-[width,height] duration-150"
+                className={`absolute right-0 top-1/2 rounded-full bg-red-600 shadow translate-x-1/2 -translate-y-1/2 transition-[width,height] duration-150 ${dragging ? 'w-4 h-4' : 'w-3 h-3 group-hover:w-3.5 group-hover:h-3.5'}`}
                 aria-hidden="true"
               />
             </div>
