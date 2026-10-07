@@ -75,10 +75,14 @@ export default function DropdownSelect({ value, placeholder, options, onChange, 
             <li
               key={o.value}
               data-selected={same(o.value, value)}
-              className={`px-3 py-1.5 text-sm cursor-pointer ${same(o.value, value) ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}
-              onClick={() => { onChange(o.value); setOpen(false) }}
+              aria-disabled={o.disabled || undefined}
+              className={`px-3 py-1.5 text-sm flex items-center justify-between gap-2 ${
+                o.disabled ? 'text-gray-400 cursor-not-allowed'
+                : same(o.value, value) ? 'bg-primary-600 text-white cursor-pointer' : 'hover:bg-gray-100 cursor-pointer'}`}
+              onClick={() => { if (o.disabled) return; onChange(o.value); setOpen(false) }}
             >
-              {o.label}
+              <span className="truncate">{o.label}</span>
+              {o.note && <span className="text-xs text-gray-400 shrink-0">{o.note}</span>}
             </li>
           ))}
         </ul>,

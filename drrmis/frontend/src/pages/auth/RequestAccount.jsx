@@ -115,7 +115,13 @@ export default function RequestAccount() {
                     className={inputCls('barangay_id')}
                     value={form.barangay_id}
                     placeholder={loadingBarangays ? 'Loading barangays…' : 'Select your barangay…'}
-                    options={barangays.map(b => ({ value: b.id, label: b.name }))}
+                    options={barangays.map(b => ({
+                      value: b.id, label: b.name,
+                      // Barangays that already have an account (or a request
+                      // waiting for review) can't be picked.
+                      disabled: !!b.has_account || !!b.has_pending,
+                      note: b.has_account ? 'Has account' : b.has_pending ? 'Pending' : undefined,
+                    }))}
                     onChange={v => set('barangay_id', v)}
                   />
                 </div>

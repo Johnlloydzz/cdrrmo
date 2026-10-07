@@ -12,7 +12,14 @@ const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 // login yet can still pick their barangay.
 router.get('/barangays', async (req, res) => {
   try {
-    const rows = await all('SELECT id, name FROM barangays ORDER BY name')
+    // has_account / has_pending let the form grey out barangays that already
+    // have a Barangay Official account or a request waiting for review.
+    const rows = await all(
+      `SELECT b.id, b.name,
+              EXISTS(SELECT 1 FROM users u WHERE u.role = 'Barangay Official' AND u.barangay_id = b.id) AS has_account,
+              EXISTS(SELECT 1 FROM account_requests ar WHERE ar.barangay_id = b.id AND ar.status = 'Pending') AS has_pending
+       FROM barangays b ORDER BY b.name`
+    )
     res.json(rows)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
@@ -58,6 +65,22 @@ router.post('/', async (req, res) => {
     }
     const barangay = await get('SELECT id, name FROM barangays WHERE id = ?', [barangay_id])
     if (!barangay) return res.status(400).json({ error: 'Selected barangay was not found.' })
+    // One Barangay Official account per barangay: no request if the barangay
+    // already has an account, or already has a request waiting for review.
+    const taken = await get(
+      "SELECT id FROM users WHERE role = 'Barangay Official' AND barangay_id = ?",
+      [barangay_id]
+    )
+    if (taken) {
+      return res.status(400).json({ error: `Brgy. ${barangay.name} already has an account. Contact CDRRMO if you need access.` })
+    }
+    const barangayPending = await get(
+      "SELECT id FROM account_requests WHERE barangay_id = ? AND status = 'Pending'",
+      [barangay_id]
+    )
+    if (barangayPending) {
+      return res.status(400).json({ error: `A request for Brgy. ${barangay.name} is already waiting for CDRRMO review.` })
+    }
 
     const r = await run(
       'INSERT INTO account_requests (name, email, contact, barangay_id, position, message) VALUES (?, ?, ?, ?, ?, ?)',
