@@ -39,6 +39,23 @@ router.post('/', async (req, res) => {
     if (dupContact) {
       return res.status(400).json({ error: 'This contact number is already used in another account request.' })
     }
+    // An email that already has an account, or already has a request waiting
+    // for review, can't request again.
+    const cleanEmail = String(email).trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' })
+    }
+    const hasAccount = await get('SELECT id FROM users WHERE LOWER(email) = ?', [cleanEmail])
+    if (hasAccount) {
+      return res.status(400).json({ error: 'This email already has an account. Sign in, or use Forgot Password if you can’t remember it.' })
+    }
+    const pending = await get(
+      "SELECT id FROM account_requests WHERE LOWER(email) = ? AND status = 'Pending'",
+      [cleanEmail]
+    )
+    if (pending) {
+      return res.status(400).json({ error: 'A request with this email is already waiting for CDRRMO review.' })
+    }
     const barangay = await get('SELECT id, name FROM barangays WHERE id = ?', [barangay_id])
     if (!barangay) return res.status(400).json({ error: 'Selected barangay was not found.' })
 
