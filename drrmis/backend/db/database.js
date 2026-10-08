@@ -175,12 +175,35 @@ async function migrateResidentsHouseholdOptional() {
   }
 }
 
+// Indexes for the lookups every page does (households/residents per
+// barangay and purok, members per household). Without them each count read
+// the WHOLE table again for every barangay/purok/household — fine with test
+// data, but minutes-slow at Gingoog's real size (tens of thousands of
+// residents). Created after selfHealColumns so every column exists.
+const INDEXES = [
+  'CREATE INDEX IF NOT EXISTS idx_puroks_barangay ON puroks(barangay_id)',
+  'CREATE INDEX IF NOT EXISTS idx_households_barangay ON households(barangay_id)',
+  'CREATE INDEX IF NOT EXISTS idx_households_purok ON households(purok_id)',
+  'CREATE INDEX IF NOT EXISTS idx_residents_household ON residents(household_id)',
+  'CREATE INDEX IF NOT EXISTS idx_residents_barangay ON residents(barangay_id)',
+  'CREATE INDEX IF NOT EXISTS idx_residents_purok ON residents(purok_id)',
+]
+async function ensureIndexes() {
+  try { await getDb().batch(INDEXES, 'write') }
+  catch {
+    for (const sql of INDEXES) {
+      try { await run(sql) } catch (err) { console.log(`Index skipped (${sql}): ${err.message}`) }
+    }
+  }
+}
+
 async function initDb() {
   const schema = require('./schema')
   // All CREATE TABLE IF NOT EXISTS statements in one round trip.
   await getDb().batch(schema, 'write')
   await selfHealColumns()
   await migrateResidentsHouseholdOptional()
+  await ensureIndexes()
   await seedBarangays()
   // These don't depend on each other — run them at the same time.
   await Promise.all([seedDefaultAdmin(), seedBoundaries(), selfHealPurokNames()])

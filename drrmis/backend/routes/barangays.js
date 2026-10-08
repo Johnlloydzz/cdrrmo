@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
       SELECT b.*,
         (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS purok_count,
         (SELECT COUNT(*) FROM households h WHERE h.barangay_id = b.id) AS household_count,
-        (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(r.barangay_id, h.barangay_id) = b.id) AS resident_count
+        ((SELECT COUNT(*) FROM residents r WHERE r.barangay_id = b.id) + (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE r.barangay_id IS NULL AND h.barangay_id = b.id)) AS resident_count
       FROM barangays b WHERE 1=1`
     const params = []
     if (search) { sql += ' AND b.name LIKE ?'; params.push(`%${search}%`) }
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
     const allPuroks = await all(`
       SELECT p.id, p.barangay_id, p.name, p.flood_risk, p.flood_threshold_m, p.landslide_risk, p.latitude, p.longitude, p.boundary_geojson,
         (SELECT COUNT(*) FROM households h WHERE h.purok_id = p.id) AS household_count,
-        (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(h.purok_id, r.purok_id) = p.id) AS resident_count
+        ((SELECT COUNT(*) FROM households h JOIN residents r ON r.household_id = h.id WHERE h.purok_id = p.id) + (SELECT COUNT(*) FROM residents r WHERE r.household_id IS NULL AND r.purok_id = p.id)) AS resident_count
       FROM puroks p ORDER BY p.name`)
     const puroksByBarangay = {}
     for (const p of allPuroks) {
@@ -46,7 +46,7 @@ router.get('/:id', async (req, res) => {
       SELECT b.*,
         (SELECT COUNT(*) FROM puroks p WHERE p.barangay_id = b.id) AS purok_count,
         (SELECT COUNT(*) FROM households h WHERE h.barangay_id = b.id) AS household_count,
-        (SELECT COUNT(*) FROM residents r LEFT JOIN households h ON r.household_id = h.id WHERE COALESCE(r.barangay_id, h.barangay_id) = b.id) AS resident_count
+        ((SELECT COUNT(*) FROM residents r WHERE r.barangay_id = b.id) + (SELECT COUNT(*) FROM residents r JOIN households h ON r.household_id = h.id WHERE r.barangay_id IS NULL AND h.barangay_id = b.id)) AS resident_count
       FROM barangays b WHERE b.id = ?`, [req.params.id])
     if (!b) return res.status(404).json({ error: 'Not found' })
     b.puroks = await all('SELECT id, name, flood_risk, landslide_risk FROM puroks WHERE barangay_id = ? ORDER BY name', [req.params.id])

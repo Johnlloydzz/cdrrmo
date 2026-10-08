@@ -33,7 +33,7 @@ router.get('/summary', async (req, res) => {
     // At-risk counts use the SAME geofencing as /api/households (including
     // the drawn flood area), so the Dashboard cards match the map and lists.
     const hh = await all(`
-      SELECT h.id, h.barangay_id, ${RISK_COLUMNS},
+      SELECT h.id, h.barangay_id, h.purok_id, ${RISK_COLUMNS},
              (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count
       FROM households h
       LEFT JOIN barangays b ON h.barangay_id = b.id

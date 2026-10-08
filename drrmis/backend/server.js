@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const morgan = require('morgan')
+const compression = require('compression')
 
 const authRoutes           = require('./routes/auth')
 const barangayRoutes       = require('./routes/barangays')
@@ -45,6 +46,9 @@ const corsOptions = {
 }
 
 app.use(cors(corsOptions))
+// gzip every response: big lists (households, residents) shrink ~10x, so
+// they download much faster on mobile/LTE connections.
+app.use(compression())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'))

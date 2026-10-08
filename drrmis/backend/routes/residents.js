@@ -62,7 +62,7 @@ router.get('/', async (req, res) => {
     const params = []
     // Barangay Officials only ever see residents of their own barangay —
     // enforced server-side, not just hidden in the UI.
-    if (req.user.role === 'Barangay Official') { sql += ' AND COALESCE(r.barangay_id, h.barangay_id) = ?'; params.push(req.user.barangay_id) }
+    if (req.user.role === 'Barangay Official') { sql += ' AND (r.barangay_id = ? OR (r.barangay_id IS NULL AND h.barangay_id = ?))'; params.push(req.user.barangay_id, req.user.barangay_id) }
     if (household_id) { sql += ' AND r.household_id = ?'; params.push(household_id) }
     // Used by Register Household to list residents that can be picked as Head
     if (unassigned === '1') sql += ' AND r.household_id IS NULL'

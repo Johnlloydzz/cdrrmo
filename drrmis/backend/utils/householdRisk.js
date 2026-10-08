@@ -91,20 +91,32 @@ async function loadRiskContext() {
 //    drawn boundary, or its geocoded location.
 function withHouseholdRisk(rows, ctx) {
   const { floodLevel, manualActive, autoBarangayIds } = ctx
+  // Every household in the same purok gets the same point and the same
+  // inside/outside-the-hazard-area answer, so the geometry (JSON parsing +
+  // point-in-polygon) is worked out ONCE per purok instead of once per
+  // household — tens of thousands of times at Gingoog's real size.
+  const perPurok = new Map()
   return rows.map(({ barangay_flood_area, barangay_landslide_area, purok_point_lat, purok_point_lng, purok_boundary, latitude, longitude, ...raw }) => {
-    const pt = purokPoint(purok_boundary, purok_point_lat, purok_point_lng)
+    const key = raw.purok_id != null ? `${raw.purok_id}|${raw.barangay_id}` : null
+    let geo = key && perPurok.get(key)
+    if (!geo) {
+      const pt = purokPoint(purok_boundary, purok_point_lat, purok_point_lng)
+      const loc = { latitude: pt?.lat ?? null, longitude: pt?.lng ?? null }
+      geo = { pt, inFloodArea: insideHazardArea(loc, barangay_flood_area), inLandslideArea: insideHazardArea(loc, barangay_landslide_area) }
+      if (key) perPurok.set(key, geo)
+    }
+    const pt = geo.pt
     const h = { ...raw, purok_lat: pt?.lat ?? null, purok_lng: pt?.lng ?? null }
-    const loc = { latitude: h.purok_lat, longitude: h.purok_lng }
     return {
       ...h,
-      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && insideHazardArea(loc, barangay_flood_area) && (manualActive
+      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && geo.inFloodArea && (manualActive
         ? floodLevel >= effectiveThreshold(h.flood_threshold_m)
         : autoBarangayIds.includes(h.barangay_id)
           ? RED_LEVEL_M >= effectiveThreshold(h.flood_threshold_m)
           : h.purok_flood_risk === 'High'),
       // Landslide has no measured value like flood depth — always the static
       // official CDRA classification.
-      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && insideHazardArea(loc, barangay_landslide_area),
+      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && geo.inLandslideArea,
     }
   })
 }
