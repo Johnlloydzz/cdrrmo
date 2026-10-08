@@ -37,10 +37,22 @@ const POLL_MS = 30000
 // Personnel and Barangay Officials each get only what's meant for them —
 // the server decides who receives what.
 export function useNotifications(enabled = true) {
-  const [notifications, setNotifications] = useState([])
+  const [notifications, setServerList] = useState([])
+  // Bumped whenever the user changes the list (read, dismiss, clear), so a
+  // poll that started before that change can't bring old items back.
+  const changeCount = useRef(0)
 
   const load = useCallback(async () => {
-    try { setNotifications(await apiGet('/notifications')) } catch { /* keep current list */ }
+    const started = changeCount.current
+    try {
+      const rows = await apiGet('/notifications')
+      if (started === changeCount.current) setServerList(rows)
+    } catch { /* keep current list */ }
+  }, [])
+
+  const setNotifications = useCallback((value) => {
+    changeCount.current++
+    setServerList(value)
   }, [])
 
   useEffect(() => {

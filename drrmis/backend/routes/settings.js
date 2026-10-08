@@ -43,6 +43,14 @@ router.put('/flood-level', async (req, res) => {
     const source = req.body.source === 'auto' ? 'auto' : 'manual'
     const prevRow = await get("SELECT value FROM system_settings WHERE key = 'current_flood_level_m'")
     const prevLevel = parseFloat(prevRow?.value) || 0
+    // An automatic update never overrides a level CDRRMO set by hand (e.g. a
+    // background check on another open page must not clear a real report).
+    if (source === 'auto' && prevLevel > 0) {
+      const prevSource = await get("SELECT value FROM system_settings WHERE key = 'current_flood_level_source'")
+      if ((prevSource?.value || 'manual') === 'manual') {
+        return res.status(409).json({ error: 'A flood level was set manually by CDRRMO; automatic updates are skipped until it is reset.' })
+      }
+    }
     await run(
       `INSERT INTO system_settings (key, value, updated_at) VALUES ('current_flood_level_m', ?, datetime('now', '+8 hours'))
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,

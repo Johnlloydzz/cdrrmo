@@ -38,10 +38,15 @@ async function request(endpoint, options = {}, { onColdStart } = {}) {
     ...options.headers,
   }
 
+  // Only reads (GET) are retried. A save that timed out may still have
+  // reached the server, and sending it again would create a duplicate
+  // (two residents, two reset codes), so a save gets one long attempt.
+  const method = (options.method || 'GET').toUpperCase()
   let res
   try {
-    res = await fetchWithTimeout(`${API_URL}${endpoint}`, { ...options, headers }, COLD_START_TIMEOUT_MS)
+    res = await fetchWithTimeout(`${API_URL}${endpoint}`, { ...options, headers }, method === 'GET' ? COLD_START_TIMEOUT_MS : COLD_START_TIMEOUT_MS + RETRY_TIMEOUT_MS)
   } catch (err) {
+    if (method !== 'GET') throw new Error('Could not reach the server. Your change may not have been saved. Please check your connection, refresh, and try again.')
     // First attempt timed out or the network dropped (common right after the
     // laptop wakes from sleep, or the backend was asleep) — tell the caller
     // we're retrying so it can show a "waking up the server…" message.

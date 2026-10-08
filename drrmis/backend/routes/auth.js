@@ -40,7 +40,7 @@ function recordFailedLogin(key) {
 router.post('/login', async (req, res) => {
   try {
     const { username, password, remember } = req.body
-    if (!username || !password)
+    if (!username || !password || typeof username !== 'string' || typeof password !== 'string')
       return res.status(400).json({ error: 'Username and password are required.' })
 
     const key = String(username).trim().toLowerCase()
@@ -89,7 +89,7 @@ router.post('/login', async (req, res) => {
 router.post('/change-password', authenticate, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body
-    if (!currentPassword || !newPassword)
+    if (!currentPassword || !newPassword || typeof currentPassword !== 'string' || typeof newPassword !== 'string')
       return res.status(400).json({ error: 'All fields are required.' })
     if (newPassword.length < 8)
       return res.status(400).json({ error: 'Password must be at least 8 characters.' })
@@ -146,12 +146,19 @@ const activeCode = (userId) => get(
 async function checkCode(userId, otp) {
   const record = await activeCode(userId)
   if (!record) return { ok: false, error: 'This code has expired. Request a new one.' }
-  if ((record.attempts || 0) >= OTP_MAX_ATTEMPTS) return { ok: false, error: 'Too many wrong tries. Request a new code.' }
-  if (String(record.otp) !== String(otp).trim()) {
-    await run('UPDATE password_resets SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?', [record.id])
+  // Count the try in ONE atomic statement before comparing, so many guesses
+  // sent at the same moment can't all slip under the limit.
+  const counted = await run(
+    'UPDATE password_resets SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ? AND COALESCE(attempts, 0) < ?',
+    [record.id, OTP_MAX_ATTEMPTS]
+  )
+  if (!counted.changes) return { ok: false, error: 'Too many wrong tries. Request a new code.' }
+  if (String(record.otp) !== String(otp ?? '').trim()) {
     const left = OTP_MAX_ATTEMPTS - (record.attempts || 0) - 1
     return { ok: false, error: left > 0 ? `Wrong code. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong tries. Request a new code.' }
   }
+  // A correct code doesn't use up a try.
+  await run('UPDATE password_resets SET attempts = attempts - 1 WHERE id = ? AND attempts > 0', [record.id])
   return { ok: true, record }
 }
 
@@ -215,7 +222,7 @@ router.post('/reset-password', async (req, res) => {
   try {
     const identifier = String(req.body.identifier || req.body.email || '').trim()
     const { otp, newPassword } = req.body
-    if (!identifier || !otp || !newPassword) return res.status(400).json({ error: 'All fields are required.' })
+    if (!identifier || !otp || !newPassword || typeof newPassword !== 'string') return res.status(400).json({ error: 'All fields are required.' })
     if (String(newPassword).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' })
 
     const user = await findUser(identifier)

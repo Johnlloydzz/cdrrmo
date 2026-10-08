@@ -24,13 +24,16 @@ export default function Settings({ currentUser }) {
   const [barangaySaved, setBarangaySaved] = useState(false)
   const [barangayError, setBarangayError] = useState('')
   const [brgyLoading, setBrgyLoading] = useState(isBarangayOfficial && !!currentUser?.barangay_id)
+  // If loading failed, the fields are empty — saving would wipe real data.
+  const [systemLoadFailed, setSystemLoadFailed] = useState(false)
+  const [brgyLoadFailed, setBrgyLoadFailed] = useState(false)
 
   useEffect(() => {
-    apiGet('/settings/system-info').then(setSystem).catch(err => setError(err.message)).finally(() => setLoading(false))
+    apiGet('/settings/system-info').then(setSystem).catch(err => { setSystemLoadFailed(true); setError(`${err.message} Saving is turned off until the page loads. Please refresh.`) }).finally(() => setLoading(false))
     if (isBarangayOfficial && currentUser?.barangay_id) {
       apiGet(`/barangays/${currentUser.barangay_id}`)
         .then(b => setMyBarangay({ captain_name: b.captain_name || '', contact_number: b.contact_number || '' }))
-        .catch(() => {})
+        .catch(err => { setBrgyLoadFailed(true); setBarangayError(`${err.message} Saving is turned off until the page loads. Please refresh.`) })
         .finally(() => setBrgyLoading(false))
     }
   }, [])
@@ -86,7 +89,7 @@ export default function Settings({ currentUser }) {
             </div>
           </div>
           <div className="flex justify-end mt-5">
-            <button className="btn-primary flex items-center gap-2" onClick={handleSaveBarangay} disabled={barangaySaving}>
+            <button className="btn-primary flex items-center gap-2" onClick={handleSaveBarangay} disabled={barangaySaving || brgyLoading || brgyLoadFailed}>
               <Save size={15} /> {barangaySaving ? 'Saving…' : 'Save Contact Info'}
             </button>
           </div>
@@ -122,7 +125,7 @@ export default function Settings({ currentUser }) {
 
       {isCdrrmo && (
         <div className="flex justify-end">
-          <button className="btn-primary flex items-center gap-2" onClick={handleSave} disabled={saving}>
+          <button className="btn-primary flex items-center gap-2" onClick={handleSave} disabled={saving || loading || systemLoadFailed}>
             <Save size={15} /> {saving ? 'Saving…' : 'Save Settings'}
           </button>
         </div>

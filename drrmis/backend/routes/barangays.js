@@ -137,7 +137,10 @@ router.put('/:id', async (req, res) => {
       })
     }
     res.json(updated)
-  } catch (err) { res.status(500).json({ error: err.message }) }
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) return res.status(400).json({ error: 'A barangay with that name already exists.' })
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // PUT /api/barangays/:id/contact — Captain name + emergency contact number.

@@ -84,7 +84,7 @@ router.post('/', async (req, res) => {
 
     const r = await run(
       'INSERT INTO account_requests (name, email, contact, barangay_id, position, message) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, email, contact || null, barangay_id, position || null, message || null]
+      [String(name).trim(), cleanEmail, contact || null, barangay_id, position || null, message || null]
     )
     const created = await get('SELECT * FROM account_requests WHERE id = ?', [r.lastID])
     await notify({

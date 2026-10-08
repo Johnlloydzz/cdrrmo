@@ -120,10 +120,14 @@ export default function ResidentManagement({ currentUser }) {
   const ageBracketCounts = stats || {}
   const statsLoading = !stats
 
-  if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
-
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="card p-3 flex flex-wrap items-center justify-between gap-3 border border-red-200 bg-red-50 text-sm text-red-700" role="alert">
+          <span>{error}</span>
+          <button type="button" className="btn-secondary text-xs px-3 py-1.5" onClick={() => list.reload()}>Try again</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="card p-4 text-center">{statsLoading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-gray-800 animate-fade-in">{(stats.total || 0).toLocaleString()}</p>}<p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
         {['Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].map(b => (

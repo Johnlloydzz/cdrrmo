@@ -7,6 +7,10 @@ import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } f
 import { apiGet } from '../utils/api'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 
+// Purok names are typed by users; escape them before putting them in a
+// map label's HTML so a name can never inject markup.
+const escapeHtml = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
 // Fix Leaflet default icons in Vite
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -184,11 +188,14 @@ export default function GISMap() {
     setShowPurokList(false)
   }, [selectedBarangay?.id])
 
-  useEffect(() => {
+  const [barangaysError, setBarangaysError] = useState('')
+  const loadMapData = () => {
     setBarangaysLoading(true)
-    apiGet('/barangays', { onColdStart: () => setWakingUp(true) }).then(setBarangays).catch(() => {}).finally(() => setBarangaysLoading(false))
+    setBarangaysError('')
+    apiGet('/barangays', { onColdStart: () => setWakingUp(true) }).then(setBarangays).catch(err => setBarangaysError(err.message || 'Could not load barangays.')).finally(() => setBarangaysLoading(false))
     apiGet('/risk-assessment/puroks').then(setPurokRows).catch(() => {})
-  }, [])
+  }
+  useEffect(() => { loadMapData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Flood Zones" and "Landslide Zones" drive the same underlying hazard
   // choropleth (a barangay can only be filled with one hazard's color at a
@@ -356,7 +363,13 @@ export default function GISMap() {
                 {!b.boundary_geojson && <span className="text-xs text-gray-400 ml-1">(no boundary)</span>}
               </button>
             ))}
-            {!barangaysLoading && filteredBarangays.length === 0 && (
+            {!barangaysLoading && barangaysError && (
+              <div className="py-2 text-xs text-red-600" role="alert">
+                <p>Could not load barangays. {barangaysError}</p>
+                <button type="button" className="mt-2 btn-secondary text-xs px-3 py-1.5" onClick={loadMapData}>Try again</button>
+              </div>
+            )}
+            {!barangaysLoading && !barangaysError && filteredBarangays.length === 0 && (
               <p className="text-xs text-gray-400 py-2">No barangays found.</p>
             )}
           </div>
@@ -733,7 +746,7 @@ export default function GISMap() {
               position={[p.lat, p.lng]}
               icon={L.divIcon({
                 className: '',
-                html: `<div style="font-size:11px;font-weight:700;color:#57534e;text-align:center;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${p.name.toUpperCase()}<br/>${p.residents} residents</div>`,
+                html: `<div style="font-size:11px;font-weight:700;color:#57534e;text-align:center;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${escapeHtml(String(p.name).toUpperCase())}<br/>${Number(p.residents) || 0} residents</div>`,
                 iconSize: [0, 0],
               })}
             />

@@ -199,6 +199,9 @@ router.put('/:id', async (req, res) => {
       const { resident: head, error } = await validateHead(head_resident_id, existing.barangay_id, req.params.id)
       if (error) return res.status(400).json({ error })
       head_family = head.name
+      // One Head per household: the previous Head is unlinked (they stay a
+      // registered resident and can be made Head of another household).
+      await run("UPDATE residents SET household_id = NULL WHERE household_id = ? AND relation_to_head = 'Head' AND id != ?", [req.params.id, head.id])
       await run('UPDATE residents SET household_id = ?, barangay_id = ?, purok_id = ? WHERE id = ?', [req.params.id, existing.barangay_id, purok_id, head.id])
     }
     await run(

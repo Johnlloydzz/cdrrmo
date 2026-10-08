@@ -195,6 +195,9 @@ export default function PurokManagement({ currentUser }) {
     setBoundaryPoints(prev => prev.map((pt, i) => i === index ? newPt : pt))
   }
   const undoBoundaryPoint = () => {
+    // Once drawing starts, the old boundary is replaced; keep the map in
+    // step with what Save will send (never show the old one again).
+    setExistingBoundary(null)
     if (pointsHistory.length === 0) { setBoundaryPoints(prev => prev.slice(0, -1)); return }
     setBoundaryPoints(pointsHistory[pointsHistory.length - 1])
     setPointsHistory(h => h.slice(0, -1))

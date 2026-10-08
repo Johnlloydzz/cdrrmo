@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Sidebar from '../components/Sidebar'
 import NotificationPanel, { useNotifications } from '../components/NotificationPanel'
 import ProfilePanel from '../components/ProfilePanel'
@@ -37,6 +37,8 @@ export default function MainLayout({ onLogout, currentUser }) {
 
   const location = useLocation()
   const title = pageTitles[location.pathname] || 'PDRA'
+  // On phones, picking a page from the menu closes the menu.
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
   const unread = notifications.filter(n => !n.read).length
 
   const toggleNotif  = () => { setNotifOpen(o => !o);   setProfileOpen(false) }
