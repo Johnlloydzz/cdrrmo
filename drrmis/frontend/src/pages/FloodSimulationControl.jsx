@@ -202,18 +202,32 @@ export default function FloodSimulationControl() {
     return d && d.length >= 3 ? d[d.length - 3] : null
   }, [liveFlood])
 
-  // Total rain over the last 24 hours up to the current hour.
-  const rain24h = useMemo(() => {
+  // Total rain over the last 24 hours up to the current hour, plus WHEN the
+  // heaviest of it fell. These are weather-model estimates for the grid cell
+  // around the city centre (it also covers nearby hills), not a rain gauge,
+  // so showing the time lets staff compare it with what they actually saw.
+  const rain24hInfo = useMemo(() => {
     const times = liveWeather?.hourly?.time, vals = liveWeather?.hourly?.precipitation
     const now = liveWeather?.current?.time
     if (!times || !vals || !now) return null
     let idx = -1
     for (let i = times.length - 1; i >= 0; i--) { if (times[i] <= now) { idx = i; break } }
     if (idx < 0) return null
-    let total = 0
-    for (let i = Math.max(0, idx - 23); i <= idx; i++) total += vals[i] ?? 0
-    return Math.round(total * 10) / 10
+    let total = 0, peakI = -1
+    for (let i = Math.max(0, idx - 23); i <= idx; i++) {
+      total += vals[i] ?? 0
+      if ((vals[i] ?? 0) > 0 && (peakI < 0 || vals[i] > vals[peakI])) peakI = i
+    }
+    let peakLabel = null
+    if (peakI >= 0) {
+      const [d, t] = times[peakI].split('T')
+      const h = parseInt(t, 10)
+      const hour = `${((h + 11) % 12) + 1} ${h < 12 ? 'AM' : 'PM'}`
+      peakLabel = d === now.split('T')[0] ? `most around ${hour}` : `most around ${hour} yesterday`
+    }
+    return { total: Math.round(total * 10) / 10, peakLabel }
   }, [liveWeather])
+  const rain24h = rain24hInfo?.total ?? null
 
   // Every 30 s, re-check the reported flood level AND the auto-detect result,
   // so this page (and the big-screen display) shows a level reported from
@@ -455,7 +469,8 @@ export default function FloodSimulationControl() {
                         </div>
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-blue-700">{rain24h ?? '—'} mm</p>
-                          <p className="text-[9px] text-gray-500 uppercase">Last 24 hrs</p>
+                          <p className="text-[9px] text-gray-500 uppercase">Est. last 24 hrs</p>
+                          {rain24h > 0 && rain24hInfo?.peakLabel && <p className="text-[9px] text-gray-400 leading-tight mt-0.5">{rain24hInfo.peakLabel}</p>}
                         </div>
                         <div className="bg-amber-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-amber-700">{todayDischarge ?? '—'}</p>
@@ -468,6 +483,9 @@ export default function FloodSimulationControl() {
                       </p>
                       <p className="text-[10px] text-gray-400 mt-1 cursor-help" title="Refreshes every 5 minutes. &quot;Rain now&quot; is the rain at this moment and shows 0 during a pause. River discharge is volume flow, not water depth.">
                         Source: Open-Meteo, GloFAS
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1 leading-snug">
+                        Rain figures are weather-model estimates for the area around the city centre, including nearby hills, not a rain gauge reading. They can differ from what fell where you are.
                       </p>
                     </>
                   )}
