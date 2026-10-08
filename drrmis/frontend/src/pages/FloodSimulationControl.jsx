@@ -121,7 +121,10 @@ export default function FloodSimulationControl() {
   const [updatedAt, setUpdatedAt] = useState(null)
 
   const [barangays, setBarangays] = useState([])
-  const [households, setHouseholds] = useState([])
+  // Per-purok counts + at-risk flags for the selected barangay's pins
+  // (from the server — not every household in the city).
+  const [purokRows, setPurokRows] = useState([])
+  const selectedIdRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
@@ -134,9 +137,6 @@ export default function FloodSimulationControl() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedBarangay])
 
-  const [expanded, setExpanded] = useState(null)
-  const [residents, setResidents] = useState([])
-  const [residentsLoading, setResidentsLoading] = useState(false)
 
   // Controls (manual water level input, live weather/river data, barangay
   // search) start collapsed — the client wants the map itself to be the
@@ -233,8 +233,11 @@ export default function FloodSimulationControl() {
       }).catch(() => {})
       apiGet('/settings/auto-flood-barangays').then(af => setAutoFloodedIds(af.barangay_ids || [])).catch(() => {})
       // At-risk flags come from the server (same geofence everywhere), so
-      // refresh them too when the level may have changed.
-      apiGet('/households').then(setHouseholds).catch(() => {})
+      // refresh the selected barangay's purok pins too.
+      if (selectedIdRef.current) {
+        const id = selectedIdRef.current
+        apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
+      }
     }
     const interval = setInterval(poll, 30000)
     window.addEventListener('focus', poll)
@@ -247,12 +250,11 @@ export default function FloodSimulationControl() {
       apiGet('/settings/flood-level'),
       apiGet('/settings/auto-flood-barangays'),
       apiGet('/barangays'),
-      apiGet('/households'),
     ])
-      .then(([fl, af, b, h]) => {
+      .then(([fl, af, b]) => {
         setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
         setAutoFloodedIds(af.barangay_ids || [])
-        setBarangays(b); setHouseholds(h)
+        setBarangays(b)
       })
       .finally(() => setLoading(false))
   }
@@ -280,19 +282,19 @@ export default function FloodSimulationControl() {
   // A reported flood level is REAL (the system is used 24/7), so the server
   // already applies it to every page — this page just shows the same live
   // at-risk status as the Dashboard and GIS Map.
-  const isAtRisk = (h) => !!h[atRiskKey]
-  const atRiskHouseholds = households.filter(isAtRisk)
+  // Purok pins for the selected barangay.
+  useEffect(() => {
+    const id = selectedBarangay?.id || null
+    selectedIdRef.current = id
+    if (!id) { setPurokRows([]); return }
+    apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
+  }, [selectedBarangay?.id])
 
   const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name)
 
   const filteredBarangays = barangaysWithCentroid.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
 
-  const toggleFamily = (h) => {
-    if (expanded === h.id) { setExpanded(null); return }
-    setExpanded(h.id)
-    setResidentsLoading(true)
-    apiGet(`/residents?household_id=${h.id}`).then(setResidents).catch(() => {}).finally(() => setResidentsLoading(false))
-  }
+
 
 
   return (
@@ -622,15 +624,11 @@ export default function FloodSimulationControl() {
             {/* One pin per PUROK (households aren't pinned individually):
                 red if any of its households is at risk. Only for the selected
                 barangay, like the Dashboard. */}
-            {selectedBarangay && Object.values(households.reduce((acc, h) => {
-              if (h.barangay_name !== selectedBarangay.name) return acc
-              if (!h.purok_id || h.purok_lat == null || h.purok_lng == null) return acc
-              const g = acc[h.purok_id] || (acc[h.purok_id] = { id: h.purok_id, name: h.purok_name, barangay: h.barangay_name, lat: h.purok_lat, lng: h.purok_lng, households: 0, atRisk: 0, members: 0 })
-              g.households += 1
-              g.members += Number(h.member_count || 0)
-              if (isAtRisk(h)) g.atRisk += 1
-              return acc
-            }, {})).map(g => (
+            {selectedBarangay && purokRows
+              .filter(p => p.barangay_id === selectedBarangay.id && p.households > 0 && p.lat != null && p.lng != null)
+              .map(p => ({ id: p.purok_id, name: p.purok_name, barangay: p.barangay_name, lat: p.lat, lng: p.lng,
+                households: p.households, members: p.members, atRisk: p[atRiskKey] ? p.households : 0 }))
+              .map(g => (
               <Marker key={`purok-${g.id}`} position={[g.lat, g.lng]} icon={g.atRisk ? redPin : bluePin}>
                 <Popup>
                   <strong>Purok {g.name}</strong> — {g.barangay}<br />

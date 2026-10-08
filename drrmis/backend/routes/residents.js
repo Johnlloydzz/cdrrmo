@@ -46,9 +46,79 @@ function toProperCase(str) {
   return str.trim().toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase())
 }
 
+// Shared FROM/JOIN for resident lists. A resident's barangay is their own
+// barangay_id, falling back to their household's (older records); their
+// purok is their household's purok, else their own.
+const RESIDENT_FROM = `FROM residents r
+  LEFT JOIN households h ON r.household_id = h.id
+  LEFT JOIN barangays b ON b.id = COALESCE(r.barangay_id, h.barangay_id)
+  LEFT JOIN puroks p ON p.id = COALESCE(h.purok_id, r.purok_id)`
+
+// Age in whole years from a YYYY-MM-DD birthdate, in SQL (birthday-aware,
+// Philippine date) — same rule as computeAgeBracket below.
+const AGE_SQL = `(CAST(strftime('%Y', 'now', '+8 hours') AS INTEGER) - CAST(substr(r.birthdate, 1, 4) AS INTEGER)
+  - (strftime('%m-%d', 'now', '+8 hours') < substr(r.birthdate, 6, 5)))`
+
+// WHERE clause for the signed-in user's scope + the common filters.
+function residentFilters(req) {
+  const { household_id, search, unassigned, relation, purok_id } = req.query
+  let where = 'WHERE 1=1'
+  const params = []
+  const barangayId = req.user.role === 'Barangay Official' ? req.user.barangay_id : (req.query.barangay_id || null)
+  if (barangayId) { where += ' AND (r.barangay_id = ? OR (r.barangay_id IS NULL AND h.barangay_id = ?))'; params.push(barangayId, barangayId) }
+  if (household_id) { where += ' AND r.household_id = ?'; params.push(household_id) }
+  if (unassigned === '1') where += ' AND r.household_id IS NULL'
+  if (relation) { where += ' AND r.relation_to_head = ?'; params.push(relation) }
+  if (purok_id) { where += ' AND COALESCE(h.purok_id, r.purok_id) = ?'; params.push(purok_id) }
+  return { where, params, search }
+}
+
+// GET /api/residents/stats — total + age-bracket counts for the cards,
+// counted in the database (no need to download every resident).
+router.get('/stats', async (req, res) => {
+  try {
+    const { where, params } = residentFilters(req)
+    const row = await get(`
+      SELECT COUNT(*) AS total,
+        SUM(CASE WHEN r.birthdate IS NOT NULL AND ${AGE_SQL} <= 12 THEN 1 ELSE 0 END) AS child,
+        SUM(CASE WHEN r.birthdate IS NOT NULL AND ${AGE_SQL} BETWEEN 13 AND 17 THEN 1 ELSE 0 END) AS teen,
+        SUM(CASE WHEN r.birthdate IS NOT NULL AND ${AGE_SQL} BETWEEN 18 AND 59 THEN 1 ELSE 0 END) AS adult,
+        SUM(CASE WHEN r.birthdate IS NOT NULL AND ${AGE_SQL} >= 60 THEN 1 ELSE 0 END) AS senior
+      ${RESIDENT_FROM} ${where}`, params)
+    res.json({
+      total: row?.total || 0,
+      'Child (1-12)': row?.child || 0, 'Teen (13-17)': row?.teen || 0,
+      'Adult (18-59)': row?.adult || 0, 'Senior (60+)': row?.senior || 0,
+    })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /api/residents?page=1&limit=50[&search=...] — one page + the total,
+// searched in the database (name, barangay or purok).
+async function listResidentsPage(req, res) {
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50))
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  let { where, params, search } = residentFilters(req)
+  if (search) {
+    where += ' AND (r.name LIKE ? OR b.name LIKE ? OR p.name LIKE ?)'
+    params = [...params, `%${search}%`, `%${search}%`, `%${search}%`]
+  }
+  const [countRow, rows] = await Promise.all([
+    get(`SELECT COUNT(*) AS n ${RESIDENT_FROM} ${where}`, params),
+    all(`SELECT r.*, h.household_id AS hh_code, b.name AS barangay_name, p.name AS purok_name,
+                COALESCE(h.purok_id, r.purok_id) AS effective_purok_id
+         ${RESIDENT_FROM} ${where} ORDER BY r.id LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]),
+  ])
+  res.json({
+    rows: rows.map(r => ({ ...r, age_bracket: computeAgeBracket(r.birthdate) || r.age_bracket })),
+    total: countRow?.n || 0, page, limit,
+  })
+}
+
 // GET /api/residents
 router.get('/', async (req, res) => {
   try {
+    if (req.query.page) return await listResidentsPage(req, res)
     const { household_id, search, unassigned, relation } = req.query
     // A resident's barangay is their own barangay_id (set at registration,
     // since they can exist before being assigned to a household), falling

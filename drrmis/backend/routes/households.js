@@ -1,14 +1,63 @@
 const router = require('express').Router()
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
-const { loadRiskContext, withHouseholdRisk } = require('../utils/householdRisk')
+const { loadRiskContext, withHouseholdRisk, purokRiskRows } = require('../utils/householdRisk')
 
 router.use(authenticate)
 
 
-// GET /api/households — includes geofencing flag (in_flood_risk_zone)
+// GET /api/households?page=1&limit=50[&search=&barangay_id=&purok_id=&at_risk=1&hazard=flood|landslide]
+// One page of households + the total, filtered and searched in the database
+// (not in the browser) so it stays fast with tens of thousands of records.
+// At-risk flags come from the purok (same geofencing as everywhere else).
+async function listHouseholdsPage(req, res) {
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50))
+  const page = Math.max(1, parseInt(req.query.page) || 1)
+  const barangayId = req.user.role === 'Barangay Official' ? req.user.barangay_id : (req.query.barangay_id || null)
+  const { purok_id, search, at_risk } = req.query
+  const hazardKey = req.query.hazard === 'landslide' ? 'in_landslide_risk_zone' : 'in_flood_risk_zone'
+
+  const puroks = await purokRiskRows(await loadRiskContext(), { barangayId, counts: false })
+  const purokById = new Map(puroks.map(p => [p.purok_id, p]))
+
+  let where = 'WHERE 1=1'
+  const params = []
+  if (barangayId) { where += ' AND h.barangay_id = ?'; params.push(barangayId) }
+  if (purok_id)   { where += ' AND h.purok_id = ?'; params.push(purok_id) }
+  if (search) {
+    where += ' AND (h.head_family LIKE ? OR h.household_id LIKE ? OR b.name LIKE ? OR p.name LIKE ?)'
+    params.push(...Array(4).fill(`%${search}%`))
+  }
+  if (at_risk === '1') {
+    const ids = puroks.filter(p => p[hazardKey]).map(p => p.purok_id)
+    if (ids.length === 0) return res.json({ rows: [], total: 0, page, limit })
+    where += ` AND h.purok_id IN (${ids.map(() => '?').join(',')})`
+    params.push(...ids)
+  }
+  const from = `FROM households h LEFT JOIN barangays b ON h.barangay_id = b.id LEFT JOIN puroks p ON h.purok_id = p.id ${where}`
+  const [countRow, rows] = await Promise.all([
+    get(`SELECT COUNT(*) AS n ${from}`, params),
+    all(`SELECT h.id, h.household_id, h.barangay_id, h.purok_id, h.head_family, h.created_at,
+                b.name AS barangay_name, p.name AS purok_name,
+                (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count
+         ${from} ORDER BY h.id LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]),
+  ])
+  res.json({
+    rows: rows.map(h => {
+      const p = purokById.get(h.purok_id)
+      return { ...h, purok_lat: p?.purok_lat ?? null, purok_lng: p?.purok_lng ?? null,
+        in_flood_risk_zone: !!p?.in_flood_risk_zone, in_landslide_risk_zone: !!p?.in_landslide_risk_zone }
+    }),
+    total: countRow?.n || 0, page, limit,
+  })
+}
+
+// GET /api/households — includes geofencing flag (in_flood_risk_zone).
+// With ?page= it returns one page (see above); without it, the full list
+// (used for small, filtered lists such as one purok's households).
 router.get('/', async (req, res) => {
   try {
+    if (req.query.page) return await listHouseholdsPage(req, res)
     const { purok_id, search, at_risk } = req.query
     // Barangay Officials only ever see their own barangay's households —
     // enforced server-side, not just hidden in the UI.

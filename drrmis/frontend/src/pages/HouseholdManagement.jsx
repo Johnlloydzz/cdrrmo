@@ -3,21 +3,24 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+import usePagedList from '../utils/usePagedList'
+import Pagination from '../components/Pagination'
 import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '' }
 
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
-  const [households, setHouseholds] = useState([])
+  const [search, setSearch] = useState('')
+  // One page of households at a time, searched on the server.
+  const list = usePagedList('/households', { search })
+  const { rows: households, loading } = list
   const [barangays, setBarangays] = useState([])
   const [puroks, setPuroks] = useState([])
-  const [loading, setLoading] = useState(true)
   // Skeleton shows as many rows as this user saw here last time.
   const skeletonRows = useSkeletonRows('households', households.length, loading)
-  const [error, setError] = useState('')
+  const error = list.error
   const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
@@ -40,22 +43,14 @@ export default function HouseholdManagement({ currentUser }) {
     } catch { setHeadOptions([]) } finally { setHeadsLoading(false) }
   }
 
-  const load = () => {
-    setLoading(true)
-    apiGet('/households').then(setHouseholds).catch(err => setError(err.message)).finally(() => setLoading(false))
-  }
+  const load = () => list.reload()
 
   useEffect(() => {
-    load()
     apiGet('/barangays').then(setBarangays).catch(() => {})
     apiGet('/puroks').then(setPuroks).catch(() => {})
   }, [])
 
-  const filtered = households.filter(h =>
-    (h.head_family || '').toLowerCase().includes(search.toLowerCase()) ||
-    (h.barangay_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (h.household_id || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = households
 
   const puroksForBarangay = (barangayId) => puroks.filter(p => String(p.barangay_id) === String(barangayId))
 
@@ -112,7 +107,7 @@ export default function HouseholdManagement({ currentUser }) {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>{['HH ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Head of Family','Members', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
-            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
+            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 transition-opacity duration-200 ${loading ? '' : 'animate-fade-in'} ${!loading && list.fetching ? 'opacity-60' : ''}`}>
               {loading ? <SkeletonTableRows columns={5} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
@@ -139,7 +134,7 @@ export default function HouseholdManagement({ currentUser }) {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <>{filtered.length} of {households.length} households</>}</div>
+        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <Pagination list={list} noun="households" />}</div>
       </div>
 
       {showModal && createPortal(

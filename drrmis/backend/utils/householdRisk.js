@@ -3,7 +3,7 @@
 // the Risk Assessment Dashboard summary, so the cards, the map and the lists
 // always show the same result.
 
-const { get } = require('../db/database')
+const { get, all } = require('../db/database')
 const { expireStaleFloodData } = require('../db/floodLevel')
 
 // Ray-casting point-in-polygon on a GeoJSON ring ([lng, lat] pairs).
@@ -128,4 +128,35 @@ const RISK_COLUMNS = `b.flood_susceptibility as barangay_flood_susceptibility, b
   p.landslide_risk as purok_landslide_risk, p.latitude as purok_point_lat, p.longitude as purok_point_lng,
   p.boundary_geojson as purok_boundary`
 
-module.exports = { loadRiskContext, withHouseholdRisk, RISK_COLUMNS, purokPoint, insideHazardArea, effectiveThreshold, RED_LEVEL_M }
+// Risk per PUROK — every household in a purok shares the same flood and
+// landslide result (it only depends on the purok and its barangay), so the
+// Dashboard, maps and at-risk filters work from ~600 puroks instead of
+// tens of thousands of households. Each row also carries how many
+// households and household members the purok has.
+//   options.barangayId — only that barangay's puroks
+//   options.counts     — include household/member counts (default true)
+async function purokRiskRows(ctx, { barangayId = null, counts = true } = {}) {
+  const where = barangayId ? 'WHERE p.barangay_id = ?' : ''
+  const params = []
+  let countJoins = ''
+  if (counts) {
+    const hWhere = barangayId ? 'WHERE barangay_id = ?' : ''
+    const mWhere = barangayId ? 'WHERE h.barangay_id = ?' : ''
+    countJoins = `
+      LEFT JOIN (SELECT purok_id, COUNT(*) AS n FROM households ${hWhere} GROUP BY purok_id) hc ON hc.purok_id = p.id
+      LEFT JOIN (SELECT h.purok_id, COUNT(*) AS n FROM residents r JOIN households h ON r.household_id = h.id ${mWhere} GROUP BY h.purok_id) mc ON mc.purok_id = p.id`
+    if (barangayId) params.push(barangayId, barangayId)
+  }
+  if (barangayId) params.push(barangayId)
+  const rows = await all(`
+    SELECT p.id AS purok_id, p.name AS purok_name, p.barangay_id, b.name AS barangay_name, ${RISK_COLUMNS}
+      ${counts ? ', COALESCE(hc.n, 0) AS households, COALESCE(mc.n, 0) AS members' : ''}
+    FROM puroks p
+    JOIN barangays b ON b.id = p.barangay_id
+    ${countJoins}
+    ${where}
+    ORDER BY b.name, p.name`, params)
+  return withHouseholdRisk(rows, ctx)
+}
+
+module.exports = { loadRiskContext, withHouseholdRisk, purokRiskRows, RISK_COLUMNS, purokPoint, insideHazardArea, effectiveThreshold, RED_LEVEL_M }

@@ -171,7 +171,8 @@ export default function GISMap() {
   const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Purok Boundaries'])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
-  const [households, setHouseholds] = useState([])
+  // Per-purok counts + at-risk flags from the server (not every household).
+  const [purokRows, setPurokRows] = useState([])
   const [barangaysLoading, setBarangaysLoading] = useState(true)
   const [wakingUp, setWakingUp] = useState(false)
   const [selectedBarangay, setSelectedBarangay] = useState(null)
@@ -186,7 +187,7 @@ export default function GISMap() {
   useEffect(() => {
     setBarangaysLoading(true)
     apiGet('/barangays', { onColdStart: () => setWakingUp(true) }).then(setBarangays).catch(() => {}).finally(() => setBarangaysLoading(false))
-    apiGet('/households').then(setHouseholds).catch(() => {})
+    apiGet('/risk-assessment/puroks').then(setPurokRows).catch(() => {})
   }, [])
 
   // "Flood Zones" and "Landslide Zones" drive the same underlying hazard
@@ -238,15 +239,12 @@ export default function GISMap() {
   // high flood-risk zone (same rules the backend applies to each household).
   const purokRisk = useMemo(() => {
     const m = new Map()
-    for (const h of households) {
-      if (!h.purok_id) continue
-      const r = m.get(h.purok_id) || { households: 0, atRisk: 0 }
-      r.households += 1
-      if (h.in_flood_risk_zone) r.atRisk += 1
-      m.set(h.purok_id, r)
+    for (const p of purokRows) {
+      if (!p.households) continue
+      m.set(p.purok_id, { households: p.households, atRisk: p.in_flood_risk_zone ? p.households : 0 })
     }
     return m
-  }, [households])
+  }, [purokRows])
 
   // Auto-select + fly to the barangay once the search narrows down to a single match
   useEffect(() => {

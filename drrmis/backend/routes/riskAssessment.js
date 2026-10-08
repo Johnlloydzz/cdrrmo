@@ -1,5 +1,5 @@
 const router = require('express').Router()
-const { loadRiskContext, withHouseholdRisk, RISK_COLUMNS } = require('../utils/householdRisk')
+const { loadRiskContext, purokRiskRows } = require('../utils/householdRisk')
 const { all, get } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 
@@ -31,20 +31,14 @@ router.get('/summary', async (req, res) => {
     `)
 
     // At-risk counts use the SAME geofencing as /api/households (including
-    // the drawn flood area), so the Dashboard cards match the map and lists.
-    const hh = await all(`
-      SELECT h.id, h.barangay_id, h.purok_id, ${RISK_COLUMNS},
-             (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count
-      FROM households h
-      LEFT JOIN barangays b ON h.barangay_id = b.id
-      LEFT JOIN puroks p ON h.purok_id = p.id
-    `)
+    // the drawn flood area), worked out per purok: every household in an
+    // at-risk purok is at risk, with its members as the population.
     const atRisk = {}
-    for (const h of withHouseholdRisk(hh, await loadRiskContext())) {
-      if (!h.in_flood_risk_zone) continue
-      const a = atRisk[h.barangay_id] || (atRisk[h.barangay_id] = { households: 0, population: 0 })
-      a.households += 1
-      a.population += Number(h.member_count || 0)
+    for (const p of await purokRiskRows(await loadRiskContext())) {
+      if (!p.in_flood_risk_zone) continue
+      const a = atRisk[p.barangay_id] || (atRisk[p.barangay_id] = { households: 0, population: 0 })
+      a.households += Number(p.households || 0)
+      a.population += Number(p.members || 0)
     }
 
     const result = rows.map(b => ({
@@ -53,6 +47,22 @@ router.get('/summary', async (req, res) => {
       at_risk_population: atRisk[b.barangay_id]?.population || 0,
     })).sort((x, y) => y.at_risk_households - x.at_risk_households)
     res.json(result)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// GET /api/risk-assessment/puroks[?barangay_id=] — one row per purok with its
+// map point, household/member counts and flood/landslide at-risk flags.
+// Used by the Dashboard drill-down, Flood Simulation Control and GIS Map
+// instead of downloading every household.
+router.get('/puroks', async (req, res) => {
+  try {
+    const barangayId = req.user.role === 'Barangay Official' ? req.user.barangay_id : (req.query.barangay_id || null)
+    const rows = await purokRiskRows(await loadRiskContext(), { barangayId })
+    res.json(rows.map(p => ({
+      purok_id: p.purok_id, purok_name: p.purok_name, barangay_id: p.barangay_id, barangay_name: p.barangay_name,
+      lat: p.purok_lat, lng: p.purok_lng, households: Number(p.households || 0), members: Number(p.members || 0),
+      in_flood_risk_zone: p.in_flood_risk_zone, in_landslide_risk_zone: p.in_landslide_risk_zone,
+    })))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

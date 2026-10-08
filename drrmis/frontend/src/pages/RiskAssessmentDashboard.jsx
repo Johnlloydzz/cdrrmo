@@ -126,7 +126,12 @@ function ageOf(birthdate) {
 export default function RiskAssessmentDashboard({ currentUser }) {
   const [summary, setSummary] = useState([])
   const [barangays, setBarangays] = useState([])
-  const [households, setHouseholds] = useState([])
+  // Household drawer: loaded a page at a time ("Load more"), never the
+  // whole city's households at once.
+  const [drawerRows, setDrawerRows] = useState([])
+  const [drawerTotal, setDrawerTotal] = useState(0)
+  const [drawerPage, setDrawerPage] = useState(1)
+  const [drawerLoading, setDrawerLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [wakingUp, setWakingUp] = useState(false)
   const [error, setError] = useState('')
@@ -189,10 +194,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
   const loadDashboardData = () =>
     Promise.all([
       apiGet('/risk-assessment/summary'),
-      apiGet('/households'),
       apiGet('/settings/flood-level'),
       apiGet('/settings/auto-flood-barangays'),
-    ]).then(([s, h, fl, af]) => { setSummary(s); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []); setAutoFloodReasons(af.reasons || {}) })
+    ]).then(([s, fl, af]) => { setSummary(s); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []); setAutoFloodReasons(af.reasons || {}) })
 
   useEffect(() => {
     setLoading(true)
@@ -200,11 +204,10 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     Promise.all([
       apiGet('/risk-assessment/summary', { onColdStart: () => setWakingUp(true) }),
       apiGet('/barangays'),
-      apiGet('/households'),
       apiGet('/settings/flood-level'),
       apiGet('/settings/auto-flood-barangays'),
     ])
-      .then(([s, b, h, fl, af]) => { setSummary(s); setBarangays(b); setHouseholds(h); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []); setAutoFloodReasons(af.reasons || {}) })
+      .then(([s, b, fl, af]) => { setSummary(s); setBarangays(b); setFloodLevel(fl.level_m); setAutoFloodedIds(af.barangay_ids || []); setAutoFloodReasons(af.reasons || {}) })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
 
@@ -221,25 +224,40 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     : summary
   const visibleBarangayIds = new Set(visible.map(s => s.barangay_id))
   const visibleBarangays = barangays.filter(b => visibleBarangayIds.has(b.id))
-  const visibleHouseholds = currentUser?.role === 'Barangay Official'
-    ? households.filter(h => h.barangay_name === currentUser.barangay)
-    : households
-
-  // Drill-down data for the "Barangays in Risk Zone" dropdown — only at-risk
-  // households (the same geofence flag used everywhere on this page).
+  // Drill-down data for the "Barangays in Risk Zone" dropdown, from the
+  // server: the barangay's at-risk puroks (with counts), then that purok's
+  // households — never the whole household list.
   const rzBarangayObj = barangays.find(b => b.id === rzBarangay) || null
-  const rzAtRiskHouseholds = visibleHouseholds.filter(h => h.in_flood_risk_zone && h.barangay_id === rzBarangay)
-  const rzPuroks = Object.values(rzAtRiskHouseholds.reduce((acc, h) => {
-    const key = h.purok_id || 'none'
-    const g = acc[key] || (acc[key] = { id: key, name: h.purok_name || '—', households: 0, population: 0 })
-    g.households += 1
-    g.population += Number(h.member_count || 0)
-    return acc
-  }, {})).sort((a, b) => b.population - a.population || String(a.name).localeCompare(String(b.name)))
+  const [rzPuroks, setRzPuroks] = useState([])
+  const [rzPuroksLoading, setRzPuroksLoading] = useState(false)
+  const [rzPurokHouseholds, setRzPurokHouseholds] = useState([])
+  const [rzHouseholdsLoading, setRzHouseholdsLoading] = useState(false)
+  useEffect(() => {
+    if (!rzBarangay) { setRzPuroks([]); return }
+    let cancelled = false
+    setRzPuroksLoading(true)
+    apiGet(`/risk-assessment/puroks?barangay_id=${rzBarangay}`)
+      .then(rows => {
+        if (cancelled) return
+        setRzPuroks(rows.filter(p => p.in_flood_risk_zone && p.households > 0)
+          .map(p => ({ id: p.purok_id, name: p.purok_name || '—', households: p.households, population: p.members }))
+          .sort((a, b) => b.population - a.population || String(a.name).localeCompare(String(b.name))))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRzPuroksLoading(false) })
+    return () => { cancelled = true }
+  }, [rzBarangay])
+  useEffect(() => {
+    if (!rzPurok) { setRzPurokHouseholds([]); return }
+    let cancelled = false
+    setRzHouseholdsLoading(true)
+    apiGet(`/households?purok_id=${rzPurok}`)
+      .then(rows => { if (!cancelled) setRzPurokHouseholds(rows.filter(h => h.in_flood_risk_zone).sort((a, b) => String(a.head_family).localeCompare(String(b.head_family)))) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRzHouseholdsLoading(false) })
+    return () => { cancelled = true }
+  }, [rzPurok])
   const rzPurokGroup = rzPuroks.find(g => g.id === rzPurok) || null
-  const rzPurokHouseholds = rzAtRiskHouseholds
-    .filter(h => (h.purok_id || 'none') === rzPurok)
-    .sort((a, b) => String(a.head_family).localeCompare(String(b.head_family)))
 
   const totals = visible.reduce((acc, s) => ({
     households: acc.households + (s.total_households || 0),
@@ -273,10 +291,26 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     atRiskPopulation: selectedStats.at_risk_population || 0,
   } : totals
 
-  const householdsToList = (selectedBarangay
-    ? visibleHouseholds.filter(h => h.barangay_name === selectedBarangay.name)
-    : visibleHouseholds
-  ).filter(h => !filterAtRiskOnly || h.in_flood_risk_zone)
+  // Household drawer list: first page when it opens (or the barangay /
+  // filter changes), more with "Load more".
+  const loadDrawerPage = (pageNo) => {
+    setDrawerLoading(true)
+    const q = new URLSearchParams({ page: String(pageNo), limit: '50' })
+    if (selectedBarangay) q.set('barangay_id', String(selectedBarangay.id))
+    if (filterAtRiskOnly) q.set('at_risk', '1')
+    return apiGet(`/households?${q}`)
+      .then(res => {
+        setDrawerRows(prev => pageNo === 1 ? res.rows : [...prev, ...res.rows])
+        setDrawerTotal(res.total)
+        setDrawerPage(pageNo)
+      })
+      .catch(() => {})
+      .finally(() => setDrawerLoading(false))
+  }
+  useEffect(() => {
+    if (showHouseholds) loadDrawerPage(1)
+  }, [showHouseholds, selectedBarangay?.id, filterAtRiskOnly]) // eslint-disable-line react-hooks/exhaustive-deps
+  const householdsToList = drawerRows
 
   const openHouseholdList = () => {
     setFilterAtRiskOnly(false)
@@ -356,7 +390,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 order-2 lg:order-2">
           <div className="card p-3">
             <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Search size={13} /> Search</h3>
-            <input className="input text-sm py-1.5" placeholder="Search barangay…" disabled />
+            <input className="input text-sm py-1.5" placeholder="Search barangay…" value="" readOnly disabled />
           </div>
           <div className="card p-3">
             <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5"><Building2 size={13} /> Barangays</h3>
@@ -477,7 +511,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                     }))}
 
                 {/* 2. Puroks of that barangay, with population */}
-                {rzLevel === 'puroks' && (rzPuroks.length === 0
+                {rzLevel === 'puroks' && rzPuroksLoading && <SkeletonList rows={3} />}
+                {rzLevel === 'puroks' && !rzPuroksLoading && (rzPuroks.length === 0
                   ? <p className="text-center text-gray-400 py-6 text-sm">No at-risk puroks.</p>
                   : rzPuroks.map(g => (
                       <button key={g.id} type="button" onClick={() => setRzPurok(g.id)}
@@ -494,7 +529,8 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                     )))}
 
                 {/* 3. Households (head of family) in that purok */}
-                {rzLevel === 'households' && rzPurokHouseholds.map(h => (
+                {rzLevel === 'households' && rzHouseholdsLoading && <SkeletonList rows={3} />}
+                {rzLevel === 'households' && !rzHouseholdsLoading && rzPurokHouseholds.map(h => (
                   <button key={h.id} type="button" onClick={() => openRzHousehold(h)}
                     className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left">
                     <span>
@@ -797,12 +833,14 @@ export default function RiskAssessmentDashboard({ currentUser }) {
         >
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
               <h3 className="font-semibold text-gray-800 text-sm">
-                {selectedBarangay ? selectedBarangay.name : 'All Barangays'}{filterAtRiskOnly ? ' — At-Risk Households' : ' Households'} ({householdsToList.length})
+                {selectedBarangay ? selectedBarangay.name : 'All Barangays'}{filterAtRiskOnly ? ' — At-Risk Households' : ' Households'} ({drawerTotal.toLocaleString()})
               </h3>
               <button onClick={() => setShowHouseholds(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="overflow-y-auto flex-1">
-              {householdsToList.length === 0 ? (
+              {drawerLoading && householdsToList.length === 0 ? (
+                <SkeletonList rows={6} />
+              ) : householdsToList.length === 0 ? (
                 <p className="text-center text-gray-400 py-8 text-sm">{filterAtRiskOnly ? 'No at-risk households here.' : 'No households registered yet.'}</p>
               ) : (
                 <div className="divide-y divide-gray-100">
@@ -844,6 +882,15 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                           </div>
                         )
                       })()}
+                    </div>
+                  )}
+                  {/* More households, a page at a time */}
+                  {householdsToList.length < drawerTotal && (
+                    <div className="p-3">
+                      <button type="button" onClick={() => loadDrawerPage(drawerPage + 1)} disabled={drawerLoading}
+                        className="w-full text-sm text-primary-700 font-medium py-2 rounded-lg border border-primary-100 hover:bg-primary-50 disabled:opacity-60 transition-colors">
+                        {drawerLoading ? 'Loading…' : `Load more (${(drawerTotal - householdsToList.length).toLocaleString()} left)`}
+                      </button>
                     </div>
                   )}
                 </div>

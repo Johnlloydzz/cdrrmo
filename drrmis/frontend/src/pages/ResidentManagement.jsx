@@ -3,6 +3,8 @@ import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone, MapPin } from 'luc
 import { createPortal } from 'react-dom'
 import BirthdateInput from '../components/BirthdateInput'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
+import usePagedList from '../utils/usePagedList'
+import Pagination from '../components/Pagination'
 
 // Philippine mobile number: 11 digits starting with 09, and not a dummy
 // like 09999999999 / 09000000000 (same digit repeated).
@@ -33,40 +35,46 @@ function computeAge(birthdate) {
 
 export default function ResidentManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
-  const [residents, setResidents] = useState([])
+  const [search, setSearch] = useState('')
+  // One page of residents at a time, searched on the server — fast even with
+  // the whole city's ~200,000 residents.
+  const list = usePagedList('/residents', { search })
+  const { rows: residents, loading } = list
+  // Total + age brackets for the cards, counted on the server.
+  const [stats, setStats] = useState(null)
+  // Households of the purok picked in the form (loaded only when needed).
   const [households, setHouseholds] = useState([])
   const [puroks, setPuroks] = useState([])
   // The purok the resident lives in (saved) — also narrows the Household list below.
   const [purokFilter, setPurokFilter] = useState('')
-  const [loading, setLoading] = useState(true)
   // Skeleton shows as many rows as this user saw here last time.
   const skeletonRows = useSkeletonRows('residents', residents.length, loading)
-  const [error, setError] = useState('')
+  const error = list.error
   const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
 
-  const load = () => {
-    setLoading(true)
-    apiGet('/residents').then(setResidents).catch(err => setError(err.message)).finally(() => setLoading(false))
-  }
+  const loadStats = () => apiGet('/residents/stats').then(setStats).catch(() => {})
+  const load = () => { list.reload(); loadStats() }
+
+  // Households for the form's Household dropdown — only the chosen purok's.
+  useEffect(() => {
+    if (!showModal || !purokFilter) { setHouseholds([]); return }
+    let cancelled = false
+    apiGet(`/households?purok_id=${purokFilter}`).then(h => { if (!cancelled) setHouseholds(h) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [showModal, purokFilter])
 
   useEffect(() => {
-    load()
-    apiGet('/households').then(setHouseholds).catch(() => {})
+    loadStats()
     // Already scoped to the Barangay Official's own barangay server-side —
     // this is exactly what they set up in Puroks, reused here instead of
     // free-typing anything.
     apiGet('/puroks').then(setPuroks).catch(() => {})
   }, [])
 
-  const filtered = residents.filter(r =>
-    (r.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.barangay_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.purok_name || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = residents
 
   const openAdd = () => { setEditing(null); setForm(emptyForm); setPurokFilter(''); setShowModal(true) }
   const openEdit = (r) => {
@@ -77,8 +85,7 @@ export default function ResidentManagement({ currentUser }) {
       sex: r.sex || '', contact_number: r.contact_number || '',
     })
     // The resident's purok: their household's purok, else their own.
-    const hh = households.find(h => String(h.id) === String(r.household_id))
-    const pid = hh?.purok_id || r.purok_id
+    const pid = r.effective_purok_id || r.purok_id
     setPurokFilter(pid ? String(pid) : '')
     setShowModal(true)
   }
@@ -110,20 +117,17 @@ export default function ResidentManagement({ currentUser }) {
     try { await apiDelete(`/residents/${id}`); load() } catch (err) { alert(err.message) }
   }
 
-  const ageBracketCounts = residents.reduce((acc, r) => {
-    const b = r.age_bracket || 'Unknown'
-    acc[b] = (acc[b] || 0) + 1
-    return acc
-  }, {})
+  const ageBracketCounts = stats || {}
+  const statsLoading = !stats
 
   if (error) return <div className="card p-10 text-center text-red-600">{error}</div>
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="card p-4 text-center">{loading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-gray-800 animate-fade-in">{residents.length}</p>}<p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
+        <div className="card p-4 text-center">{statsLoading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-gray-800 animate-fade-in">{(stats.total || 0).toLocaleString()}</p>}<p className="text-xs text-gray-500 mt-1">Total Residents</p></div>
         {['Child (1-12)','Teen (13-17)','Adult (18-59)','Senior (60+)'].map(b => (
-          <div key={b} className="card p-4 text-center">{loading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-primary-700 animate-fade-in">{ageBracketCounts[b] || 0}</p>}<p className="text-xs text-gray-500 mt-1">{b}</p></div>
+          <div key={b} className="card p-4 text-center">{statsLoading ? <SkeletonNumber /> : <p className="text-2xl font-bold text-primary-700 animate-fade-in">{(ageBracketCounts[b] || 0).toLocaleString()}</p>}<p className="text-xs text-gray-500 mt-1">{b}</p></div>
         ))}
       </div>
 
@@ -143,7 +147,7 @@ export default function ResidentManagement({ currentUser }) {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>{['Res. ID', ...(canAdd ? [] : ['Barangay']), 'Purok','Household','Name','Sex','Birthdate','Age','Contact','Relation to Head', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
             </thead>
-            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
+            <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 transition-opacity duration-200 ${loading ? '' : 'animate-fade-in'} ${!loading && list.fetching ? 'opacity-60' : ''}`}>
               {loading ? <SkeletonTableRows columns={10} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
@@ -172,7 +176,7 @@ export default function ResidentManagement({ currentUser }) {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <>{filtered.length} of {residents.length} residents</>}</div>
+        <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <Pagination list={list} noun="residents" />}</div>
       </div>
 
       {showModal && createPortal(
