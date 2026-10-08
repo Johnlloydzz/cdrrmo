@@ -1,5 +1,5 @@
 const { createClient } = require('@libsql/client')
-const bcrypt = require('bcryptjs')
+const { hashPassword } = require('../utils/password')
 
 // Hosted on Turso (libSQL) instead of a local file — Render's free tier has
 // an ephemeral filesystem, so a local SQLite file gets wiped on every
@@ -233,23 +233,20 @@ async function seedDefaultAdmin() {
     },
   ]
 
-  const existingCount = await get(
-    'SELECT COUNT(*) as c FROM users WHERE username IN (?, ?)',
-    demoUsers.map(u => u.username)
-  )
-  if ((existingCount?.c || 0) >= demoUsers.length) return
+  // Only on a brand-new, empty database (first-time setup). Once real
+  // accounts exist, a demo account that was deleted or renamed must never
+  // come back on its own with a password that is written in this file.
+  const existingCount = await get('SELECT COUNT(*) as c FROM users')
+  if ((existingCount?.c || 0) > 0) return
 
   for (const user of demoUsers) {
-    const existing = await get('SELECT id FROM users WHERE username = ?', [user.username])
-    if (!existing) {
-      const hash = await bcrypt.hash(user.password, 12)
-      await run(
-        `INSERT INTO users (name, username, email, password_hash, role, barangay_id, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [user.name, user.username, user.email, hash, user.role, user.barangay_id, 'Active']
-      )
-      console.log(`Demo user created: ${user.username} / ${user.password}`)
-    }
+    const hash = await hashPassword(user.password)
+    await run(
+      `INSERT INTO users (name, username, email, password_hash, role, barangay_id, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [user.name, user.username, user.email, hash, user.role, user.barangay_id, 'Active']
+    )
+    console.log(`Demo user created: ${user.username} (change its password after first sign-in)`)
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
@@ -29,24 +29,33 @@ export default function HouseholdManagement({ currentUser }) {
   const [headOptions, setHeadOptions] = useState([])
   const [headsLoading, setHeadsLoading] = useState(false)
 
+  // Only the newest call may fill the form (closing Edit on one household
+  // and quickly opening another must not pre-select the first one's Head).
+  const headsRequestId = useRef(0)
   const loadHeads = async (household) => {
+    const reqId = ++headsRequestId.current
+    setHeadOptions([])
     setHeadsLoading(true)
     try {
-      const unassigned = await apiGet('/residents?unassigned=1&relation=Head')
-      const current = household ? await apiGet(`/residents?household_id=${household.id}&relation=Head`) : []
+      const [unassigned, current] = await Promise.all([
+        apiGet('/residents?unassigned=1&relation=Head'),
+        household ? apiGet(`/residents?household_id=${household.id}&relation=Head`) : Promise.resolve([]),
+      ])
+      if (reqId !== headsRequestId.current) return
       setHeadOptions([...current, ...unassigned])
       // When editing, pre-select the resident who is this household's Head
       if (household) {
         const match = current.find(r => r.name === household.head_family) || current[0]
         if (match) setForm(f => ({ ...f, head_resident_id: String(match.id) }))
       }
-    } catch { setHeadOptions([]) } finally { setHeadsLoading(false) }
+    } catch { if (reqId === headsRequestId.current) setHeadOptions([]) }
+    finally { if (reqId === headsRequestId.current) setHeadsLoading(false) }
   }
 
   const load = () => list.reload()
 
   useEffect(() => {
-    apiGet('/barangays').then(setBarangays).catch(() => {})
+    apiGet('/barangays?fields=basic').then(setBarangays).catch(() => {})
     apiGet('/puroks').then(setPuroks).catch(() => {})
   }, [])
 

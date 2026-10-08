@@ -8,6 +8,11 @@ router.use(authenticate)
 // GET /api/barangays
 router.get('/', async (req, res) => {
   try {
+    // ?fields=basic → just id + name, for dropdowns (the full list carries
+    // every barangay's and purok's map boundaries and resident counts).
+    if (req.query.fields === 'basic') {
+      return res.json(await all('SELECT id, name FROM barangays ORDER BY name'))
+    }
     const { search, risk } = req.query
     let sql = `
       SELECT b.*,

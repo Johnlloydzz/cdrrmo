@@ -5,11 +5,19 @@ const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
 
-// GET /api/notifications — newest 50. Notifications older than 30 days are
-// cleaned up here so the table never grows without limit.
+// Notifications older than 30 days are cleaned up so the table never grows
+// without limit — at most once an hour, not on every 30-second poll.
+let lastCleanup = 0
+function cleanupOldNotifications() {
+  if (Date.now() - lastCleanup < 60 * 60 * 1000) return
+  lastCleanup = Date.now()
+  run("DELETE FROM notifications WHERE created_at < datetime('now', '+8 hours', '-30 days')").catch(() => {})
+}
+
+// GET /api/notifications — newest 50.
 router.get('/', async (req, res) => {
   try {
-    await run("DELETE FROM notifications WHERE created_at < datetime('now', '+8 hours', '-30 days')")
+    cleanupOldNotifications()
     const rows = await all(
       'SELECT id, type, title, body, link, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT 50',
       [req.user.id]

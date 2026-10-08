@@ -60,7 +60,7 @@ import RequestPasswordReset from './pages/auth/RequestPasswordReset'
 import ForgotPassword    from './pages/auth/ForgotPassword'
 import ChangePassword    from './pages/auth/ChangePassword'
 import Unauthorized      from './pages/Unauthorized'
-import { getStoredUser, setStoredUser, clearStoredUser } from './utils/storage'
+import { getStoredUser, setStoredUser, clearStoredUser, clearStoredToken } from './utils/storage'
 
 // PDRA — 5 modules only (Chapter 1, Section 1.5):
 // Risk Assessment Dashboard, Web-Based Hazard Mapping (+ Geofencing),
@@ -112,6 +112,7 @@ function App() {
   }
 
   const handleLogout = () => {
+    clearStoredToken()
     clearStoredUser()
     setCurrentUser(null)
   }

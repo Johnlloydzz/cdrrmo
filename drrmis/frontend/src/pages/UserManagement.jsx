@@ -35,7 +35,7 @@ export default function UserManagement() {
     load()
     loadRequests()
     loadPwRequests()
-    apiGet('/barangays').then(setBarangays).catch(() => {})
+    apiGet('/barangays?fields=basic').then(setBarangays).catch(() => {})
     // Poll for live online/offline status — no manual refresh needed while
     // this page stays open, e.g. during a live demo.
     const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}); loadRequests(); loadPwRequests() }, 15000)

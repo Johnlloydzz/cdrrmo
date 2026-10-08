@@ -26,10 +26,13 @@ async function authenticate(req, res, next) {
   } catch (err) {
     return res.status(500).json({ error: err.message })
   }
-  // Fire-and-forget: stamps this user as "active right now" on every
-  // request, powering the live online/offline indicator in User
+  // Fire-and-forget: stamps this user as "active right now" (at most once
+  // every 20 seconds, so a page that makes many requests writes only once), powering the live online/offline indicator in User
   // Management. Never awaited — must not slow down or block the request.
-  run('UPDATE users SET last_active = datetime(\'now\', \'+8 hours\') WHERE id = ?', [decoded.id]).catch(() => {})
+  run(
+    "UPDATE users SET last_active = datetime('now', '+8 hours') WHERE id = ? AND (last_active IS NULL OR last_active < datetime('now', '+8 hours', '-20 seconds'))",
+    [decoded.id]
+  ).catch(() => {})
   next()
 }
 

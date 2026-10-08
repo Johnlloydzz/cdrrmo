@@ -1,7 +1,7 @@
 const { sendAccountEmail, isEmailConfigured } = require('../utils/mailer')
 const router = require('express').Router()
-const bcrypt = require('bcryptjs')
-const { all, get, run } = require('../db/database')
+const { hashPassword } = require('../utils/password')
+const { all, get, run, getDb } = require('../db/database')
 const { authenticate, authorize } = require('../middleware/auth')
 
 // Sends the username + password to the user's email. Never throws: returns
@@ -38,7 +38,7 @@ router.get('/', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const { search, role } = req.query
     let sql = `SELECT u.id, u.name, u.username, u.email, u.role, u.barangay_id, b.name as barangay_name, u.status, u.last_login, u.last_active, u.created_at,
-               (u.last_active IS NOT NULL AND (julianday('now', '+8 hours') - julianday(u.last_active)) * 24 * 60 * 60 <= 30) AS is_online
+               (u.last_active IS NOT NULL AND (julianday('now', '+8 hours') - julianday(u.last_active)) * 24 * 60 * 60 <= 90) AS is_online
                FROM users u LEFT JOIN barangays b ON u.barangay_id = b.id WHERE 1=1`
     const params = []
     if (search) { sql += ' AND (u.name LIKE ? OR u.username LIKE ? OR u.email LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`) }
@@ -63,7 +63,7 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
     if (!name || !username || !email || !password || !role) return res.status(400).json({ error: 'All fields required' })
     const slotError = await checkBarangaySlot(role, barangay_id)
     if (slotError) return res.status(400).json({ error: slotError })
-    const hash = await bcrypt.hash(password, 12)
+    const hash = await hashPassword(password)
     const r = await run(
       'INSERT INTO users (name, username, email, password_hash, role, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [name, username, email, hash, role, barangay_id || null, status || 'Active']
@@ -92,7 +92,7 @@ router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
     const slotError = await checkBarangaySlot(role, barangay_id, req.params.id)
     if (slotError) return res.status(400).json({ error: slotError })
     if (password && password.trim()) {
-      const hash = await bcrypt.hash(password, 12)
+      const hash = await hashPassword(password)
       await run(
         `UPDATE users SET name=?, email=?, role=?, barangay_id=?, status=?, password_hash=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
         [name, email, role, barangay_id, status, hash, req.params.id]
@@ -118,7 +118,17 @@ router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
 router.delete('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     if (req.params.id == req.user.id) return res.status(400).json({ error: 'Cannot delete own account' })
-    await run('DELETE FROM users WHERE id = ?', [req.params.id])
+    // Clear everything that points at this user first, in one atomic batch,
+    // so the delete works whether or not the database enforces foreign keys.
+    const id = req.params.id
+    await getDb().batch([
+      { sql: 'UPDATE account_requests SET reviewed_by = NULL WHERE reviewed_by = ?', args: [id] },
+      { sql: 'UPDATE password_reset_requests SET reviewed_by = NULL WHERE reviewed_by = ?', args: [id] },
+      { sql: 'DELETE FROM notifications WHERE user_id = ?', args: [id] },
+      { sql: 'DELETE FROM password_resets WHERE user_id = ?', args: [id] },
+      { sql: 'DELETE FROM password_reset_requests WHERE user_id = ?', args: [id] },
+      { sql: 'DELETE FROM users WHERE id = ?', args: [id] },
+    ], 'write')
     res.json({ message: 'Deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

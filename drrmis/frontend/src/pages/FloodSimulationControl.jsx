@@ -244,9 +244,11 @@ export default function FloodSimulationControl() {
     return () => { clearInterval(interval); window.removeEventListener('focus', poll) }
   }, [])
 
-  const load = () => {
-    setLoading(true)
-    Promise.all([
+  // First load shows the skeleton; a refresh after Update/Reset happens in
+  // the background, so the map keeps its zoom and the selected barangay.
+  const load = ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
+    return Promise.all([
       apiGet('/settings/flood-level'),
       apiGet('/settings/auto-flood-barangays'),
       apiGet('/barangays'),
@@ -255,8 +257,11 @@ export default function FloodSimulationControl() {
         setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
         setAutoFloodedIds(af.barangay_ids || [])
         setBarangays(b)
+        const id = selectedIdRef.current
+        if (id) apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
       })
-      .finally(() => setLoading(false))
+      .catch(err => { if (!silent) alert(err.message || 'Could not load flood data. Please refresh the page.') })
+      .finally(() => { if (!silent) setLoading(false) })
   }
 
   useEffect(() => { load() }, [])
@@ -265,14 +270,14 @@ export default function FloodSimulationControl() {
     const level = parseFloat(input)
     if (isNaN(level) || level < 0) { alert('Enter a valid, non-negative number of meters.'); return }
     setSaving(true)
-    try { await apiPut('/settings/flood-level', { level_m: level, source: 'manual' }); load() }
+    try { await apiPut('/settings/flood-level', { level_m: level, source: 'manual' }); load({ silent: true }) }
     catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
   const handleReset = async () => {
     if (!window.confirm('Reset to normal? This clears the reported flood level for the WHOLE system (Dashboard, GIS Map and this page).')) return
     setSaving(true)
-    try { await apiPut('/settings/flood-level', { level_m: 0, source: 'manual' }); load() }
+    try { await apiPut('/settings/flood-level', { level_m: 0, source: 'manual' }); load({ silent: true }) }
     catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 

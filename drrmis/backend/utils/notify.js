@@ -16,21 +16,18 @@ const OFFICIAL = 'Barangay Official'
 //  - type: alert | incident | evacuation | relief | system (icon/color)
 async function notify({ role, barangay_ids, exclude_user_id, type = 'system', title, body = null, link = null }) {
   try {
-    let sql = "SELECT id FROM users WHERE status = 'Active' AND role = ?"
-    const params = [role]
+    // One statement for every recipient (instead of one INSERT per user),
+    // so notifying all 79 barangays takes one database call, not 79.
+    let sql = `INSERT INTO notifications (user_id, type, title, body, link)
+               SELECT id, ?, ?, ?, ? FROM users WHERE status = 'Active' AND role = ?`
+    const params = [type, title, body, link, role]
     if (Array.isArray(barangay_ids)) {
       if (barangay_ids.length === 0) return
       sql += ` AND barangay_id IN (${barangay_ids.map(() => '?').join(',')})`
       params.push(...barangay_ids)
     }
     if (exclude_user_id) { sql += ' AND id != ?'; params.push(exclude_user_id) }
-    const users = await all(sql, params)
-    for (const u of users) {
-      await run(
-        'INSERT INTO notifications (user_id, type, title, body, link) VALUES (?, ?, ?, ?, ?)',
-        [u.id, type, title, body, link]
-      )
-    }
+    await run(sql, params)
   } catch (err) {
     console.error('notify failed:', err.message)
   }

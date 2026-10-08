@@ -163,6 +163,9 @@ async function resolvePurok(bodyPurokId, household_id, barangay_id) {
 // POST /api/residents
 router.post('/', async (req, res) => {
   try {
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'CDRRMO Personnel have view-only access to resident records.' })
+    }
     const { household_id, last_name, first_name, middle_name, birthdate, relation_to_head, sex, contact_number } = req.body
     if (!last_name?.trim() || !first_name?.trim() || !birthdate) {
       return res.status(400).json({ error: 'Last name, first name, and birthdate are required' })

@@ -101,7 +101,7 @@ const gridKey = ([lat, lng]) => `${(Math.round(lat / GRID_DEG) * GRID_DEG).toFix
 let dischargeCache = { at: 0, ratio: null }
 async function getDischargeRatio() {
   if (Date.now() - dischargeCache.at < 60 * 60 * 1000) return dischargeCache.ratio
-  const floodResp = await fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json())
+  const floodResp = await fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`, { signal: AbortSignal.timeout(20000) }).then(r => r.json())
   if (floodResp?.error) throw new Error(`Open-Meteo flood API: ${floodResp.reason || 'error'}`)
   const daily = floodResp?.daily?.river_discharge
   let ratio = null
@@ -138,7 +138,7 @@ async function runFloodAutoDetectCheck() {
   // actually raining.
   const [dischargeRatio, perPointResp] = await Promise.all([
     getDischargeRatio(),
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=precipitation&hourly=precipitation&past_days=7&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=precipitation&hourly=precipitation&past_days=7&forecast_days=1&timezone=Asia%2FManila`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()),
   ])
   if (perPointResp?.error) throw new Error(`Open-Meteo forecast API: ${perPointResp.reason || 'error'}`)
 

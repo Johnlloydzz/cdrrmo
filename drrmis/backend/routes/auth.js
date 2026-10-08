@@ -1,5 +1,6 @@
 const router = require('express').Router()
 const bcrypt = require('bcryptjs')
+const { hashPassword, needsRehash } = require('../utils/password')
 const jwt = require('jsonwebtoken')
 const { get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
@@ -12,6 +13,29 @@ const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || '7d'
 const JWT_EXPIRES_REMEMBERED = process.env.JWT_EXPIRES_IN_REMEMBERED || '30d'
 const JWT_EXPIRES_UNREMEMBERED = process.env.JWT_EXPIRES_IN_UNREMEMBERED || '1d'
 
+// Stops password guessing: after 5 wrong tries for the same username, that
+// username is locked for 15 minutes. Kept in memory (resets on restart),
+// which is enough to make guessing impractical.
+const MAX_FAILED_LOGINS = 5
+const LOCK_MS = 15 * 60 * 1000
+const failedLogins = new Map() // username(lowercase) → { count, until }
+
+function loginLockedFor(key) {
+  const entry = failedLogins.get(key)
+  if (!entry || !entry.until) return 0
+  const left = entry.until - Date.now()
+  if (left <= 0) { failedLogins.delete(key); return 0 }
+  return left
+}
+
+function recordFailedLogin(key) {
+  const entry = failedLogins.get(key) || { count: 0, until: 0 }
+  entry.count += 1
+  if (entry.count >= MAX_FAILED_LOGINS) { entry.until = Date.now() + LOCK_MS; entry.count = 0 }
+  failedLogins.set(key, entry)
+  if (failedLogins.size > 5000) failedLogins.clear() // never grows without limit
+}
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
@@ -19,14 +43,29 @@ router.post('/login', async (req, res) => {
     if (!username || !password)
       return res.status(400).json({ error: 'Username and password are required.' })
 
+    const key = String(username).trim().toLowerCase()
+    const lockedMs = loginLockedFor(key)
+    if (lockedMs) {
+      const minutes = Math.ceil(lockedMs / 60000)
+      return res.status(429).json({ error: `Too many failed sign-in attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}, or use Forgot password.` })
+    }
+
     const user = await get(
       `SELECT u.*, b.name as barangay_name FROM users u LEFT JOIN barangays b ON u.barangay_id = b.id WHERE u.username = ? AND u.status = ?`,
       [username, 'Active']
     )
-    if (!user) return res.status(401).json({ error: 'Invalid credentials.' })
+    if (!user) { recordFailedLogin(key); return res.status(401).json({ error: 'Invalid credentials.' }) }
 
     const valid = await bcrypt.compare(password, user.password_hash)
-    if (!valid) return res.status(401).json({ error: 'Invalid credentials.' })
+    if (!valid) { recordFailedLogin(key); return res.status(401).json({ error: 'Invalid credentials.' }) }
+    failedLogins.delete(key)
+    // Older accounts were saved with a slower hash setting; re-save once in
+    // the background so every later sign-in is quicker. Never blocks login.
+    if (needsRehash(user.password_hash)) {
+      hashPassword(password)
+        .then(h => run('UPDATE users SET password_hash = ? WHERE id = ?', [h, user.id]))
+        .catch(() => {})
+    }
 
     await run('UPDATE users SET last_login = datetime(\'now\', \'+8 hours\') WHERE id = ?', [user.id])
 
@@ -59,7 +98,7 @@ router.post('/change-password', authenticate, async (req, res) => {
     const valid = await bcrypt.compare(currentPassword, user.password_hash)
     if (!valid) return res.status(400).json({ error: 'Current password is incorrect.' })
 
-    const hash = await bcrypt.hash(newPassword, 12)
+    const hash = await hashPassword(newPassword)
     await run('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\', \'+8 hours\') WHERE id = ?', [hash, req.user.id])
     res.json({ message: 'Password updated successfully.' })
   } catch (err) {
@@ -184,7 +223,7 @@ router.post('/reset-password', async (req, res) => {
     const check = await checkCode(user.id, otp)
     if (!check.ok) return res.status(400).json({ error: check.error })
 
-    const hash = await bcrypt.hash(newPassword, 12)
+    const hash = await hashPassword(newPassword)
     await run("UPDATE users SET password_hash = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?", [hash, user.id])
     await run('UPDATE password_resets SET used = 1 WHERE user_id = ?', [user.id])
     res.json({ message: 'Password has been reset successfully.' })

@@ -20,6 +20,13 @@ const cron                 = require('node-cron')
 
 const { initDb } = require('./db/database')
 
+// Without JWT_SECRET the code would sign tokens with a public fallback
+// string, letting anyone forge a login. Refuse to start in production.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set. Add it in Render → Environment.')
+  process.exit(1)
+}
+
 const app = express()
 const PORT = process.env.PORT || 5000
 
@@ -95,10 +102,16 @@ initDb().then(() => {
   // Every 5 min: Open-Meteo's current values update every 15 min, so checking
   // more often (e.g. every 1 min) returns the same numbers and would push the
   // free API past its 10,000 calls/day limit, getting the server blocked.
+  // Skip a tick while the previous check is still running (a slow weather
+  // API must never pile up checks on the small free-tier server).
+  let floodCheckRunning = false
   cron.schedule('*/5 * * * *', () => {
+    if (floodCheckRunning) return
+    floodCheckRunning = true
     internalRoutes.runFloodAutoDetectCheck()
       .then(result => console.log('[flood-check]', JSON.stringify(result)))
       .catch(err => console.error('[flood-check] failed:', err.message))
+      .finally(() => { floodCheckRunning = false })
   })
 }).catch(err => {
   console.error('Failed to initialize database:', err)

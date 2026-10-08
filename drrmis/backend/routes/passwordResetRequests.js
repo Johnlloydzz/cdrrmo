@@ -9,11 +9,12 @@ const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 // this can't be used to check which usernames/emails are registered.
 router.post('/', async (req, res) => {
   try {
-    const { identifier, message } = req.body
-    if (!identifier || !identifier.trim()) {
+    const identifier = String(req.body.identifier ?? '').trim()
+    const message = req.body.message ? String(req.body.message).slice(0, 500) : null
+    if (!identifier) {
       return res.status(400).json({ error: 'Enter your username or email.' })
     }
-    const user = await get('SELECT id, name, username FROM users WHERE username = ? OR email = ?', [identifier.trim(), identifier.trim()])
+    const user = await get('SELECT id, name, username FROM users WHERE username = ? OR email = ?', [identifier, identifier])
     // One open request per account every 15 minutes — stops anyone from
     // flooding CDRRMO with notifications. Same answer either way.
     const recent = user && await get(

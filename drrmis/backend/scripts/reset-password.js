@@ -19,7 +19,7 @@
 //   node scripts/reset-password.js cdrrmo01 MyNewPassword123
 
 require('dotenv').config()
-const bcrypt = require('bcryptjs')
+const { hashPassword } = require('../utils/password')
 const { get, run } = require('../db/database')
 
 async function main() {
@@ -40,7 +40,7 @@ async function main() {
     process.exit(1)
   }
 
-  const hash = await bcrypt.hash(newPassword, 12)
+  const hash = await hashPassword(newPassword)
   await run(
     `UPDATE users SET password_hash = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?`,
     [hash, user.id]

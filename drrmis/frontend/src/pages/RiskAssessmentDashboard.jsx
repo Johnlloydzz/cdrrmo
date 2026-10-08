@@ -214,8 +214,12 @@ export default function RiskAssessmentDashboard({ currentUser }) {
     // The flood level is now set from a separate Flood Simulation Control
     // page — poll here so the Dashboard's figures stay current even though
     // the two pages aren't directly connected.
-    const interval = setInterval(() => loadDashboardData().catch(() => {}), 20000)
-    return () => clearInterval(interval)
+    // Skipped while the tab is hidden (no point keeping the server busy for
+    // a page nobody is looking at); refreshes right away on coming back.
+    const refresh = () => { if (!document.hidden) loadDashboardData().catch(() => {}) }
+    const interval = setInterval(refresh, 30000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh) }
   }, [])
 
   // Barangay Officials only see their own barangay's data
@@ -293,19 +297,24 @@ export default function RiskAssessmentDashboard({ currentUser }) {
 
   // Household drawer list: first page when it opens (or the barangay /
   // filter changes), more with "Load more".
+  // Only the newest request may fill the list: switching barangay while an
+  // older (slow) answer is still on its way must not show the wrong rows.
+  const drawerRequestId = useRef(0)
   const loadDrawerPage = (pageNo) => {
+    const reqId = ++drawerRequestId.current
     setDrawerLoading(true)
     const q = new URLSearchParams({ page: String(pageNo), limit: '50' })
     if (selectedBarangay) q.set('barangay_id', String(selectedBarangay.id))
     if (filterAtRiskOnly) q.set('at_risk', '1')
     return apiGet(`/households?${q}`)
       .then(res => {
+        if (reqId !== drawerRequestId.current) return
         setDrawerRows(prev => pageNo === 1 ? res.rows : [...prev, ...res.rows])
         setDrawerTotal(res.total)
         setDrawerPage(pageNo)
       })
       .catch(() => {})
-      .finally(() => setDrawerLoading(false))
+      .finally(() => { if (reqId === drawerRequestId.current) setDrawerLoading(false) })
   }
   useEffect(() => {
     if (showHouseholds) loadDrawerPage(1)
