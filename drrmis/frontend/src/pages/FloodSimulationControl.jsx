@@ -53,11 +53,19 @@ function satSources() {
 function SatelliteLayer({ onStatus }) {
   const sources = useMemo(satSources, [])
   const [index, setIndex] = useState(0)
-  const counts = useRef({ ok: 0, err: 0, moved: false })
-  useEffect(() => { counts.current = { ok: 0, err: 0, moved: false } }, [index])
+  const counts = useRef({ ok: 0, moved: false })
+  // Try the next way of asking for the picture (only once per source).
+  const next = () => {
+    const c = counts.current
+    if (c.ok === 0 && !c.moved) { c.moved = true; setIndex(i => i + 1) }
+  }
   useEffect(() => {
-    if (index >= sources.length) onStatus({ state: 'error' })
-    else onStatus({ state: 'loading' })
+    counts.current = { ok: 0, moved: false }
+    if (index >= sources.length) { onStatus({ state: 'error' }); return }
+    onStatus({ state: 'loading' })
+    // If nothing has arrived after 15 seconds, move on as well.
+    const t = setTimeout(next, 15000)
+    return () => clearTimeout(t)
   }, [index]) // eslint-disable-line react-hooks/exhaustive-deps
   if (index >= sources.length) return null
   const src = sources[index]
@@ -66,13 +74,10 @@ function SatelliteLayer({ onStatus }) {
       counts.current.ok++
       if (counts.current.ok === 1) onStatus({ state: 'ok', time: src.time })
     },
-    tileerror: () => {
-      const c = counts.current
-      c.err++
-      // Move to the next way of asking only once per source (many tiles
-      // fail at the same moment).
-      if (c.ok === 0 && c.err >= 3 && !c.moved) { c.moved = true; setIndex(i => i + 1) }
-    },
+    // 'load' fires when every tile in view has finished, failed ones
+    // included. Zoomed in on Gingoog only one or two satellite tiles cover
+    // the screen, so this (not an error count) decides if a source failed.
+    load: next,
   }
   const common = { opacity: 0.6, pane: 'satellite', attribution: 'Satellite: NASA GIBS, JMA Himawari', eventHandlers: handlers }
   return src.kind === 'wms'
