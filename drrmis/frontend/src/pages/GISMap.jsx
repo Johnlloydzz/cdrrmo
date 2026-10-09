@@ -58,12 +58,11 @@ const LAYERS = [
 ]
 
 // Free, public, no-API-key overlay tiles (Esri's ArcGIS Online reference
-// layers, commonly used this way in Leaflet projects) for the "Roads" and
-// "Rivers" Map Layers toggles — real data, not placeholders.
+// layers, commonly used this way in Leaflet projects) for the
+// Roads Map Layers toggle — real data, not placeholders.
 const ROADS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
-const RIVERS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Hydro_Reference_Overlay/MapServer/tile/{z}/{y}/{x}'
 
-const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Rivers','Flood Zones','Landslide Zones']
+const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Flood Zones','Landslide Zones']
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors,
 // matching the City of Gingoog CLUP Landslide and Flood Susceptibility Map.
@@ -578,12 +577,11 @@ export default function GISMap() {
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
           />
 
-          {/* Roads / Rivers reference overlays — free public Esri tiles, no
+          {/* Roads reference overlay — free public Esri tiles, no
               API key. Always mounted with opacity 0/1 (rather than
               mounted/unmounted) so the CSS transition in index.css fades
               them in/out smoothly instead of popping. */}
           <TileLayer url={ROADS_OVERLAY_URL} opacity={activeOverlays.includes('Roads') ? 0.9 : 0} zIndex={5} />
-          <TileLayer url={RIVERS_OVERLAY_URL} opacity={activeOverlays.includes('Rivers') ? 0.9 : 0} zIndex={5} />
 
           {/* Barangay Boundaries — plain outline, no fill, independent of
               whichever hazard choropleth (or none) is currently showing, so
