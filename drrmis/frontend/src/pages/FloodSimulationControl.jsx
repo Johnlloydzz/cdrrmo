@@ -571,7 +571,7 @@ export default function FloodSimulationControl() {
                           : 'For drills and demos: acts as if heavy rain is falling in every barangay.'}
                       </p>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100 cursor-help" title="A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.">
+                    <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100 cursor-help" title="A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours and the river is 20% above normal; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.">
                       Auto-detect: every 5 minutes, based on live rainfall and river data.
                     </p>
                   </div>

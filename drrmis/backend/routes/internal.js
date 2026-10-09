@@ -42,6 +42,7 @@ const T = {
   intenseRainMmHr:        parseFloat(process.env.INTENSE_RAIN_MM_HR) || 30,
   intenseDischargeRatio:  parseFloat(process.env.INTENSE_DISCHARGE_RATIO) || 1.5,
   heavy24hMm:             parseFloat(process.env.HEAVY_24H_MM) || 100,
+  heavy24hDischargeRatio: parseFloat(process.env.HEAVY_24H_DISCHARGE_RATIO) || 1.2,
   prolonged72hMm:         parseFloat(process.env.PROLONGED_72H_MM) || 150,
   prolonged7dMm:          parseFloat(process.env.PROLONGED_7D_MM) || 250,
   prolongedDischargeRatio: parseFloat(process.env.PROLONGED_DISCHARGE_RATIO) || 1.2,
@@ -52,7 +53,10 @@ const T = {
 //  1. INTENSE: a very heavy downpour right now (PAGASA Red, >30 mm/hr) while
 //     the river is already well above normal.
 //  2. HEAVY 24H: a lot of rain piled up within one day (≥100 mm, PAGASA's
-//     "heavy to intense" band) — floods even if each hour looked moderate.
+//     "heavy to intense" band) while the river is at least somewhat above
+//     normal — so a high rainfall ESTIMATE alone (e.g. rain mostly over the
+//     hills, or the weather model over-estimating) can't raise a false alarm
+//     when the river shows the water isn't actually building up.
 //  3. PROLONGED: light-to-moderate rain that just doesn't stop for days
 //     (≥150 mm over 3 days or ≥250 mm over 7 days) — the ground saturates
 //     and creeks/rivers keep rising — while the river is at least somewhat
@@ -63,8 +67,8 @@ function evaluateBarangay({ currentRain, sum24, sum72, sum168, dischargeRatio })
   if (currentRain != null && currentRain > T.intenseRainMmHr && ratio >= T.intenseDischargeRatio) {
     return `Intense rain now: ${currentRain} mm/hr, river ${ratio.toFixed(1)}x normal`
   }
-  if (sum24 >= T.heavy24hMm) {
-    return `Heavy rain: ${Math.round(sum24)} mm in the last 24 hours`
+  if (sum24 >= T.heavy24hMm && ratio >= T.heavy24hDischargeRatio) {
+    return `Heavy rain: ${Math.round(sum24)} mm in the last 24 hours, river ${ratio.toFixed(1)}x normal`
   }
   if (ratio >= T.prolongedDischargeRatio && (sum72 >= T.prolonged72hMm || sum168 >= T.prolonged7dMm)) {
     return sum72 >= T.prolonged72hMm
