@@ -618,7 +618,7 @@ export default function FloodSimulationControl() {
                   <GeoJSON
                     key={`purok-${p.id}`}
                     data={geo}
-                    pathOptions={{ color: '#2563eb', weight: 1.5, fillOpacity: 0, dashArray: '4, 3' }}
+                    pathOptions={{ color: '#2563eb', weight: 3, fillOpacity: 0 }}
                     eventHandlers={{ click: markHandled }}
                   >
                     <Tooltip sticky>{p.name}</Tooltip>

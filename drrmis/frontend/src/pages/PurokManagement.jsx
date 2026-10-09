@@ -377,7 +377,7 @@ export default function PurokManagement({ currentUser }) {
                       {existingBoundary && boundaryPoints.length === 0 && (() => {
                         let geo
                         try { geo = JSON.parse(existingBoundary) } catch { return null }
-                        return <GeoJSON key="purok-existing" data={geo} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} ref={setPurokBoundaryLayer} />
+                        return <GeoJSON key="purok-existing" data={geo} pathOptions={{ color: '#2563eb', weight: 3, fillOpacity: 0.15 }} ref={setPurokBoundaryLayer} />
                       })()}
 
                       {/* Fit to whichever boundary is available, preferring
@@ -408,9 +408,9 @@ export default function PurokManagement({ currentUser }) {
                         />
                       ))}
                       {boundaryPoints.length >= 3
-                        ? <Polygon ref={shapeRef} positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2, fillOpacity: 0.15 }} />
+                        ? <Polygon ref={shapeRef} positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 3, fillOpacity: 0.15 }} />
                         : boundaryPoints.length === 2
-                          ? <Polyline ref={shapeRef} positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 2 }} />
+                          ? <Polyline ref={shapeRef} positions={boundaryPoints} pathOptions={{ color: '#2563eb', weight: 3 }} />
                           : null}
                     </MapContainer>
                     </MapErrorBoundary>

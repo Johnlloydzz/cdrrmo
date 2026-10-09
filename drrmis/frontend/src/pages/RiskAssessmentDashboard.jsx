@@ -778,7 +778,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   <GeoJSON
                     key={`purok-${p.id}`}
                     data={geo}
-                    pathOptions={{ color: atRisk ? '#dc2626' : '#2563eb', weight: 1.5, fillColor: atRisk ? '#dc2626' : '#2563eb', fillOpacity: 0.1, dashArray: '4, 3' }}
+                    pathOptions={{ color: atRisk ? '#dc2626' : '#2563eb', weight: 3, fillColor: atRisk ? '#dc2626' : '#2563eb', fillOpacity: 0.1 }}
                   >
                     <Tooltip permanent direction="center" className="purok-name-label">{p.name}</Tooltip>
                     <Popup>

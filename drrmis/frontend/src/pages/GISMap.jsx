@@ -714,8 +714,8 @@ export default function GISMap() {
                   key={`purok-boundary-${p.id}-${purokRisk.get(p.id)?.atRisk ? 'risk' : 'ok'}`}
                   data={geo}
                   style={purokRisk.get(p.id)?.atRisk
-                    ? { color: '#dc2626', weight: 2, fillColor: '#dc2626', fillOpacity: 0.18, dashArray: '4, 3' }
-                    : { color: '#2563eb', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.08, dashArray: '4, 3' }}
+                    ? { color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.18 }
+                    : { color: '#2563eb', weight: 3, fillColor: '#2563eb', fillOpacity: 0.08 }}
                 >
                   <Tooltip permanent direction="center" className="purok-name-label">
                     <div style={{ textAlign: 'center', lineHeight: 1.2 }}>
