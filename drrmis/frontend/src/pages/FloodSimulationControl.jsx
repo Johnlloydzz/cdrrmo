@@ -74,22 +74,23 @@ function SatelliteLayer({ onStatus }) {
       if (c.ok === 0 && c.err >= 3 && !c.moved) { c.moved = true; setIndex(i => i + 1) }
     },
   }
-  const common = { opacity: 0.9, pane: 'satellite', attribution: 'Satellite: NASA GIBS, JMA Himawari', eventHandlers: handlers }
+  const common = { opacity: 0.6, pane: 'satellite', attribution: 'Satellite: NASA GIBS, JMA Himawari', eventHandlers: handlers }
   return src.kind === 'wms'
     ? <WMSTileLayer key={index} url={src.url} params={{ layers: src.layers, format: 'image/jpeg', transparent: false, version: '1.3.0', ...(src.time !== 'default' ? { time: src.time } : {}) }} {...common} />
     : <TileLayer key={index} url={src.url} maxNativeZoom={src.maxNativeZoom} maxZoom={18} {...common} />
 }
 
-// Zooms out to see the whole region when satellite turns on, and back to
-// Gingoog when it turns off.
-function SatelliteView({ on }) {
+// The satellite stays focused on Gingoog City (the flood-prone area). The
+// "whole region" view zooms out to see a typhoon or rain band coming in;
+// "Back to Gingoog" returns.
+function SatelliteView({ region }) {
   const map = useMap()
   const first = useRef(true)
   useEffect(() => {
-    if (first.current) { first.current = false; if (!on) return }
-    if (on) map.flyTo(SAT_VIEW.center, SAT_VIEW.zoom, { duration: 0.8 })
+    if (first.current) { first.current = false; if (!region) return }
+    if (region) map.flyTo(SAT_VIEW.center, SAT_VIEW.zoom, { duration: 0.8 })
     else map.flyTo(CENTER, 12, { duration: 0.8 })
-  }, [on, map])
+  }, [region, map])
   return null
 }
 
@@ -235,6 +236,8 @@ export default function FloodSimulationControl() {
 
   const [autoFloodedIds, setAutoFloodedIds] = useState([])
   const [showSatellite, setShowSatellite] = useState(false)
+  const [satRegion, setSatRegion] = useState(false)
+  useEffect(() => { if (!showSatellite) setSatRegion(false) }, [showSatellite])
   const [satStatus, setSatStatus] = useState({ state: 'off' })
   const [satRefresh, setSatRefresh] = useState(0)
   // New satellite picture every 10 minutes while it is on.
@@ -646,7 +649,7 @@ export default function FloodSimulationControl() {
                   onClick={() => setShowSatellite(v => !v)}
                   aria-pressed={showSatellite}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-md border transition-colors ${showSatellite ? 'bg-primary-600 text-white border-primary-600' : 'bg-white/95 text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-                  title="Live cloud picture from the Himawari-9 satellite (NASA GIBS)"
+                  title="Live rain-cloud picture from the Himawari-9 satellite (NASA GIBS). Blue = rain clouds."
                 >
                   <Satellite size={14} aria-hidden="true" /> {showSatellite ? 'Satellite on' : 'Satellite'}
                 </button>
@@ -664,8 +667,16 @@ export default function FloodSimulationControl() {
                 <p className="rounded-md bg-white/95 border border-gray-200 shadow px-2.5 py-1 text-[11px] text-gray-600 max-w-[16rem] text-right" role="status">
                   {satStatus.state === 'loading' && 'Loading satellite picture…'}
                   {satStatus.state === 'ok' && (satStatus.time && satStatus.time !== 'default'
-                    ? `Himawari-9 infrared, ${new Date(satStatus.time).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}. Bright = thick rain clouds.`
-                    : 'Himawari-9 infrared, latest. Bright = thick rain clouds.')}
+                    ? `Himawari-9 infrared, ${new Date(satStatus.time).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}. Blue over Gingoog = rain clouds (darker = heavier).`
+                    : 'Himawari-9 infrared, latest. Blue over Gingoog = rain clouds (darker = heavier).')}
+                  {satStatus.state === 'ok' && (
+                    <span className="block mt-0.5 text-gray-400">Shows clouds, not flooding on the ground.</span>
+                  )}
+                  {satStatus.state !== 'error' && (
+                    <button type="button" onClick={() => setSatRegion(r => !r)} className="block ml-auto mt-1 font-semibold text-primary-700 hover:underline">
+                      {satRegion ? 'Back to Gingoog' : 'See whole region (incoming typhoon)'}
+                    </button>
+                  )}
                   {satStatus.state === 'error' && 'Satellite picture is not available right now. Try again later or open the PAGASA bulletin.'}
                 </p>
               )}
@@ -675,11 +686,14 @@ export default function FloodSimulationControl() {
           {loading ? <SkeletonBlock className="w-full h-full rounded-none" /> : (
           <MapContainer center={CENTER} zoom={12} className="w-full h-full animate-fade-in">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
-            {/* Satellite clouds above the street map; 'screen' blending
-                makes the dark (clear-sky) parts see-through. */}
-            <Pane name="satellite" style={{ zIndex: 350, mixBlendMode: 'screen', pointerEvents: 'none' }} />
+            {/* Satellite clouds above the street map. The infrared picture
+                is inverted and tinted blue, then multiplied onto the map:
+                clear sky becomes see-through and rain clouds show as blue
+                (darker blue = colder, thicker clouds), visible even on the
+                light street map. */}
+            <Pane name="satellite" style={{ zIndex: 350, mixBlendMode: 'multiply', filter: 'invert(1) sepia(1) saturate(5) hue-rotate(175deg)', pointerEvents: 'none' }} />
             {showSatellite && <SatelliteLayer key={satRefresh} onStatus={setSatStatus} />}
-            <SatelliteView on={showSatellite} />
+            <SatelliteView region={showSatellite && satRegion} />
             <MapResizeHandler />
             <ClearOnMapClick onClear={() => setSelectedBarangay(null)} />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
