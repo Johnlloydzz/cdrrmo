@@ -58,23 +58,29 @@ function effectiveThreshold() {
   return RED_LEVEL_M
 }
 
-// Current flood situation, in priority order:
-//  1. A flood level reported by CDRRMO (Flood Simulation Control) — real,
-//     citywide, compared with each purok's own flood threshold.
-//  2. Live auto-detect's flagged barangays — treated as a 1 m flood there.
-//  3. Otherwise the official CDRA purok classification (flood_risk = High).
+// Current flood situation. A purok turns red ONLY while its barangay has
+// HEAVY RAIN right now:
+//  - the live auto-detect flagged the barangay (real rainfall + river data), or
+//  - CDRRMO switched on "Simulate heavy rain" (test switch for demos/drills),
+//    which counts as heavy rain in every barangay.
+// The flood level typed on Flood Simulation Control is the water depth to
+// expect during that heavy rain (standby until the rain comes). With no level
+// typed, heavy rain is treated as a 1 m flood.
 async function loadRiskContext() {
   await expireStaleFloodData()
-  const [levelRow, sourceRow, autoRow] = await Promise.all([
+  const [levelRow, sourceRow, autoRow, simRow] = await Promise.all([
     get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
     get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
     get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
+    get('SELECT value FROM system_settings WHERE key = ?', ['simulate_heavy_rain']),
   ])
   const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
   const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
+  const simulateRain = simRow?.value === '1'
   let autoBarangayIds = []
   try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
-  return { floodLevel, manualActive, autoBarangayIds }
+  if (simulateRain) autoBarangayIds = (await all('SELECT id FROM barangays')).map(b => b.id)
+  return { floodLevel, manualActive, simulateRain, autoBarangayIds: autoBarangayIds.map(Number) }
 }
 
 // Adds in_flood_risk_zone / in_landslide_risk_zone (+ purok_lat/lng) to
@@ -109,11 +115,11 @@ function withHouseholdRisk(rows, ctx) {
     const h = { ...raw, purok_lat: pt?.lat ?? null, purok_lng: pt?.lng ?? null }
     return {
       ...h,
-      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && geo.inFloodArea && (manualActive
-        ? floodLevel >= effectiveThreshold(h.flood_threshold_m)
-        : autoBarangayIds.includes(h.barangay_id)
-          ? RED_LEVEL_M >= effectiveThreshold(h.flood_threshold_m)
-          : h.purok_flood_risk === 'High'),
+      // Red only during heavy rain in this barangay (live or simulated), at
+      // the reported flood level (or 1 m when none was typed).
+      in_flood_risk_zone: (h.barangay_flood_susceptibility || 'Low') !== 'Low' && geo.inFloodArea
+        && autoBarangayIds.includes(Number(h.barangay_id))
+        && (manualActive ? floodLevel : RED_LEVEL_M) >= effectiveThreshold(h.flood_threshold_m),
       // Landslide has no measured value like flood depth — always the static
       // official CDRA classification.
       in_landslide_risk_zone: h.purok_landslide_risk === 'High' && geo.inLandslideArea,

@@ -1,6 +1,6 @@
 const router = require('express').Router()
 const { expireStaleFloodData } = require('../db/floodLevel')
-const { get, run } = require('../db/database')
+const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
@@ -64,8 +64,8 @@ router.put('/flood-level', async (req, res) => {
     if (level !== prevLevel) {
       const how = source === 'auto' ? ' (auto-detected)' : ''
       const msg = level > 0
-        ? { type: 'alert', title: `Flood level reported: ${level} m${how}`,
-            body: `Puroks with a flood threshold of ${level} m or lower are now at risk. Check your households.` }
+        ? { type: 'alert', title: `Flood level set: ${level} m${how}`,
+            body: `If heavy rain hits your barangay, puroks in its flood-prone area will be flagged at risk at ${level} m. Check your households.` }
         : { type: 'system', title: 'Flood level cleared',
             body: 'The reported flood water level is back to 0 m (normal).' }
       await notify({ role: OFFICIAL, ...msg, link: '/households' })
@@ -94,7 +94,15 @@ router.get('/auto-flood-barangays', async (req, res) => {
     const reasonsRow = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flood_reasons'])
     let reasons = {}
     try { reasons = reasonsRow ? JSON.parse(reasonsRow.value) : {} } catch { reasons = {} }
-    res.json({ barangay_ids, reasons })
+    // "Simulate heavy rain" test switch: every barangay counts as having
+    // heavy rain, exactly like the live auto-detect flagging it.
+    const simulate = (await get("SELECT value FROM system_settings WHERE key = 'simulate_heavy_rain'"))?.value === '1'
+    if (simulate) {
+      const live = new Set(barangay_ids.map(Number))
+      barangay_ids = (await all('SELECT id FROM barangays')).map(b => b.id)
+      for (const id of barangay_ids) if (!live.has(id)) reasons[id] = 'TEST: simulated heavy rain'
+    }
+    res.json({ barangay_ids, reasons, simulate })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -117,6 +125,35 @@ router.put('/auto-flood-barangays', async (req, res) => {
     )
     await notifyAutoFlood(prevIds, ids)
     res.json({ barangay_ids: ids })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// PUT /api/settings/simulate-heavy-rain — body: { on: true|false }. CDRRMO
+// Personnel only. A TEST switch for demos and drills: while on, every
+// barangay is treated as having heavy rain, so puroks in flood-prone areas
+// turn red at the flood level set on Flood Simulation Control (1 m if none).
+router.put('/simulate-heavy-rain', async (req, res) => {
+  try {
+    if (req.user.role !== 'CDRRMO Personnel') {
+      return res.status(403).json({ error: 'Only CDRRMO Personnel can use the heavy rain test switch.' })
+    }
+    const on = req.body.on === true
+    const prev = (await get("SELECT value FROM system_settings WHERE key = 'simulate_heavy_rain'"))?.value === '1'
+    await run(
+      `INSERT INTO system_settings (key, value, updated_at) VALUES ('simulate_heavy_rain', ?, datetime('now', '+8 hours'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [on ? '1' : '0']
+    )
+    if (on !== prev) {
+      const msg = on
+        ? { type: 'alert', title: 'TEST: Heavy rain simulation started',
+            body: 'This is a drill. Puroks in flood-prone areas are flagged at risk as if heavy rain were falling.' }
+        : { type: 'system', title: 'TEST: Heavy rain simulation ended',
+            body: 'The drill is over. Flood risk is back to live rainfall data.' }
+      await notify({ role: OFFICIAL, ...msg, link: '/households' })
+      await notify({ role: CDRRMO, exclude_user_id: req.user.id, ...msg, link: '/flood-control' })
+    }
+    res.json({ simulate: on })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

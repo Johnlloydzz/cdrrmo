@@ -159,6 +159,9 @@ export default function FloodSimulationControl() {
   const [liveUpdatedAt, setLiveUpdatedAt] = useState(null) // when the live data was last refreshed
 
   const [autoFloodedIds, setAutoFloodedIds] = useState([])
+  // "Simulate heavy rain" TEST switch (drills / defense demo): while on,
+  // every barangay counts as having heavy rain.
+  const [simulateRain, setSimulateRain] = useState(false)
 
   const loadLiveData = () => {
     setLiveLoading(true)
@@ -245,7 +248,7 @@ export default function FloodSimulationControl() {
         }
         setFloodLevel(fl.level_m); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
       }).catch(() => {})
-      apiGet('/settings/auto-flood-barangays').then(af => setAutoFloodedIds(af.barangay_ids || [])).catch(() => {})
+      apiGet('/settings/auto-flood-barangays').then(af => { setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate) }).catch(() => {})
       // At-risk flags come from the server (same geofence everywhere), so
       // refresh the selected barangay's purok pins too.
       if (selectedIdRef.current) {
@@ -269,7 +272,7 @@ export default function FloodSimulationControl() {
     ])
       .then(([fl, af, b]) => {
         setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
-        setAutoFloodedIds(af.barangay_ids || [])
+        setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate)
         setBarangays(b)
         const id = selectedIdRef.current
         if (id) apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
@@ -294,6 +297,21 @@ export default function FloodSimulationControl() {
     try { await apiPut('/settings/flood-level', { level_m: 0, source: 'manual' }); load({ silent: true }) }
     catch (err) { alert(err.message) } finally { setSaving(false) }
   }
+
+  const handleToggleSimulate = async () => {
+    const on = !simulateRain
+    if (!window.confirm(on
+      ? 'Start the TEST heavy rain simulation? Every barangay will be treated as having heavy rain, so puroks in flood-prone areas turn red at the flood level set above (1 m if none). Everyone is notified that this is a drill.'
+      : 'Stop the TEST heavy rain simulation? Flood risk goes back to live rainfall data.')) return
+    setSaving(true)
+    try { await apiPut('/settings/simulate-heavy-rain', { on }); await load({ silent: true }) }
+    catch (err) { alert(err.message) } finally { setSaving(false) }
+  }
+
+  // Heavy rain right now (live auto-detect or the test switch) makes the set
+  // flood level take effect; without it the level is standby.
+  const heavyRain = autoFloodedIds.length > 0
+  const activeFloodLevel = floodLevel > 0 ? floodLevel : 1
 
   const isFlood = hazard === 'flood'
   const atRiskKey = isFlood ? 'in_flood_risk_zone' : 'in_landslide_risk_zone'
@@ -421,8 +439,10 @@ export default function FloodSimulationControl() {
             </button>
             {(floodLevel > 0 || autoFloodedIds.length > 0) && (
               <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-                {floodLevel > 0 && <span className="badge-red text-[10px]">Flood level: {floodLevel}m (live)</span>}
-                {autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Auto-flagged: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
+                {floodLevel > 0 && <span className={`${heavyRain ? 'badge-red' : 'badge-yellow'} text-[10px]`}>Flood level: {floodLevel}m ({heavyRain ? 'active' : 'standby'})</span>}
+                {simulateRain
+                  ? <span className="badge-red text-[10px]">TEST: heavy rain simulation</span>
+                  : autoFloodedIds.length > 0 && <span className="badge-red text-[10px]">Heavy rain: {autoFloodedIds.length} barangay{autoFloodedIds.length > 1 ? 's' : ''}</span>}
               </div>
             )}
 
@@ -501,24 +521,44 @@ export default function FloodSimulationControl() {
                     </div>
                     {floodLevel > 0 && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving}>Reset to Normal</button>}
                     {floodLevel > 0 ? (
-                      <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5">
+                      <p className={`text-xs font-medium mt-2 flex items-start gap-1.5 ${heavyRain ? 'text-red-600' : 'text-amber-700'}`}>
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        Flood level: <strong className="mx-1">{floodLevel} m</strong> — applied system-wide
+                        <span>Flood level: <strong>{floodLevel} m</strong> — {heavyRain ? 'ACTIVE (heavy rain): puroks in flood-prone areas are red' : 'standby: puroks turn red only when heavy rain is detected'}</span>
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-2">No flood level reported.</p>
+                      <p className="text-xs text-gray-500 mt-2">No flood level set. Heavy rain is treated as a 1 m flood.</p>
                     )}
                     {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
                     {floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Stays in effect until you change it or press Reset to Normal.</p>}
 
-                    {autoFloodedBarangayNames.length > 0 && (
+                    {!simulateRain && autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        Flood detected: <strong className="mx-1">{autoFloodedBarangayNames.join(', ')}</strong>
+                        <span>Heavy rain detected: <strong>{autoFloodedBarangayNames.join(', ')}</strong></span>
                       </p>
                     )}
+
+                    {/* TEST switch — makes every barangay count as having heavy
+                        rain, for drills and demos when it isn't really raining. */}
+                    <div className={`mt-3 pt-3 border-t border-gray-100 rounded-lg ${simulateRain ? 'bg-red-50 -mx-2 px-2 pb-2' : ''}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-gray-700">Simulate heavy rain (test)</span>
+                        <button
+                          type="button" role="switch" aria-checked={simulateRain} onClick={handleToggleSimulate} disabled={saving}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${simulateRain ? 'bg-red-500' : 'bg-gray-300'} disabled:opacity-50`}
+                          title={simulateRain ? 'Stop the simulation' : 'Start the simulation'}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${simulateRain ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                        </button>
+                      </div>
+                      <p className={`text-[10px] mt-1 leading-snug ${simulateRain ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+                        {simulateRain
+                          ? `ON — drill only. All puroks in flood-prone areas are red at ${activeFloodLevel} m. Turn off when done.`
+                          : 'For drills and demos: acts as if heavy rain is falling in every barangay.'}
+                      </p>
+                    </div>
                     <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100 cursor-help" title="A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.">
-                      Auto-detect: every 10 minutes, based on live rainfall and river data.
+                      Auto-detect: every 5 minutes, based on live rainfall and river data.
                     </p>
                   </div>
                 ) : (
@@ -656,7 +696,7 @@ export default function FloodSimulationControl() {
                 <Popup>
                   <strong>Purok {g.name}</strong> — {g.barangay}<br />
                   Households: {g.households} · Residents in households: {g.members}<br />
-                  {g.atRisk ? (isFlood && floodLevel > 0 ? `WARNING: ${g.atRisk} household(s) flooded at ${floodLevel} m (reported, live)` : `WARNING: ${g.atRisk} household(s) within high ${hazard}-risk zone`) : 'Outside high-risk zone'}
+                  {g.atRisk ? (isFlood ? `WARNING: ${g.atRisk} household(s) flooded at ${activeFloodLevel} m (${simulateRain ? 'TEST simulation' : 'heavy rain, live'})` : `WARNING: ${g.atRisk} household(s) within high ${hazard}-risk zone`) : 'Outside high-risk zone'}
                 </Popup>
               </Marker>
             ))}
