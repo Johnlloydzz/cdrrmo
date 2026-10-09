@@ -124,6 +124,9 @@ export default function FloodSimulationControl() {
   // Per-purok counts + at-risk flags for the selected barangay's pins
   // (from the server — not every household in the city).
   const [purokRows, setPurokRows] = useState([])
+  // During heavy rain (live or the test switch): every at-risk purok in the
+  // city, so red pins pop up on the map without picking a barangay first.
+  const [cityAtRiskPuroks, setCityAtRiskPuroks] = useState([])
   const selectedIdRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -326,6 +329,17 @@ export default function FloodSimulationControl() {
     if (!id) { setPurokRows([]); return }
     apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
   }, [selectedBarangay?.id])
+
+  // Citywide red pins while heavy rain is on. Refetched whenever the flood
+  // situation changes (rain flagged/cleared, test switch, flood level).
+  useEffect(() => {
+    if (!isFlood || !heavyRain) { setCityAtRiskPuroks([]); return }
+    let cancelled = false
+    apiGet('/risk-assessment/puroks')
+      .then(rows => { if (!cancelled) setCityAtRiskPuroks(rows.filter(p => p.in_flood_risk_zone && p.households > 0 && p.lat != null && p.lng != null)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isFlood, heavyRain, simulateRain, floodLevel, autoFloodedIds.join(',')])
 
   const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name)
 
@@ -697,6 +711,17 @@ export default function FloodSimulationControl() {
                   <strong>Purok {g.name}</strong> — {g.barangay}<br />
                   Households: {g.households} · Residents in households: {g.members}<br />
                   {g.atRisk ? (isFlood ? `WARNING: ${g.atRisk} household(s) flooded at ${activeFloodLevel} m (${simulateRain ? 'TEST simulation' : 'heavy rain, live'})` : `WARNING: ${g.atRisk} household(s) within high ${hazard}-risk zone`) : 'Outside high-risk zone'}
+                </Popup>
+              </Marker>
+            ))}
+            {/* No barangay picked yet: during heavy rain, show a red pin for
+                every at-risk purok in the city. */}
+            {!selectedBarangay && cityAtRiskPuroks.map(p => (
+              <Marker key={`city-purok-${p.purok_id}`} position={[p.lat, p.lng]} icon={redPin}>
+                <Popup>
+                  <strong>Purok {p.purok_name}</strong> — {p.barangay_name}<br />
+                  Households: {p.households} · Residents in households: {p.members}<br />
+                  {`WARNING: ${p.households} household(s) flooded at ${activeFloodLevel} m (${simulateRain ? 'TEST simulation' : 'heavy rain, live'})`}
                 </Popup>
               </Marker>
             ))}
