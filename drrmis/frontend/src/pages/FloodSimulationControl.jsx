@@ -1,10 +1,10 @@
 import React from 'react'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, useMapEvents, Pane } from 'react-leaflet'
+import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, useMapEvents, Pane } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft, X } from 'lucide-react'
+import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft, X, Satellite } from 'lucide-react'
 import { prepareSessionHandoff } from '../utils/storage'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { apiGet, apiPut } from '../utils/api'
@@ -17,6 +17,81 @@ L.Icon.Default.mergeOptions({
 })
 
 const CENTER = [8.8231, 125.1109]
+
+// ── Live satellite (free): Himawari-9 infrared clouds from NASA GIBS ──────
+// Same kind of picture PAGASA shows for typhoons. Free, no API key; images
+// are allowed by our security headers (img-src https:). Several ways of
+// asking GIBS for the picture are tried in order, newest first, so if one
+// form or time isn't available the next one is used automatically. If none
+// work, the layer quietly turns off with a message — the map is unaffected.
+const GIBS = 'https://gibs.earthdata.nasa.gov'
+const HIMAWARI = 'Himawari_AHI_Band13_Clean_Infrared_v0_NRT_ZENJPEG'
+const SAT_VIEW = { center: [10.5, 126.5], zoom: 5 } // the Philippines and the sea to the east
+function satTimes() {
+  // GIBS updates every 10 minutes with some delay: try 'latest', then a few
+  // recent 10-minute slots (UTC).
+  const out = ['default']
+  const base = Date.now() - 30 * 60000
+  for (let k = 0; k < 3; k++) {
+    const d = new Date(base - k * 20 * 60000)
+    d.setUTCMinutes(Math.floor(d.getUTCMinutes() / 10) * 10, 0, 0)
+    out.push(d.toISOString().replace('.000Z', 'Z'))
+  }
+  return out
+}
+function satSources() {
+  const list = []
+  for (const t of satTimes()) {
+    for (const level of [6, 7]) {
+      list.push({ kind: 'wmts', time: t, maxNativeZoom: level, url: `${GIBS}/wmts/epsg3857/all/${HIMAWARI}/default/${t}/GoogleMapsCompatible_Level${level}/{z}/{y}/{x}.jpg` })
+    }
+    list.push({ kind: 'wms', time: t, url: `${GIBS}/wms/epsg3857/all/wms.cgi`, layers: HIMAWARI })
+  }
+  return list
+}
+
+function SatelliteLayer({ onStatus }) {
+  const sources = useMemo(satSources, [])
+  const [index, setIndex] = useState(0)
+  const counts = useRef({ ok: 0, err: 0, moved: false })
+  useEffect(() => { counts.current = { ok: 0, err: 0, moved: false } }, [index])
+  useEffect(() => {
+    if (index >= sources.length) onStatus({ state: 'error' })
+    else onStatus({ state: 'loading' })
+  }, [index]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (index >= sources.length) return null
+  const src = sources[index]
+  const handlers = {
+    tileload: () => {
+      counts.current.ok++
+      if (counts.current.ok === 1) onStatus({ state: 'ok', time: src.time })
+    },
+    tileerror: () => {
+      const c = counts.current
+      c.err++
+      // Move to the next way of asking only once per source (many tiles
+      // fail at the same moment).
+      if (c.ok === 0 && c.err >= 3 && !c.moved) { c.moved = true; setIndex(i => i + 1) }
+    },
+  }
+  const common = { opacity: 0.9, pane: 'satellite', attribution: 'Satellite: NASA GIBS, JMA Himawari', eventHandlers: handlers }
+  return src.kind === 'wms'
+    ? <WMSTileLayer key={index} url={src.url} params={{ layers: src.layers, format: 'image/jpeg', transparent: false, version: '1.3.0', ...(src.time !== 'default' ? { time: src.time } : {}) }} {...common} />
+    : <TileLayer key={index} url={src.url} maxNativeZoom={src.maxNativeZoom} maxZoom={18} {...common} />
+}
+
+// Zooms out to see the whole region when satellite turns on, and back to
+// Gingoog when it turns off.
+function SatelliteView({ on }) {
+  const map = useMap()
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) { first.current = false; if (!on) return }
+    if (on) map.flyTo(SAT_VIEW.center, SAT_VIEW.zoom, { duration: 0.8 })
+    else map.flyTo(CENTER, 12, { duration: 0.8 })
+  }, [on, map])
+  return null
+}
 
 // Official PAGASA color-coded rainfall warning thresholds (mm observed within
 // one hour). Used to automatically classify the live rain reading below —
@@ -159,6 +234,15 @@ export default function FloodSimulationControl() {
   const [liveUpdatedAt, setLiveUpdatedAt] = useState(null) // when the live data was last refreshed
 
   const [autoFloodedIds, setAutoFloodedIds] = useState([])
+  const [showSatellite, setShowSatellite] = useState(false)
+  const [satStatus, setSatStatus] = useState({ state: 'off' })
+  const [satRefresh, setSatRefresh] = useState(0)
+  // New satellite picture every 10 minutes while it is on.
+  useEffect(() => {
+    if (!showSatellite) { setSatStatus({ state: 'off' }); return }
+    const t = setInterval(() => setSatRefresh(n => n + 1), 10 * 60000)
+    return () => clearInterval(t)
+  }, [showSatellite])
 
   const loadLiveData = () => {
     setLiveLoading(true)
@@ -553,10 +637,49 @@ export default function FloodSimulationControl() {
               </div>
             </div>
           )}
+          {/* Satellite + PAGASA (top-right of the map) */}
+          {!loading && (
+            <div className="absolute top-3 right-3 z-[500] flex flex-col items-end gap-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSatellite(v => !v)}
+                  aria-pressed={showSatellite}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-md border transition-colors ${showSatellite ? 'bg-primary-600 text-white border-primary-600' : 'bg-white/95 text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+                  title="Live cloud picture from the Himawari-9 satellite (NASA GIBS)"
+                >
+                  <Satellite size={14} aria-hidden="true" /> {showSatellite ? 'Satellite on' : 'Satellite'}
+                </button>
+                <a
+                  href="https://www.pagasa.dost.gov.ph/tropical-cyclone/severe-weather-bulletin"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-md border bg-white/95 text-gray-700 border-gray-200 hover:bg-gray-50 transition-colors"
+                  title="Official PAGASA tropical cyclone bulletins (opens a new tab)"
+                >
+                  PAGASA bulletin <ExternalLink size={12} aria-hidden="true" />
+                </a>
+              </div>
+              {showSatellite && (
+                <p className="rounded-md bg-white/95 border border-gray-200 shadow px-2.5 py-1 text-[11px] text-gray-600 max-w-[16rem] text-right" role="status">
+                  {satStatus.state === 'loading' && 'Loading satellite picture…'}
+                  {satStatus.state === 'ok' && (satStatus.time && satStatus.time !== 'default'
+                    ? `Himawari-9 infrared, ${new Date(satStatus.time).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}. Bright = thick rain clouds.`
+                    : 'Himawari-9 infrared, latest. Bright = thick rain clouds.')}
+                  {satStatus.state === 'error' && 'Satellite picture is not available right now. Try again later or open the PAGASA bulletin.'}
+                </p>
+              )}
+            </div>
+          )}
           {/* While loading: a shimmer block exactly where the map goes. */}
           {loading ? <SkeletonBlock className="w-full h-full rounded-none" /> : (
           <MapContainer center={CENTER} zoom={12} className="w-full h-full animate-fade-in">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+            {/* Satellite clouds above the street map; 'screen' blending
+                makes the dark (clear-sky) parts see-through. */}
+            <Pane name="satellite" style={{ zIndex: 350, mixBlendMode: 'screen', pointerEvents: 'none' }} />
+            {showSatellite && <SatelliteLayer key={satRefresh} onStatus={setSatStatus} />}
+            <SatelliteView on={showSatellite} />
             <MapResizeHandler />
             <ClearOnMapClick onClear={() => setSelectedBarangay(null)} />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
