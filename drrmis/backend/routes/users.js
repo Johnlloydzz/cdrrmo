@@ -83,6 +83,8 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
 router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const isSelf = String(req.params.id) === String(req.user.id)
+    const target = await get('SELECT id FROM users WHERE id = ?', [req.params.id])
+    if (!target) return res.status(404).json({ error: 'User not found.' })
     const { name, email, password } = req.body
     // You can't demote or deactivate your own account (you'd lock yourself out).
     const role = isSelf ? req.user.role : req.body.role

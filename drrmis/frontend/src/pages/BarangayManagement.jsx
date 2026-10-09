@@ -164,14 +164,16 @@ export default function BarangayManagement() {
                 <div><label className="label">Barangay Name</label><input className="input bg-gray-50 text-gray-500" value={form.name} disabled /></div>
                 <div>
                   <label className="label">Flood Susceptibility (CDRA)</label>
+                  {/* Only levels the maps can color (flood: Low/High). An older
+                      value outside the list is still shown so it isn't lost. */}
                   <select className="input" value={form.flood_susceptibility} onChange={e => setForm({...form, flood_susceptibility: e.target.value})}>
-                    <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
+                    {[...new Set(['Low', 'High', form.flood_susceptibility].filter(Boolean))].map(v => <option key={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="label">Landslide Susceptibility (CDRA)</label>
                   <select className="input" value={form.landslide_susceptibility} onChange={e => setForm({...form, landslide_susceptibility: e.target.value})}>
-                    <option>Low</option><option>Moderate</option><option>High</option><option>Very High</option>
+                    {[...new Set(['Low', 'Moderate', 'High', form.landslide_susceptibility].filter(Boolean))].map(v => <option key={v}>{v}</option>)}
                   </select>
                 </div>
               </div>

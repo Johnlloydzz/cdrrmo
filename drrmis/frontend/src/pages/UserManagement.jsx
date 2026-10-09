@@ -28,7 +28,7 @@ export default function UserManagement() {
   const [resetSuccess, setResetSuccess] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const load = () => { setLoading(true); apiGet('/users').then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false)) }
+  const load = () => { setLoading(true); apiGet('/users').then(u => { setUsers(u); setError('') }).catch(err => setError(err.message)).finally(() => setLoading(false)) }
   const loadRequests = () => apiGet('/account-requests?status=Pending').then(setRequests).catch(() => {})
   const loadPwRequests = () => apiGet('/password-reset-requests?status=Pending').then(setPwRequests).catch(() => {})
   useEffect(() => {
@@ -38,7 +38,8 @@ export default function UserManagement() {
     apiGet('/barangays?fields=basic').then(setBarangays).catch(() => {})
     // Poll for live online/offline status — no manual refresh needed while
     // this page stays open, e.g. during a live demo.
-    const interval = setInterval(() => { apiGet('/users').then(setUsers).catch(() => {}); loadRequests(); loadPwRequests() }, 15000)
+    // A successful poll also clears an earlier load error (e.g. a cold start).
+    const interval = setInterval(() => { apiGet('/users').then(u => { setUsers(u); setError('') }).catch(() => {}); loadRequests(); loadPwRequests() }, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -52,13 +53,10 @@ export default function UserManagement() {
     setShowModal(true)
   }
 
-  const approveRequest = async (r) => {
-    try {
-      await apiPut(`/account-requests/${r.id}/approve`, {})
-      loadRequests()
-      openFromRequest(r)
-    } catch (err) { alert(err.message) }
-  }
+  // The request is marked Approved only AFTER the account is actually
+  // created (in handleSave). Cancelling the form, or a failed save, leaves
+  // it Pending so it isn't lost.
+  const approveRequest = (r) => { openFromRequest(r) }
 
   const rejectRequest = async (id) => {
     if (!window.confirm('Reject this account request?')) return
@@ -119,6 +117,10 @@ export default function UserManagement() {
         if (form.password.trim()) setResetSuccess({ mode: 'reset', name: form.name, username: form.username, password: form.password, email: form.email, emailSent: !!saved?.email_sent, emailError: saved?.email_error })
       } else {
         const created = await apiPost('/users', { ...form, barangay_id: form.role === 'Barangay Official' ? form.barangay_id : null })
+        if (fromRequestId) {
+          await apiPut(`/account-requests/${fromRequestId}/approve`, {}).catch(() => {})
+          loadRequests()
+        }
         // The server emails the login details; show the result either way.
         setResetSuccess({ mode: 'created', name: form.name, username: form.username, password: form.password, email: form.email, emailSent: !!created?.email_sent, emailError: created?.email_error })
       }

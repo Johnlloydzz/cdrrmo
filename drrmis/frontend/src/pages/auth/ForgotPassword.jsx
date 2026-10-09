@@ -79,6 +79,9 @@ export default function ForgotPassword() {
       setStep('done')
     } catch (err) {
       setError(err.message)
+      // The code expired or ran out of tries while typing the new password:
+      // go back to the code step, where a new code can be requested.
+      if (/expired|too many|request a new/i.test(err.message || '')) { setStep('code'); setCode('') }
     } finally {
       setLoading(false)
     }
