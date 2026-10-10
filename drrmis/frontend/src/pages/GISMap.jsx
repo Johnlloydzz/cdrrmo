@@ -529,6 +529,9 @@ export default function GISMap() {
               { color: LANDSLIDE_COLOR.High, label: 'High Susceptibility to Landslide' },
               { color: LANDSLIDE_COLOR.Moderate, label: 'Moderate Susceptibility to Landslide' },
               { color: LANDSLIDE_COLOR.Low, label: 'Low Susceptibility to Landslide' },
+              // Same legend as the CLUP "Landslide and Flood Susceptibility Map".
+              { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
+              { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
                 <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />

@@ -253,7 +253,14 @@ export default function BarangayManagement() {
                     })()}
                   </PolygonEditor>
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                    {Object.entries(hazardColors(bgHazard)).map(([lvl, c]) => (
+                    {bgHazard === 'landslide' ? (
+                      // Same legend as the CLUP "Landslide and Flood Susceptibility Map".
+                      [[LANDSLIDE_COLOR.High, 'High Susceptibility to Landslide'], [LANDSLIDE_COLOR.Moderate, 'Moderate Susceptibility to Landslide'],
+                       [LANDSLIDE_COLOR.Low, 'Low Susceptibility to Landslide'], [FLOOD_COLOR.High, 'High Susceptibility of Flooding'],
+                       [FLOOD_COLOR.Low, 'Low Susceptibility of Flooding']].map(([c, label]) => (
+                        <span key={label} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: c }} /> {label}</span>
+                      ))
+                    ) : Object.entries(hazardColors(bgHazard)).map(([lvl, c]) => (
                       <span key={lvl} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: c }} /> {lvl}</span>
                     ))}
                     {bgHazard === 'flood' && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: RESIDENTIAL_COLOR }} /> Residential Area</span>}
