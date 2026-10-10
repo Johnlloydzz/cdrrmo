@@ -1,12 +1,13 @@
 const router = require('express').Router()
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { cached } = require('../utils/cache')
 const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 router.use(authenticate)
 
 // GET /api/barangays
-router.get('/', async (req, res) => {
+router.get('/', cached(60), async (req, res) => {
   try {
     // ?fields=basic → just id + name, for dropdowns (the full list carries
     // every barangay's and purok's map boundaries and resident counts).

@@ -19,6 +19,7 @@ const notificationRoutes   = require('./routes/notifications')
 const cron                 = require('node-cron')
 
 const { initDb } = require('./db/database')
+const { clearOnWrite, clearAll } = require('./utils/cache')
 
 // Without JWT_SECRET the code would sign tokens with a public fallback
 // string, letting anyone forge a login. Refuse to start in production.
@@ -59,6 +60,10 @@ app.use(compression())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'))
+
+// Cache: any save to these areas clears the cached Dashboard/map/flood
+// answers at once, so nobody sees old numbers after a change.
+app.use(['/api/barangays', '/api/puroks', '/api/households', '/api/residents', '/api/settings', '/api/internal'], clearOnWrite)
 
 // ── API Routes ──────────────────────────────────────────────────────────────
 // Matches the 5 PDRA modules (Chapter 1, Section 1.5):
@@ -109,7 +114,7 @@ initDb().then(() => {
     if (floodCheckRunning) return
     floodCheckRunning = true
     internalRoutes.runFloodAutoDetectCheck()
-      .then(result => console.log('[flood-check]', JSON.stringify(result)))
+      .then(result => { clearAll(); console.log('[flood-check]', JSON.stringify(result)) })
       .catch(err => console.error('[flood-check] failed:', err.message))
       .finally(() => { floodCheckRunning = false })
   })

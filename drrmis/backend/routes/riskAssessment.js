@@ -2,6 +2,7 @@ const router = require('express').Router()
 const { loadRiskContext, purokRiskRows } = require('../utils/householdRisk')
 const { all, get } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { cached } = require('../utils/cache')
 
 router.use(authenticate)
 
@@ -14,7 +15,7 @@ router.use(authenticate)
 //   this is the real-time flood simulation.
 // - Otherwise (no active flood event reported), at-risk falls back to the
 //   static official CDRA classification (flood_risk = 'High').
-router.get('/summary', async (req, res) => {
+router.get('/summary', cached(30, () => 'risk:summary'), async (req, res) => {
   try {
     // Totals per barangay (all households / residents).
     const rows = await all(`
@@ -54,7 +55,9 @@ router.get('/summary', async (req, res) => {
 // map point, household/member counts and flood/landslide at-risk flags.
 // Used by the Dashboard drill-down, Flood Simulation Control and GIS Map
 // instead of downloading every household.
-router.get('/puroks', async (req, res) => {
+// Cache key = the barangay this user may see (a Barangay Official is always
+// limited to their own), so nobody is ever served another barangay's list.
+router.get('/puroks', cached(30, (req) => `risk:puroks:${req.user.role === 'Barangay Official' ? req.user.barangay_id : (req.query.barangay_id || 'all')}`), async (req, res) => {
   try {
     const barangayId = req.user.role === 'Barangay Official' ? req.user.barangay_id : (req.query.barangay_id || null)
     const rows = await purokRiskRows(await loadRiskContext(), { barangayId })

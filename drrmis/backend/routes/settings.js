@@ -2,6 +2,7 @@ const router = require('express').Router()
 const { expireStaleFloodData } = require('../db/floodLevel')
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
+const { cached } = require('../utils/cache')
 const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 router.use(authenticate)
@@ -13,7 +14,7 @@ router.use(authenticate)
 // heavy rainfall AND river discharge well above its recent normal — set it).
 // Auto-detect only ever raises a level from 0, and only ever lowers a level
 // it set itself; a manually-set level is never touched by auto-detect.
-router.get('/flood-level', async (req, res) => {
+router.get('/flood-level', cached(10, () => 'flood-level'), async (req, res) => {
   try {
     await expireStaleFloodData()
     const [levelRow, sourceRow] = await Promise.all([
@@ -83,7 +84,7 @@ router.put('/flood-level', async (req, res) => {
 // above normal at the same time). Barangays NOT in this list fall back to
 // their static CDRA classification — auto-detect only marks the specific
 // area actually experiencing heavy rain, not the whole city at once.
-router.get('/auto-flood-barangays', async (req, res) => {
+router.get('/auto-flood-barangays', cached(10, () => 'auto-flood'), async (req, res) => {
   try {
     await expireStaleFloodData()
     const row = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids'])
