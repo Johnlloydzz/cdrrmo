@@ -165,6 +165,10 @@ export default function FloodSimulationControl() {
   // "Simulate heavy rain" TEST switch (drills / defense demo): while on,
   // every barangay counts as having heavy rain.
   const [simulateRain, setSimulateRain] = useState(false)
+  // How the rain auto-detect is running: on the server, on a CDRRMO
+  // computer's browser (backup when the weather service blocks the server),
+  // or paused.
+  const [autoStatus, setAutoStatus] = useState({})
 
   const loadLiveData = () => {
     setLiveLoading(true)
@@ -251,7 +255,7 @@ export default function FloodSimulationControl() {
         }
         setFloodLevel(fl.level_m); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
       }).catch(() => {})
-      apiGet('/settings/auto-flood-barangays').then(af => { setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate) }).catch(() => {})
+      apiGet('/settings/auto-flood-barangays').then(af => { setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate); setAutoStatus(af.status || {}) }).catch(() => {})
       // At-risk flags come from the server (same geofence everywhere), so
       // refresh the selected barangay's purok pins too.
       if (selectedIdRef.current) {
@@ -275,7 +279,7 @@ export default function FloodSimulationControl() {
     ])
       .then(([fl, af, b]) => {
         setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
-        setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate)
+        setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate); setAutoStatus(af.status || {})
         setBarangays(b)
         const id = selectedIdRef.current
         if (id) apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
@@ -588,6 +592,27 @@ export default function FloodSimulationControl() {
                     <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100 cursor-help" title="A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours and the river is 20% above normal; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.">
                       Auto-detect: every 5 minutes, based on live rainfall and river data.
                     </p>
+                    {(() => {
+                      // Auto-detect status — green: the server checks by itself;
+                      // amber: the server is blocked by the weather service's
+                      // daily limit and a CDRRMO computer is checking instead;
+                      // red: paused until a CDRRMO computer has the system open.
+                      const st = autoStatus || {}
+                      if (!st.last_success_at && st.server_ok === undefined) return null
+                      const mins = st.last_success_at ? (Date.now() - new Date(st.last_success_at).getTime()) / 60000 : Infinity
+                      const at = st.last_success_at ? new Date(st.last_success_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : null
+                      const [dot, text, color] = st.server_ok && mins <= 12
+                        ? ['bg-green-500', `Auto-detect running on the server · last check ${at}`, 'text-gray-500']
+                        : st.last_source === 'browser' && mins <= 12
+                          ? ['bg-amber-500', `Weather service is blocking the server (daily limit), so a CDRRMO computer is checking instead · last check ${at}. Keep the system open on this computer.`, 'text-amber-700']
+                          : ['bg-red-500', 'Auto-detect paused: the weather service limit was reached on the server. Keep the system open on a CDRRMO computer so it can check from there.', 'text-red-600']
+                      return (
+                        <p className={`text-[10px] mt-1 leading-snug flex items-start gap-1.5 ${color}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 ${dot}`} />
+                          <span>{text}</span>
+                        </p>
+                      )
+                    })()}
                   </div>
                 ) : (
                   <div className="border-t border-gray-100 pt-3">

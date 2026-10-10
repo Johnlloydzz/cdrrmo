@@ -103,7 +103,8 @@ router.get('/auto-flood-barangays', cached(10, () => 'auto-flood'), async (req, 
       barangay_ids = (await all('SELECT id FROM barangays')).map(b => b.id)
       for (const id of barangay_ids) if (!live.has(id)) reasons[id] = 'TEST: simulated heavy rain'
     }
-    res.json({ barangay_ids, reasons, simulate })
+    const status = await require('./internal').getStatus()
+    res.json({ barangay_ids, reasons, simulate, status })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -126,6 +127,67 @@ router.put('/auto-flood-barangays', async (req, res) => {
     )
     await notifyAutoFlood(prevIds, ids)
     res.json({ barangay_ids: ids })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// ── Browser backup for the rain auto-detect ──────────────────────────────────
+// Open-Meteo can block the server (its free daily limit is per IP address,
+// and a free Render server shares its IP with other apps). When that
+// happens, a CDRRMO computer that has the system open fetches the rain data
+// from ITS OWN internet connection and sends it here; the server then
+// applies exactly the same rules (evaluateBarangay) as its own check.
+const BROWSER_TAKEOVER_MIN = 12  // server hasn't succeeded for this long → ask a browser
+const BROWSER_MIN_GAP_MIN = 4    // ignore duplicate reports from several open tabs
+const minutesSince = (iso) => iso ? (Date.now() - new Date(iso).getTime()) / 60000 : Infinity
+function browserNeeded(status) {
+  return !status.server_ok || minutesSince(status.last_success_at) > BROWSER_TAKEOVER_MIN
+}
+
+// GET /api/settings/flood-check-plan — does the server need a browser's
+// help right now, and which grid points to fetch if so. CDRRMO only.
+router.get('/flood-check-plan', async (req, res) => {
+  try {
+    if (req.user.role !== 'CDRRMO Personnel') return res.json({ need_browser: false })
+    const internal = require('./internal')
+    const status = await internal.getStatus()
+    if (!browserNeeded(status) || minutesSince(status.last_success_at) < BROWSER_MIN_GAP_MIN) {
+      return res.json({ need_browser: false })
+    }
+    const plan = await internal.loadPlan()
+    res.json({
+      need_browser: true,
+      points: plan.points.map(k => { const [lat, lng] = k.split(','); return { key: k, lat: Number(lat), lng: Number(lng) } }),
+    })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /api/settings/flood-check-browser — body:
+//   { points: { "<gridKey>": { currentRain, sum24, sum72, sum168 } }, discharge_ratio }
+router.post('/flood-check-browser', async (req, res) => {
+  try {
+    if (req.user.role !== 'CDRRMO Personnel') {
+      return res.status(403).json({ error: 'Only CDRRMO Personnel can send rain data.' })
+    }
+    const internal = require('./internal')
+    const status = await internal.getStatus()
+    // Server is healthy, or another tab/computer just reported: nothing to do.
+    if (!browserNeeded(status) || minutesSince(status.last_success_at) < BROWSER_MIN_GAP_MIN) {
+      return res.json({ skipped: true })
+    }
+    const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0 && v < 5000 ? v : null)
+    const plan = await internal.loadPlan()
+    const valid = new Set(plan.points)
+    const pointData = new Map()
+    for (const [key, d] of Object.entries(req.body?.points || {})) {
+      if (!valid.has(key) || !d) continue
+      const sum24 = num(d.sum24), sum72 = num(d.sum72), sum168 = num(d.sum168)
+      if (sum24 == null || sum72 == null || sum168 == null) continue
+      pointData.set(key, { currentRain: num(d.currentRain), sum24, sum72, sum168 })
+    }
+    if (pointData.size === 0) return res.status(400).json({ error: 'No valid rain data.' })
+    const ratio = typeof req.body?.discharge_ratio === 'number' && isFinite(req.body.discharge_ratio) && req.body.discharge_ratio >= 0 && req.body.discharge_ratio < 100
+      ? req.body.discharge_ratio : null
+    res.json(await internal.applyResults(plan, pointData, ratio, 'browser'))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

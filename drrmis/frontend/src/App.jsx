@@ -60,6 +60,7 @@ import RequestPasswordReset from './pages/auth/RequestPasswordReset'
 import ForgotPassword    from './pages/auth/ForgotPassword'
 import ChangePassword    from './pages/auth/ChangePassword'
 import Unauthorized      from './pages/Unauthorized'
+import FloodBackup       from './components/FloodBackup'
 import { getStoredUser, setStoredUser, clearStoredUser, clearStoredToken } from './utils/storage'
 
 // PDRA — 5 modules only (Chapter 1, Section 1.5):
@@ -134,6 +135,9 @@ function App() {
 
   return (
     <BrowserRouter>
+      {/* Rain auto-detect backup (CDRRMO only, invisible) — takes over if
+          the weather service blocks the server. */}
+      <FloodBackup currentUser={currentUser} />
       <AppErrorBoundary>
       <Suspense fallback={routeFallback}>
       <Routes>

@@ -461,9 +461,19 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               ) : (
                 <>
                   <strong>LIVE flood alert — heavy rain detected</strong> (real-time rainfall + river data, flood level {activeFloodLevel} m) — puroks in flood-prone areas of these barangays are flagged at-risk:
-                  {barangays.filter(b => autoFloodedIds.includes(b.id)).map(b => (
-                    <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'heavy rain detected'}</span>
-                  ))}
+                  {(() => {
+                    // Long lists (a typhoon can flag dozens of barangays) are
+                    // cut to the first few so the banner doesn't push the
+                    // whole Dashboard down; the full list is in the
+                    // "Barangays in Risk Zone" card below.
+                    const flagged = barangays.filter(b => autoFloodedIds.includes(b.id))
+                    return <>
+                      {flagged.slice(0, 5).map(b => (
+                        <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'heavy rain detected'}</span>
+                      ))}
+                      {flagged.length > 5 && <span className="block mt-0.5">• and {flagged.length - 5} more barangay{flagged.length - 5 > 1 ? 's' : ''} — see "Barangays in Risk Zone" below</span>}
+                    </>
+                  })()}
                 </>
               )}
             </p>

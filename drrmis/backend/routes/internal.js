@@ -4,13 +4,10 @@
 // with node-cron directly inside this backend (see server.js) — pure
 // JavaScript, no external service or YAML workflow file needed.
 //
-// Note: Render's free tier puts a web service to sleep after ~15 minutes
-// with no incoming HTTP requests. This scheduled job only runs while the
-// server happens to be awake — it does not itself keep the server awake.
-// In practice, any real traffic (someone using the site) wakes it up and
-// the check resumes; there's just no guarantee of a check firing during a
-// long stretch with zero visitors. That's a fair tradeoff for a capstone
-// system on a free-tier server.
+// The server keeps itself awake (keep-awake in server.js), so this runs
+// 24/7. If Open-Meteo blocks the server (daily limit on a shared free-tier
+// IP), a CDRRMO computer with the system open takes over as a backup — see
+// /api/settings/flood-check-plan and /flood-check-browser.
 
 const router = require('express').Router()
 const { all, get, run } = require('../db/database')
@@ -119,52 +116,46 @@ async function getDischargeRatio() {
   return ratio
 }
 
-async function runFloodAutoDetectCheck() {
+// Barangays to check and the weather grid points they map to.
+async function loadPlan() {
   const barangays = await all('SELECT id, name, boundary_geojson FROM barangays WHERE boundary_geojson IS NOT NULL')
   const withCentroid = barangays
     .map(b => { try { return { ...b, centroid: getCentroid(JSON.parse(b.boundary_geojson)) } } catch { return { ...b, centroid: null } } })
     .filter(b => b.centroid)
-
-  if (withCentroid.length === 0) {
-    return { checked: 0, qualifying_barangays: [], note: 'No barangays with a boundary to check.' }
-  }
-
-  // Unique grid points (see GRID_DEG above)
   const points = [...new Set(withCentroid.map(b => gridKey(b.centroid)))]
-  const lats = points.map(k => k.split(',')[0]).join(',')
-  const lngs = points.map(k => k.split(',')[1]).join(',')
+  return { withCentroid, points }
+}
 
-  // One batched call: current precipitation + the last 7 days of hourly
-  // precipitation per grid point, so accumulated totals (24h / 3 days /
-  // 7 days) can be computed. Uses `precipitation` (ALL rain), not `rain`:
-  // Open-Meteo's `rain` excludes convective showers — which is most of the
-  // rain in a tropical place like Gingoog — so it often read 0 while it was
-  // actually raining.
-  const [dischargeRatio, perPointResp] = await Promise.all([
-    getDischargeRatio(),
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=precipitation&hourly=precipitation&past_days=7&forecast_days=1&timezone=Asia%2FManila`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()),
-  ])
-  if (perPointResp?.error) throw new Error(`Open-Meteo forecast API: ${perPointResp.reason || 'error'}`)
+// ── Check status ────────────────────────────────────────────────────────────
+// Shared/free servers can get blocked by Open-Meteo's daily limit (the limit
+// is per IP address, and a free Render server shares its IP with other
+// apps). The status records whether the server's own check works, so the
+// CDRRMO computer's browser can take over as a backup (see settings.js).
+async function getStatus() {
+  const row = await get("SELECT value FROM system_settings WHERE key = 'auto_flood_status'")
+  try { return row ? JSON.parse(row.value) : {} } catch { return {} }
+}
+async function recordStatus(patch) {
+  const next = { ...(await getStatus()), ...patch }
+  await run(
+    `INSERT INTO system_settings (key, value, updated_at) VALUES ('auto_flood_status', ?, datetime('now', '+8 hours'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [JSON.stringify(next)]
+  )
+  return next
+}
 
-  // Open-Meteo returns an array for multiple locations, a single object for one.
-  const results = Array.isArray(perPointResp) ? perPointResp : [perPointResp]
-  const byPoint = new Map(points.map((k, i) => [k, results[i]]))
+// Applies one round of weather data — from the server's own fetch or from
+// the CDRRMO browser backup — with the SAME rules either way.
+// pointData: Map gridKey -> { currentRain, sum24, sum72, sum168 }
+async function applyResults(plan, pointData, dischargeRatio, source) {
   const reasons = {}
-  withCentroid.forEach((b) => {
-    const r = byPoint.get(gridKey(b.centroid))
-    if (!r) return
-    const currentTime = r.current?.time || ''
-    const times = r.hourly?.time
-    const values = r.hourly?.precipitation
-    const reason = evaluateBarangay({
-      currentRain: r.current?.precipitation ?? null,
-      sum24:  sumLastHours(times, values, currentTime, 24),
-      sum72:  sumLastHours(times, values, currentTime, 72),
-      sum168: sumLastHours(times, values, currentTime, 168),
-      dischargeRatio,
-    })
+  for (const b of plan.withCentroid) {
+    const d = pointData.get(gridKey(b.centroid))
+    if (!d) continue
+    const reason = evaluateBarangay({ ...d, dischargeRatio })
     if (reason) reasons[b.id] = reason
-  })
+  }
   const qualifying = Object.keys(reasons).map(Number)
 
   const upsert = (key, value) => run(
@@ -178,12 +169,61 @@ async function runFloodAutoDetectCheck() {
   await upsert('auto_flooded_barangay_ids', JSON.stringify(qualifying))
   await notifyAutoFlood(prevIds, qualifying, reasons)
   await upsert('auto_flood_reasons', JSON.stringify(reasons))
+  const now = new Date().toISOString()
+  await recordStatus(source === 'server'
+    ? { server_ok: true, server_error: null, server_checked_at: now, last_source: 'server', last_success_at: now }
+    : { last_source: 'browser', last_success_at: now })
 
   return {
-    checked: withCentroid.length,
-    weather_points: points.length,
+    source,
+    checked: plan.withCentroid.length,
+    weather_points: plan.points.length,
     discharge_ratio: dischargeRatio,
-    qualifying_barangays: withCentroid.filter(b => reasons[b.id]).map(b => `${b.name} — ${reasons[b.id]}`),
+    qualifying_barangays: plan.withCentroid.filter(b => reasons[b.id]).map(b => `${b.name} — ${reasons[b.id]}`),
+  }
+}
+
+async function runFloodAutoDetectCheck() {
+  const plan = await loadPlan()
+  if (plan.withCentroid.length === 0) {
+    return { checked: 0, qualifying_barangays: [], note: 'No barangays with a boundary to check.' }
+  }
+  try {
+    const lats = plan.points.map(k => k.split(',')[0]).join(',')
+    const lngs = plan.points.map(k => k.split(',')[1]).join(',')
+
+    // One batched call: current precipitation + the last 7 days of hourly
+    // precipitation per grid point, so accumulated totals (24h / 3 days /
+    // 7 days) can be computed. Uses `precipitation` (ALL rain), not `rain`:
+    // Open-Meteo's `rain` excludes convective showers — which is most of the
+    // rain in a tropical place like Gingoog — so it often read 0 while it was
+    // actually raining.
+    const [dischargeRatio, perPointResp] = await Promise.all([
+      getDischargeRatio(),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=precipitation&hourly=precipitation&past_days=7&forecast_days=1&timezone=Asia%2FManila`, { signal: AbortSignal.timeout(20000) }).then(r => r.json()),
+    ])
+    if (perPointResp?.error) throw new Error(`Open-Meteo forecast API: ${perPointResp.reason || 'error'}`)
+
+    // Open-Meteo returns an array for multiple locations, a single object for one.
+    const results = Array.isArray(perPointResp) ? perPointResp : [perPointResp]
+    const pointData = new Map()
+    plan.points.forEach((k, i) => {
+      const r = results[i]
+      if (!r) return
+      const currentTime = r.current?.time || ''
+      const times = r.hourly?.time
+      const values = r.hourly?.precipitation
+      pointData.set(k, {
+        currentRain: r.current?.precipitation ?? null,
+        sum24:  sumLastHours(times, values, currentTime, 24),
+        sum72:  sumLastHours(times, values, currentTime, 72),
+        sum168: sumLastHours(times, values, currentTime, 168),
+      })
+    })
+    return await applyResults(plan, pointData, dischargeRatio, 'server')
+  } catch (err) {
+    await recordStatus({ server_ok: false, server_error: err.message, server_checked_at: new Date().toISOString() }).catch(() => {})
+    throw err
   }
 }
 
@@ -207,3 +247,7 @@ module.exports = router
 module.exports.runFloodAutoDetectCheck = runFloodAutoDetectCheck
 module.exports.evaluateBarangay = evaluateBarangay
 module.exports.sumLastHours = sumLastHours
+module.exports.loadPlan = loadPlan
+module.exports.applyResults = applyResults
+module.exports.getStatus = getStatus
+module.exports.gridKey = gridKey
