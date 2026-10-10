@@ -19,7 +19,7 @@ L.Icon.Default.mergeOptions({
 // Official CDRA (Climate and Disaster Risk Assessment) flood susceptibility
 // colors — same palette as Hazard Map & Geofencing and Flood Simulation
 // Control, matching the City of Gingoog CLUP Flood Susceptibility Map.
-const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
+const FLOOD_COLOR = { High: '#6b3fa0', Low: '#d9d4c7' } // CLUP legend: purple, light gray
 
 // A barangay with an adjusted hazard area is drawn as two shapes: the rest
 // of the barangay in the "Low" color, and the area in its real color. If
