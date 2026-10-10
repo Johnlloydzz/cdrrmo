@@ -113,6 +113,22 @@ initDb().then(() => {
       .catch(err => console.error('[flood-check] failed:', err.message))
       .finally(() => { floodCheckRunning = false })
   })
+
+  // Keep-awake: Render's free tier puts the server to sleep after ~15 min
+  // with no visitors, which would also pause the flood auto-detect above.
+  // The server visits its own public health page every 10 minutes so it
+  // never goes idle, and the rain check keeps running 24/7 even when nobody
+  // has the site open. RENDER_EXTERNAL_URL is set by Render automatically
+  // (absent locally, so this does nothing on a developer's PC). Turn it off
+  // by setting KEEP_AWAKE=off on Render.
+  const selfUrl = process.env.RENDER_EXTERNAL_URL
+  if (selfUrl && process.env.KEEP_AWAKE !== 'off') {
+    setInterval(() => {
+      fetch(`${selfUrl}/api/health`, { signal: AbortSignal.timeout(30000) })
+        .catch(err => console.error('[keep-awake] ping failed:', err.message))
+    }, 10 * 60 * 1000)
+    console.log(`[keep-awake] pinging ${selfUrl}/api/health every 10 minutes`)
+  }
 }).catch(err => {
   console.error('Failed to initialize database:', err)
   process.exit(1)
