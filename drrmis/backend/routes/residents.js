@@ -246,6 +246,12 @@ router.put('/:id', async (req, res) => {
       `UPDATE residents SET name=?, last_name=?, first_name=?, middle_name=?, birthdate=?, age_bracket=?, relation_to_head=?, sex=?, contact_number=?, household_id=?, barangay_id=?, purok_id=? WHERE id=?`,
       [name, properLast, properFirst, properMiddle || null, birthdate, age_bracket, relation_to_head, sex || null, contact_number || null, household_id, existing.barangay_id, purok_id, req.params.id]
     )
+    // The household keeps its Head's name as text (head_family), so when the
+    // Head's name is edited here, update it on the household too — otherwise
+    // the Households list keeps showing the old name.
+    if (relation_to_head === 'Head' && household_id) {
+      await run(`UPDATE households SET head_family = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?`, [name, household_id])
+    }
     const updated = await get('SELECT * FROM residents WHERE id = ?', [req.params.id])
     res.json(updated)
   } catch (err) { res.status(500).json({ error: err.message }) }
