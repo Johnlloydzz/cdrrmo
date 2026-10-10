@@ -16,8 +16,8 @@ const emptyForm = { name: '', flood_susceptibility: 'Low', landslide_susceptibil
 
 // EXACT same colors and fallback as GIS Map / Flood Simulation Control /
 // Dashboard, so what you see while editing is exactly what those maps show.
-const FLOOD_COLOR = { High: '#6b3fa0', Low: '#d9d4c7' } // CLUP legend: purple, light gray
-const LANDSLIDE_COLOR = { High: '#e11d48', Moderate: '#15803d', Low: '#eadb2b' } // CLUP legend: crimson, dark green, yellow
+const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
+const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
 const hazardColors = (key) => key === 'flood' ? FLOOD_COLOR : LANDSLIDE_COLOR
 const levelColor = (key, level) => hazardColors(key)[level] || hazardColors(key).Low
 
@@ -253,14 +253,7 @@ export default function BarangayManagement() {
                     })()}
                   </PolygonEditor>
                   <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                    {bgHazard === 'landslide' ? (
-                      // Same legend as the CLUP "Landslide and Flood Susceptibility Map".
-                      [[LANDSLIDE_COLOR.High, 'High Susceptibility to Landslide'], [LANDSLIDE_COLOR.Moderate, 'Moderate Susceptibility to Landslide'],
-                       [LANDSLIDE_COLOR.Low, 'Low Susceptibility to Landslide'], [FLOOD_COLOR.High, 'High Susceptibility of Flooding'],
-                       [FLOOD_COLOR.Low, 'Low Susceptibility of Flooding']].map(([c, label]) => (
-                        <span key={label} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: c }} /> {label}</span>
-                      ))
-                    ) : Object.entries(hazardColors(bgHazard)).map(([lvl, c]) => (
+                    {Object.entries(hazardColors(bgHazard)).map(([lvl, c]) => (
                       <span key={lvl} className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: c }} /> {lvl}</span>
                     ))}
                     {bgHazard === 'flood' && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: RESIDENTIAL_COLOR }} /> Residential Area</span>}

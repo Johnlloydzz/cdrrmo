@@ -66,8 +66,8 @@ const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Flood Zones'
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors,
 // matching the City of Gingoog CLUP Landslide and Flood Susceptibility Map.
-const LANDSLIDE_COLOR = { High: '#e11d48', Moderate: '#15803d', Low: '#eadb2b' } // CLUP legend: crimson, dark green, yellow
-const FLOOD_COLOR = { High: '#6b3fa0', Low: '#d9d4c7' } // CLUP legend: purple, light gray
+const LANDSLIDE_COLOR = { High: '#dc2626', Moderate: '#15803d', Low: '#eab308' }
+const FLOOD_COLOR = { High: '#7c3aed', Low: '#d6c9a8' }
 
 // A barangay with an adjusted hazard area is drawn as two shapes: the rest
 // of the barangay in the "Low" color, and the area in its real color. If
@@ -529,9 +529,6 @@ export default function GISMap() {
               { color: LANDSLIDE_COLOR.High, label: 'High Susceptibility to Landslide' },
               { color: LANDSLIDE_COLOR.Moderate, label: 'Moderate Susceptibility to Landslide' },
               { color: LANDSLIDE_COLOR.Low, label: 'Low Susceptibility to Landslide' },
-              // Same legend as the CLUP "Landslide and Flood Susceptibility Map".
-              { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
-              { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
             ].map(l => (
               <div key={l.label} className="flex items-center gap-2 text-xs">
                 <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
