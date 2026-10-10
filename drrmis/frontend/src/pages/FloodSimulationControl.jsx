@@ -357,7 +357,21 @@ export default function FloodSimulationControl() {
       {!isDisplayMode && (
       <div className="flex items-start justify-between gap-3 flex-wrap flex-shrink-0">
         <div>
-          <Link to="/" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 mb-1">
+          <Link
+            to="/"
+            onClick={(e) => {
+              // Opened from the sidebar in its own tab: go back to the
+              // system tab that opened it (this tab closes) instead of
+              // turning this tab into a second copy of the system.
+              const opener = window.opener
+              if (window.name === 'pdra-flood-control' && opener && !opener.closed) {
+                e.preventDefault()
+                try { opener.focus() } catch { /* ignore */ }
+                window.close()
+              }
+            }}
+            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 mb-1"
+          >
             <ArrowLeft size={13} /> Back to system
           </Link>
           <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">

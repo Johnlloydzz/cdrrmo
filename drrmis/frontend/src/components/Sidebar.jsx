@@ -3,10 +3,11 @@ import {
   LayoutDashboard, MapPin, Home, Users, Shield, AlertTriangle,
   Tent, Package, Truck, CloudRain, Map, Bell, UserCog,
   FileText, BarChart2, ClipboardList, Settings, ChevronDown,
-  Building2, TreePine, LogOut, Archive, Waves, Maximize2
+  Building2, TreePine, LogOut, Archive, Waves, ExternalLink
 } from 'lucide-react'
 import { useState } from 'react'
 import { ROLE_ACCESS, ROLE_COLORS } from '../data/users'
+import { prepareSessionHandoff } from '../utils/storage'
 
 const navGroups = [
   {
@@ -37,25 +38,44 @@ const navGroups = [
   },
 ]
 
+// Flood Simulation Control opens in its OWN browser tab, and always the
+// SAME one: clicking it again just switches to that tab instead of opening
+// another copy.
+const FLOOD_TAB = 'pdra-flood-control'
+function openFullPageTab(e, to) {
+  e.preventDefault()
+  prepareSessionHandoff() // lets the new tab keep a "Remember me"-unchecked login
+  // Reuse the tab if it's already open (no reload, keeps its map and
+  // selections); otherwise open it.
+  const w = window.open('', FLOOD_TAB)
+  if (!w) { window.location.href = to; return } // pop-up blocked: open here
+  try {
+    if (w.location.href === 'about:blank' || !w.location.pathname.startsWith(to)) w.location.href = to
+  } catch { w.location.href = to }
+  w.focus()
+}
+
 function NavItem({ to, icon: Icon, label, exact, fullPage }) {
+  const itemClass = (isActive) =>
+    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 ${
+      isActive
+        ? 'bg-primary-700 text-white'
+        : 'text-blue-100 hover:bg-primary-700 hover:text-white'
+    }`
+  if (fullPage) {
+    return (
+      <a href={to} target={FLOOD_TAB} onClick={(e) => openFullPageTab(e, to)}
+        title="Opens in a separate tab (only one at a time)." className={itemClass(false)}>
+        <Icon size={18} className="flex-shrink-0" />
+        <span className="flex-1">{label}</span>
+        <ExternalLink size={13} className="flex-shrink-0 opacity-60" aria-label="Opens in a separate tab" />
+      </a>
+    )
+  }
   return (
-    <NavLink
-      to={to}
-      end={exact}
-      title={fullPage ? 'Opens as a full page. Use “Back to system” to return.' : undefined}
-      className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 ${
-          isActive
-            ? 'bg-primary-700 text-white'
-            : 'text-blue-100 hover:bg-primary-700 hover:text-white'
-        }`
-      }
-    >
+    <NavLink to={to} end={exact} className={({ isActive }) => itemClass(isActive)}>
       <Icon size={18} className="flex-shrink-0" />
       <span className="flex-1">{label}</span>
-      {fullPage && (
-        <Maximize2 size={13} className="flex-shrink-0 opacity-60" aria-label="Opens as a full page" />
-      )}
     </NavLink>
   )
 }
