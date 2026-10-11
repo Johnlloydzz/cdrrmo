@@ -11,8 +11,8 @@
 // bigger one (that is how "holes" of another color work).
 // Display only — these areas do not change flood alerts or geofencing.
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Polygon, Polyline, Marker, Pane, useMapEvents } from 'react-leaflet'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, Marker, Pane, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Pencil, Plus, Trash2, Save, X, RotateCcw, Check } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
@@ -212,7 +212,7 @@ export function ClupPanel({ s }) {
               <ColorChoices value={draft.hazard} onChange={h => setDraft(d => ({ ...d, hazard: h }))} />
               <p className="text-[10px] text-gray-500 leading-snug">Drag the white squares to move the edge. Drag a small dot to add a point. Double-click a square to remove it.</p>
               <div className="flex gap-1.5">
-                <button type="button" disabled={busy} onClick={s.save} className="flex-1 btn-primary text-xs py-1.5 flex items-center justify-center gap-1"><Save size={13} /> Save</button>
+                <button type="button" disabled={busy} onClick={s.save} className="flex-1 btn-primary text-xs py-1.5 flex items-center justify-center gap-1"><Save size={13} /> Save changes</button>
                 <button type="button" disabled={busy} onClick={s.cancel} className="flex-1 btn-secondary text-xs py-1.5 flex items-center justify-center gap-1"><X size={13} /> Cancel</button>
               </div>
               <button type="button" disabled={busy} onClick={s.remove} className="w-full text-[11px] text-red-600 hover:text-red-700 flex items-center justify-center gap-1 py-1"><Trash2 size={12} /> Delete this area</button>
@@ -234,6 +234,43 @@ export function ClupPanel({ s }) {
       )}
       {error && <p className="text-[11px] text-red-600" role="alert">{error}</p>}
       <p className="text-[10px] text-gray-400 leading-snug">Source: Gingoog City CLUP (CPDO/MGB), traced from the printed map. Display only — does not change flood alerts.</p>
+    </div>
+  )
+}
+// ── Small map for the Barangays → Edit Barangay → "CLUP Map" tab ─────────────
+// Shows the CLUP colored areas around one barangay (its boundary = dashed
+// line) with the same editing tools as the GIS Map.
+function FitToBoundary({ geo }) {
+  const map = useMap()
+  const done = useRef(false)
+  useEffect(() => {
+    if (done.current || !geo) return
+    done.current = true
+    const fit = () => { try { map.invalidateSize(); map.fitBounds(L.geoJSON(geo).getBounds(), { padding: [20, 20], animate: false }) } catch { /* ignore */ } }
+    fit()
+    const t = [150, 400].map(ms => setTimeout(fit, ms))
+    return () => t.forEach(clearTimeout)
+  }, [map, geo])
+  useEffect(() => {
+    const obs = new ResizeObserver(() => map.invalidateSize())
+    obs.observe(map.getContainer())
+    return () => obs.disconnect()
+  }, [map])
+  return null
+}
+
+export function ClupEditorMap({ s, boundary, others = [], heightClass = 'h-[42vh]' }) {
+  const geo = useMemo(() => { try { return typeof boundary === 'string' ? JSON.parse(boundary) : boundary } catch { return null } }, [boundary])
+  const otherGeos = useMemo(() => others.map(o => { try { return { id: o.id, geo: JSON.parse(o.boundary_geojson) } } catch { return null } }).filter(Boolean), [others])
+  return (
+    <div className={`${heightClass} rounded-lg overflow-hidden border border-gray-200 relative`}>
+      <MapContainer center={[8.8231, 125.1109]} zoom={13} className="w-full h-full">
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
+        <FitToBoundary geo={geo} />
+        {otherGeos.map(o => <GeoJSON key={`o-${o.id}`} data={o.geo} interactive={false} pathOptions={{ color: '#475569', weight: 1, fillOpacity: 0 }} />)}
+        {geo && <GeoJSON data={geo} interactive={false} pathOptions={{ color: '#0f172a', weight: 2.5, dashArray: '6 4', fillOpacity: 0 }} />}
+        <ClupZonesLayer s={s} />
+      </MapContainer>
     </div>
   )
 }

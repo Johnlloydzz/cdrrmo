@@ -2,10 +2,11 @@ import { useState, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { GeoJSON } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Search, Pencil, Building2, Waves, Mountain, RotateCcw, Home } from 'lucide-react'
+import { Search, Pencil, Building2, Waves, Mountain, RotateCcw, Home, Map as MapIcon } from 'lucide-react'
 import { apiGet, apiPut } from '../utils/api'
 import PolygonEditor, { geojsonToLatLngs, latLngsToGeojson, simplifyPoints } from '../components/editor'
 import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
+import { useClupZones, ClupEditorMap, ClupPanel } from '../components/ClupZones'
 
 // Badge colors matched to the official MGB Landslide and Flood Susceptibility Map legend.
 // Landslide: brown (Very High) → red (High) → green (Moderate) → yellow (Low)
@@ -86,6 +87,12 @@ export default function BarangayManagement() {
     if (b.boundary_geojson) setAreas({ flood: initialArea(b, 'flood'), residential: initialArea(b, 'residential'), landslide: initialArea(b, 'landslide') })
     setShowModal(true)
   }
+
+  // "CLUP Map" tab: the CLUP Landslide & Flood colored areas (same ones as
+  // GIS Map → CLUP Landslide & Flood Map), editable right here. Those edits
+  // save on their own (Save in the CLUP panel), separate from this form.
+  const clup = useClupZones(showModal && areaTab === 'clup')
+  useEffect(() => { if (showModal && areaTab === 'clup' && clup.canEdit) clup.setEditMode(true) }, [showModal, areaTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setAreaPoints = (key, points) => setAreas(a => ({ ...a, [key]: { points, custom: true } }))
   // The Residential tab is part of the flood map, so it shows the flood colors behind it.
@@ -188,16 +195,23 @@ export default function BarangayManagement() {
                   <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                     <label className="label mb-0">Hazard Area</label>
                     <div className="flex gap-2">
-                      {[['flood', 'Flood', Waves], ['residential', 'Residential', Home], ['landslide', 'Landslide', Mountain]].map(([key, label, Icon]) => (
+                      {[['flood', 'Flood', Waves], ['residential', 'Residential', Home], ['landslide', 'Landslide', Mountain], ['clup', 'CLUP Map', MapIcon]].map(([key, label, Icon]) => (
                         <button key={key} type="button" onClick={() => setAreaTab(key)}
                           className={`text-xs px-3 py-1.5 rounded-lg border flex items-center gap-1.5 transition-colors ${areaTab === key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
-                          <Icon size={12} /> {label} {key === 'residential'
+                          <Icon size={12} /> {label} {key === 'clup' ? '' : key === 'residential'
                             ? (areas[key].points.length >= 3 ? '(drawn)' : '(none)')
                             : (areas[key].custom ? '(adjusted)' : '(whole)')}
                         </button>
                       ))}
                     </div>
                   </div>
+                  {areaTab === 'clup' ? (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">CLUP Landslide &amp; Flood Susceptibility Map (same as GIS Map → Map Layers). Click a colored area to change its color or drag its points. These changes save right away with "Save changes" below the map (separate from the Save button of this form).</p>
+                      <ClupEditorMap s={clup} boundary={editingBarangay.boundary_geojson} others={barangays.filter(b => b.id !== editing && b.boundary_geojson)} />
+                      <div className="mt-2 max-w-md"><ClupPanel s={clup} /></div>
+                    </div>
+                  ) : (<>
                   <p className="text-xs text-gray-500 mb-2">
                     {areaTab === 'residential'
                       ? 'Click on the map to trace where people actually live (yellow). Drag points to adjust. Shown on top of the flood colors, on the flood map only.'
@@ -274,6 +288,7 @@ export default function BarangayManagement() {
                       <RotateCcw size={12} /> {areaTab === 'residential' ? 'Remove residential area' : 'Use whole barangay'}
                     </button>
                   )}
+                  </>)}
                 </div>
               ) : (
                 <p className="text-xs text-amber-600">This barangay has no boundary on file, so its hazard area can't be adjusted yet.</p>
