@@ -12,7 +12,7 @@ import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skel
 // Flood:     navy (Very High) → violet (High) → purple (Moderate) → blue (Low)
 const LANDSLIDE_BADGE = { 'Very High': 'badge-brown', High: 'badge-red', Moderate: 'badge-green', Low: 'badge-yellow' }
 const FLOOD_BADGE = { 'Very High': 'badge-navy', High: 'badge-violet', Moderate: 'badge-purple', Low: 'badge-blue' }
-const emptyForm = { name: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low' }
+const emptyForm = { name: '', flood_susceptibility: 'Low', landslide_susceptibility: 'Low', landslide_rest_level: 'Low' }
 
 // EXACT same colors and fallback as GIS Map / Flood Simulation Control /
 // Dashboard, so what you see while editing is exactly what those maps show.
@@ -80,6 +80,7 @@ export default function BarangayManagement() {
       name: b.name || '',
       flood_susceptibility: b.flood_susceptibility || 'Low',
       landslide_susceptibility: b.landslide_susceptibility || 'Low',
+      landslide_rest_level: b.landslide_rest_level || 'Low',
     })
     setAreaTab('flood')
     if (b.boundary_geojson) setAreas({ flood: initialArea(b, 'flood'), residential: initialArea(b, 'residential'), landslide: initialArea(b, 'landslide') })
@@ -223,7 +224,7 @@ export default function BarangayManagement() {
                       const residential = bgHazard === 'flood' ? parse(b.residential_area_geojson) : null
                       return (
                         <Fragment key={`ref-${bgHazard}-${b.id}`}>
-                          <GeoJSON data={area ? withHole(geo, areaStr) : geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? hazardColors(bgHazard).Low : color, fillOpacity: 0.55 }} />
+                          <GeoJSON data={area ? withHole(geo, areaStr) : geo} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: area ? (bgHazard === 'landslide' ? levelColor('landslide', b.landslide_rest_level) : hazardColors(bgHazard).Low) : color, fillOpacity: 0.55 }} />
                           {area && <GeoJSON data={area} interactive={false} pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }} />}
                           {residential && <GeoJSON data={residential} interactive={false} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: RESIDENTIAL_COLOR, fillOpacity: 0.7 }} />}
                         </Fragment>
@@ -247,7 +248,7 @@ export default function BarangayManagement() {
                       try { geo = JSON.parse(editingBarangay.boundary_geojson) } catch { return null }
                       return (
                         <GeoJSON key={`self-${areaTab}-${areas[bgHazard].custom}`} data={geo} interactive={false}
-                          pathOptions={{ color: '#1e293b', weight: 2, dashArray: '5, 4', fillColor: hazardColors(bgHazard).Low,
+                          pathOptions={{ color: '#1e293b', weight: 2, dashArray: '5, 4', fillColor: bgHazard === 'landslide' ? levelColor('landslide', form.landslide_rest_level) : hazardColors(bgHazard).Low,
                             fillOpacity: areaTab === 'residential' ? (areas.flood.custom ? 0.55 : 0.35) : (areas[areaTab].custom ? 0.55 : 0) }} />
                       )
                     })()}
@@ -258,6 +259,16 @@ export default function BarangayManagement() {
                     ))}
                     {bgHazard === 'flood' && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: RESIDENTIAL_COLOR }} /> Residential Area</span>}
                   </div>
+                  {/* Landslide: pick the color of the part OUTSIDE the drawn
+                      area (e.g. drawn area High = red, outside Moderate = green). */}
+                  {areaTab === 'landslide' && areas.landslide.custom && areas.landslide.points.length >= 3 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+                      <span className="text-gray-600">Inside the drawn area: <strong style={{ color: levelColor('landslide', form.landslide_susceptibility) }}>{form.landslide_susceptibility}</strong> · Color outside the drawn area:</span>
+                      <select className="input py-1 text-xs w-auto" value={form.landslide_rest_level} onChange={e => setForm({ ...form, landslide_rest_level: e.target.value })}>
+                        {['Low', 'Moderate', 'High'].map(v => <option key={v}>{v}</option>)}
+                      </select>
+                    </div>
+                  )}
                   {areas[areaTab].custom && areas[areaTab].points.length > 0 && (
                     <button type="button" onClick={() => resetArea(areaTab)} className="btn-secondary text-xs px-2.5 py-1.5 mt-2 flex items-center gap-1">
                       <RotateCcw size={12} /> {areaTab === 'residential' ? 'Remove residential area' : 'Use whole barangay'}

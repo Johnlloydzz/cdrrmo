@@ -102,7 +102,7 @@ function withHouseholdRisk(rows, ctx) {
   // point-in-polygon) is worked out ONCE per purok instead of once per
   // household — tens of thousands of times at Gingoog's real size.
   const perPurok = new Map()
-  return rows.map(({ barangay_flood_area, barangay_landslide_area, purok_point_lat, purok_point_lng, purok_boundary, latitude, longitude, ...raw }) => {
+  return rows.map(({ barangay_flood_area, barangay_landslide_area, barangay_landslide_rest, purok_point_lat, purok_point_lng, purok_boundary, latitude, longitude, ...raw }) => {
     const key = raw.purok_id != null ? `${raw.purok_id}|${raw.barangay_id}` : null
     let geo = key && perPurok.get(key)
     if (!geo) {
@@ -122,7 +122,9 @@ function withHouseholdRisk(rows, ctx) {
         && (manualActive ? floodLevel : RED_LEVEL_M) >= effectiveThreshold(h.flood_threshold_m),
       // Landslide has no measured value like flood depth — always the static
       // official CDRA classification.
-      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && geo.inLandslideArea,
+      // Outside the drawn landslide area the barangay uses its "color outside
+      // the area" level; if that is High, puroks there count as well.
+      in_landslide_risk_zone: h.purok_landslide_risk === 'High' && (geo.inLandslideArea || barangay_landslide_rest === 'High'),
     }
   })
 }
@@ -130,6 +132,7 @@ function withHouseholdRisk(rows, ctx) {
 // The columns withHouseholdRisk() needs, for any households query
 // (FROM households h LEFT JOIN barangays b ... LEFT JOIN puroks p ...).
 const RISK_COLUMNS = `b.flood_susceptibility as barangay_flood_susceptibility, b.flood_area_geojson as barangay_flood_area,
+  b.landslide_rest_level as barangay_landslide_rest,
   b.landslide_area_geojson as barangay_landslide_area, p.flood_risk as purok_flood_risk, p.flood_threshold_m,
   p.landslide_risk as purok_landslide_risk, p.latitude as purok_point_lat, p.longitude as purok_point_lng,
   p.boundary_geojson as purok_boundary`

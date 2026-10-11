@@ -110,6 +110,13 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'A hazard area needs at least 3 points.' })
     }
 
+    // Landslide color OUTSIDE the drawn landslide area (inside uses
+    // landslide_susceptibility). Default Low, as before.
+    const landslide_rest_level = 'landslide_rest_level' in req.body ? req.body.landslide_rest_level : (current.landslide_rest_level || 'Low')
+    if (!['Low', 'Moderate', 'High'].includes(landslide_rest_level)) {
+      return res.status(400).json({ error: 'Color outside the landslide area must be Low, Moderate or High.' })
+    }
+
     const name                     = req.body.name ?? current.name
     const population                = req.body.population ?? current.population
     const risk_level                = req.body.risk_level ?? current.risk_level
@@ -125,8 +132,8 @@ router.put('/:id', async (req, res) => {
     const contact_number            = current.contact_number
 
     await run(
-      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, flood_area_geojson=?, landslide_area_geojson=?, residential_area_geojson=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
-      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, flood_area_geojson ?? null, landslide_area_geojson ?? null, residential_area_geojson ?? null, req.params.id]
+      `UPDATE barangays SET name=?, population=?, risk_level=?, flood_susceptibility=?, landslide_susceptibility=?, boundary_geojson=?, captain_name=?, contact_number=?, flood_area_geojson=?, landslide_area_geojson=?, residential_area_geojson=?, landslide_rest_level=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
+      [name, population, risk_level, flood_susceptibility, landslide_susceptibility, boundary_geojson, captain_name, contact_number, flood_area_geojson ?? null, landslide_area_geojson ?? null, residential_area_geojson ?? null, landslide_rest_level, req.params.id]
     )
     const updated = await get('SELECT * FROM barangays WHERE id = ?', [req.params.id])
     if (current.flood_susceptibility !== flood_susceptibility || current.landslide_susceptibility !== landslide_susceptibility) {

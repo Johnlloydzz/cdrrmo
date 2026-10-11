@@ -616,7 +616,7 @@ export default function GISMap() {
               <React.Fragment key={`hz-${hazardLayer}-${b.id}-${b.updated_at}`}>
                 <GeoJSON
                   data={areaStr ? withHole(geo, areaStr) : geo}
-                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? colors.Low : color, fillOpacity: 0.55 }}
+                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? (hazardLayer === 'landslide' ? (colors[b.landslide_rest_level] || colors.Low) : colors.Low) : color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}
                 />
                 {(() => {

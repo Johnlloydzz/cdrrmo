@@ -675,7 +675,7 @@ export default function FloodSimulationControl() {
                 <React.Fragment key={`${hazard}-${b.id}-${b.updated_at}`}>
                   <GeoJSON
                     data={areaStr ? withHole(geo, areaStr) : geo}
-                    pathOptions={{ color: '#555', weight: 0.5, fillColor: areaStr ? colorMap.Low : color, fillOpacity: 0.55 }}
+                    pathOptions={{ color: '#555', weight: 0.5, fillColor: areaStr ? (!isFlood ? (colorMap[b.landslide_rest_level] || colorMap.Low) : colorMap.Low) : color, fillOpacity: 0.55 }}
                     eventHandlers={{ click: (e) => { markHandled(e); setSelectedBarangay(b) } }}
                   >
                     <Tooltip sticky>{b.name} — {level} {isFlood ? 'flood' : 'landslide'} susceptibility</Tooltip>
