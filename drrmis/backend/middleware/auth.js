@@ -1,6 +1,23 @@
 const jwt = require('jsonwebtoken')
 const { get, run } = require('../db/database')
 
+// Speed: every request used to look the account up in the database first —
+// one extra trip to the hosted database (≈100–200 ms) before the page's own
+// data. The result is now remembered for 15 seconds per user. A change made
+// in User Management (deactivate, role, barangay) clears it at once, so it
+// still applies right away.
+const USER_TTL_MS = 15 * 1000
+const userCache = new Map() // id → { user, at }
+function forgetUser(id) { if (id == null) userCache.clear(); else userCache.delete(Number(id)) }
+async function loadUser(id) {
+  const hit = userCache.get(Number(id))
+  if (hit && Date.now() - hit.at < USER_TTL_MS) return hit.user
+  const user = await get('SELECT id, name, role, barangay_id, status FROM users WHERE id = ?', [id])
+  userCache.set(Number(id), { user, at: Date.now() })
+  if (userCache.size > 500) userCache.delete(userCache.keys().next().value)
+  return user
+}
+
 async function authenticate(req, res, next) {
   const header = req.headers.authorization
   if (!header || !header.startsWith('Bearer ')) {
@@ -18,7 +35,7 @@ async function authenticate(req, res, next) {
     // CDRRMO deleted or set to Inactive is signed out right away (instead of
     // keeping access until their token expires, up to 30 days), and a role or
     // barangay change applies immediately.
-    const user = await get('SELECT id, name, role, barangay_id, status FROM users WHERE id = ?', [decoded.id])
+    const user = await loadUser(decoded.id)
     if (!user || (user.status && user.status !== 'Active')) {
       return res.status(401).json({ error: 'Your account is no longer active. Please contact CDRRMO.' })
     }
@@ -46,4 +63,4 @@ function authorize(...roles) {
   }
 }
 
-module.exports = { authenticate, authorize }
+module.exports = { authenticate, authorize, forgetUser }

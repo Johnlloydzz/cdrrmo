@@ -2,7 +2,7 @@ const { sendAccountEmail, isEmailConfigured } = require('../utils/mailer')
 const router = require('express').Router()
 const { hashPassword } = require('../utils/password')
 const { all, get, run, getDb } = require('../db/database')
-const { authenticate, authorize } = require('../middleware/auth')
+const { authenticate, authorize, forgetUser } = require('../middleware/auth')
 
 // Sends the username + password to the user's email. Never throws: returns
 // { email_sent, email_error } for the User Management screen.
@@ -105,6 +105,7 @@ router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
         [name, email, role, barangay_id, status, req.params.id]
       )
     }
+    forgetUser(req.params.id) // role / barangay / Inactive applies on their next click
     const user = await get('SELECT id, name, username, email, role, barangay_id, status FROM users WHERE id = ?', [req.params.id])
     // A new password was set → email it to the account holder.
     const email_result = password && password.trim()
@@ -131,6 +132,7 @@ router.delete('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
       { sql: 'DELETE FROM password_reset_requests WHERE user_id = ?', args: [id] },
       { sql: 'DELETE FROM users WHERE id = ?', args: [id] },
     ], 'write')
+    forgetUser(id) // signed out on their next click
     res.json({ message: 'Deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

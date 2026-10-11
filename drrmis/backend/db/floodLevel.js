@@ -22,12 +22,16 @@ async function expireStaleFloodData() {
   const levelHours = parseFloat(process.env.FLOOD_LEVEL_EXPIRY_HOURS) || 0
   const autoMinutes = parseFloat(process.env.AUTO_FLOOD_EXPIRY_MINUTES) || 30
 
-  const level = await get(
-    `SELECT value, (julianday(datetime('now', '+8 hours')) - julianday(updated_at)) * 24 AS age_hours
-     FROM system_settings WHERE key = 'current_flood_level_m'`
-  )
-  if (levelHours > 0 && level && parseFloat(level.value) > 0 && level.age_hours != null && level.age_hours >= levelHours) {
-    await run(`UPDATE system_settings SET value = '0', updated_at = datetime('now', '+8 hours') WHERE key = 'current_flood_level_m'`)
+  // Speed: the manual-level check only runs when its expiry is switched on
+  // (it is off by default), saving one database trip on every flood read.
+  if (levelHours > 0) {
+    const level = await get(
+      `SELECT value, (julianday(datetime('now', '+8 hours')) - julianday(updated_at)) * 24 AS age_hours
+       FROM system_settings WHERE key = 'current_flood_level_m'`
+    )
+    if (level && parseFloat(level.value) > 0 && level.age_hours != null && level.age_hours >= levelHours) {
+      await run(`UPDATE system_settings SET value = '0', updated_at = datetime('now', '+8 hours') WHERE key = 'current_flood_level_m'`)
+    }
   }
 
   const auto = await get(
