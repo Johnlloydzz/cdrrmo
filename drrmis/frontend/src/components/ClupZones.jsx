@@ -324,3 +324,20 @@ export function ClupEditorMap({ s, boundary, others = [], heightClass = 'h-[42vh
     </div>
   )
 }
+// GIS Map → "Landslide Zones": the landslide colors straight from the CLUP
+// map areas (same shapes as the CLUP layer, so it looks exactly like the
+// CLUP map). The CLUP flood areas (violet/beige) are low, flat ground, so
+// they show as Low Susceptibility to Landslide here. Read-only — edit the
+// shapes with "Edit CLUP colors" (CLUP layer) or Barangays → CLUP Map.
+const LANDSLIDE_VIEW = { HL: '#dc2626', ML: '#15803d', LL: '#eab308', HF: '#eab308', LF: '#eab308' }
+export function ClupLandslideLayer({ zones }) {
+  return (
+    <>
+      <Pane name="clup-landslide" style={{ zIndex: 350, opacity: 0.6 }} />
+      {zones.map(z => (
+        <Polygon key={`ls-${z.id}-${z.updated_at}`} pane="clup-landslide" positions={toLatLngs(z.geojson)} interactive={false}
+          pathOptions={{ color: LANDSLIDE_VIEW[z.hazard], weight: 0.5, fillColor: LANDSLIDE_VIEW[z.hazard], fillOpacity: 1 }} />
+      ))}
+    </>
+  )
+}

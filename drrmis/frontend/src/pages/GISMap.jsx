@@ -6,7 +6,7 @@ import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
-import { useClupZones, ClupZonesLayer, ClupPanel } from '../components/ClupZones'
+import { useClupZones, ClupZonesLayer, ClupPanel, ClupLandslideLayer } from '../components/ClupZones'
 
 // Purok names are typed by users; escape them before putting them in a
 // map label's HTML so a name can never inject markup.
@@ -220,7 +220,9 @@ export default function GISMap() {
   }
 
   const clupOn = activeOverlays.includes(CLUP_LAYER)
-  const clup = useClupZones(clupOn)
+  // Landslide Zones also draws from the CLUP areas (exact CLUP landslide colors).
+  const clup = useClupZones(clupOn || hazardLayer === 'landslide')
+  useEffect(() => { if (!clupOn) { clup.setEditMode(false); clup.cancel(); clup.setDrawing(null) } }, [clupOn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const layer = LAYERS.find(l => l.id === activeLayer)
 
@@ -593,6 +595,7 @@ export default function GISMap() {
           />
 
           {clupOn && <ClupZonesLayer s={clup} />}
+          {hazardLayer === 'landslide' && <ClupLandslideLayer zones={clup.zones} />}
 
           {/* Roads reference overlay — free public Esri tiles, no
               API key. Always mounted with opacity 0/1 (rather than
@@ -625,12 +628,16 @@ export default function GISMap() {
             const areaStr = hazardLayer === 'landslide' ? b.landslide_area_geojson : b.flood_area_geojson
             return (
               <React.Fragment key={`hz-${hazardLayer}-${b.id}-${b.updated_at}`}>
+                {hazardLayer === 'landslide' ? (
+                  <GeoJSON data={geo} style={{ color: '#555', weight: 0.5, fillOpacity: 0 }} eventHandlers={{ click: () => setSelectedBarangay(b) }} />
+                ) : (
                 <GeoJSON
                   data={areaStr ? withHole(geo, areaStr) : geo}
-                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? (hazardLayer === 'landslide' ? (colors[b.landslide_rest_level] || colors.Low) : colors.Low) : color, fillOpacity: 0.55 }}
+                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? colors.Low : color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}
                 />
-                {(() => {
+                )}
+                {hazardLayer !== 'landslide' && (() => {
               // CDRRMO-adjusted hazard area: only this shape gets the
               // susceptibility color; the rest of the barangay shows as Low.
               if (!areaStr) return null
