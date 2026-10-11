@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, Polygon, Polyline, Marker, Pane, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { Pencil, Plus, Trash2, Save, X, RotateCcw, Check } from 'lucide-react'
+import { Pencil, Plus, Trash2, Save, X, RotateCcw, Check, Waves, Undo2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { getStoredUser } from '../utils/storage'
 
@@ -174,7 +174,42 @@ function ColorChoices({ value, onChange }) {
 }
 
 // Legend + editing tools — goes in the side panel.
-export function ClupPanel({ s }) {
+// "Use CLUP water for Flood Zones": copies the CLUP violet (High
+// Susceptibility of Flooding) into every barangay's Flood area, so the Flood
+// Zones layer, Dashboard, Flood Simulation Control and geofencing show the
+// same water as the CLUP map. Undo puts the previous flood settings back.
+function FloodFromClup({ onChanged }) {
+  const [status, setStatus] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const load = () => apiGet('/clup-zones/flood-status').then(setStatus).catch(() => {})
+  useEffect(() => { load() }, [])
+  const act = async (path, confirmText, done) => {
+    if (!window.confirm(confirmText)) return
+    setBusy(true); setMsg('')
+    try { const r = await apiPost(path, {}); setMsg(done(r)); await load(); onChanged?.() }
+    catch (e) { setMsg(e.message || 'Something went wrong.') }
+    finally { setBusy(false) }
+  }
+  return (
+    <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-2.5 space-y-1.5">
+      <p className="text-[11px] text-gray-600 leading-snug">Make <strong>Flood Zones</strong> (and the flood alerts) use exactly the CLUP water (violet).</p>
+      <button type="button" disabled={busy} className="btn-secondary w-full text-xs py-1.5 flex items-center justify-center gap-1.5"
+        onClick={() => act('/clup-zones/apply-flood', 'Replace the Flood area of ALL barangays with the CLUP violet (High Susceptibility of Flooding)? Barangays without CLUP violet become Low. You can Undo this.', r => `Done: ${r.high} barangays High (CLUP violet), ${r.low} Low.`)}>
+        <Waves size={13} /> {busy ? 'Working…' : 'Use CLUP water for Flood Zones'}
+      </button>
+      {status?.can_undo && (
+        <button type="button" disabled={busy} className="w-full text-[11px] text-gray-500 hover:text-red-600 flex items-center justify-center gap-1 py-0.5"
+          onClick={() => act('/clup-zones/undo-flood', 'Put back the Flood areas from before "Use CLUP water"? Flood edits made after that will be replaced.', r => `Restored the previous flood areas of ${r.restored} barangays.`)}>
+          <Undo2 size={12} /> Undo (put back previous flood areas)
+        </button>
+      )}
+      {msg && <p className="text-[11px] text-violet-700">{msg}</p>}
+    </div>
+  )
+}
+
+export function ClupPanel({ s, onFloodChanged }) {
   const { canEdit, editMode, setEditMode, draft, setDraft, drawing, setDrawing, busy, error, loaded } = s
   return (
     <div className="space-y-2">
@@ -186,6 +221,8 @@ export function ClupPanel({ s }) {
         </div>
       ))}
       {!loaded && !error && <p className="text-[11px] text-gray-400">Loading map…</p>}
+
+      {canEdit && !draft && !drawing && <FloodFromClup onChanged={onFloodChanged} />}
 
       {canEdit && !editMode && (
         <button type="button" onClick={() => setEditMode(true)} className="btn-secondary w-full text-xs py-1.5 flex items-center justify-center gap-1.5">

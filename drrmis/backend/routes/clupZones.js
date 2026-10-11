@@ -3,7 +3,8 @@
 // Everyone signed in can view; only CDRRMO Personnel can change them.
 // Display only: these areas do not change flood alerts or geofencing.
 const router = require('express').Router()
-const { all, get, run, seedClupZones } = require('../db/database')
+const { all, get, run, getDb, seedClupZones } = require('../db/database')
+const { clupFloodAreas } = require('../utils/clupFlood')
 const { authenticate } = require('../middleware/auth')
 
 const HAZARDS = ['HL', 'ML', 'LL', 'HF', 'LF']
@@ -84,6 +85,57 @@ router.post('/reset', onlyCdrrmo, async (_req, res) => {
     await seedClupZones(true)
     const rows = await all('SELECT id, hazard, geojson, sort_order, updated_at FROM clup_zones ORDER BY sort_order, id')
     res.json(rows.map(toRow))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// ── Copy the CLUP water (violet) into the barangays' Flood areas ────────────
+// So GIS Map → Flood Zones, the Dashboard, Flood Simulation Control and the
+// flood geofencing all show exactly the CLUP water. The barangays' previous
+// flood settings are kept so "Undo" can put them back.
+const BACKUP_KEY = 'clup_flood_backup'
+
+router.get('/flood-status', async (_req, res) => {
+  try {
+    const row = await get('SELECT updated_at FROM system_settings WHERE key = ?', [BACKUP_KEY])
+    res.json({ can_undo: !!row, applied_at: row?.updated_at || null })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+router.post('/apply-flood', onlyCdrrmo, async (_req, res) => {
+  try {
+    const [zoneRows, barangays] = await Promise.all([
+      all('SELECT hazard, geojson FROM clup_zones ORDER BY sort_order, id'),
+      all('SELECT id, name, boundary_geojson, flood_susceptibility, flood_area_geojson FROM barangays WHERE boundary_geojson IS NOT NULL'),
+    ])
+    const areas = clupFloodAreas(zoneRows.map(z => ({ hazard: z.hazard, geojson: JSON.parse(z.geojson) })), barangays)
+    // Keep the old values only the first time (a second "apply" must not
+    // overwrite the real original with CLUP values).
+    const hasBackup = await get('SELECT 1 FROM system_settings WHERE key = ?', [BACKUP_KEY])
+    const stmts = []
+    if (!hasBackup) {
+      const backup = barangays.map(b => ({ id: b.id, flood_susceptibility: b.flood_susceptibility, flood_area_geojson: b.flood_area_geojson }))
+      stmts.push({ sql: `INSERT INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now', '+8 hours'))`, args: [BACKUP_KEY, JSON.stringify(backup)] })
+    }
+    for (const b of barangays) {
+      const area = areas.get(Number(b.id))
+      stmts.push(area
+        ? { sql: "UPDATE barangays SET flood_susceptibility = 'High', flood_area_geojson = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?", args: [area, b.id] }
+        : { sql: "UPDATE barangays SET flood_susceptibility = 'Low', flood_area_geojson = NULL, updated_at = datetime('now', '+8 hours') WHERE id = ?", args: [b.id] })
+    }
+    await getDb().batch(stmts, 'write')
+    res.json({ ok: true, high: areas.size, low: barangays.length - areas.size, names: barangays.filter(b => areas.has(Number(b.id))).map(b => b.name) })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+router.post('/undo-flood', onlyCdrrmo, async (_req, res) => {
+  try {
+    const row = await get('SELECT value FROM system_settings WHERE key = ?', [BACKUP_KEY])
+    if (!row) return res.status(400).json({ error: 'Nothing to undo.' })
+    const backup = JSON.parse(row.value)
+    const stmts = backup.map(b => ({ sql: "UPDATE barangays SET flood_susceptibility = ?, flood_area_geojson = ?, updated_at = datetime('now', '+8 hours') WHERE id = ?", args: [b.flood_susceptibility || 'Low', b.flood_area_geojson || null, b.id] }))
+    stmts.push({ sql: 'DELETE FROM system_settings WHERE key = ?', args: [BACKUP_KEY] })
+    await getDb().batch(stmts, 'write')
+    res.json({ ok: true, restored: backup.length })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

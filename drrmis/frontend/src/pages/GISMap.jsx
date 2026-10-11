@@ -553,7 +553,7 @@ export default function GISMap() {
                 {l.label}
               </div>
             ))}
-            {clupOn && <ClupPanel s={clup} />}
+            {clupOn && <ClupPanel s={clup} onFloodChanged={loadMapData} />}
             <div className="border-t border-gray-100 my-2" />
             {[
               { color: '#dc2626', label: 'Purok — High Flood-Risk Zone (Geofenced)' },

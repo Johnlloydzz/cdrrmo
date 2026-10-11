@@ -64,7 +64,7 @@ if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'))
 
 // Cache: any save to these areas clears the cached Dashboard/map/flood
 // answers at once, so nobody sees old numbers after a change.
-app.use(['/api/barangays', '/api/puroks', '/api/households', '/api/residents', '/api/settings', '/api/internal'], clearOnWrite)
+app.use(['/api/barangays', '/api/puroks', '/api/households', '/api/residents', '/api/settings', '/api/internal', '/api/clup-zones'], clearOnWrite)
 
 // ── API Routes ──────────────────────────────────────────────────────────────
 // Matches the 5 PDRA modules (Chapter 1, Section 1.5):

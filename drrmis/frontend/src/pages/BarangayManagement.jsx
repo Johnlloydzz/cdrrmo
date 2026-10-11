@@ -94,6 +94,22 @@ export default function BarangayManagement() {
   const clup = useClupZones(showModal && areaTab === 'clup')
   useEffect(() => { if (showModal && areaTab === 'clup' && clup.canEdit) clup.setEditMode(true) }, [showModal, areaTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // After "Use CLUP water for Flood Zones" (or Undo): reload the list and
+  // refresh this open form's flood values too, so pressing Save here can't
+  // put the old flood area back.
+  const refreshAfterClupFlood = async () => {
+    try {
+      const list = await apiGet('/barangays')
+      setBarangays(list)
+      const b = list.find(x => x.id === editing)
+      if (b) {
+        setEditingBarangay(b)
+        setForm(f => ({ ...f, flood_susceptibility: b.flood_susceptibility || 'Low' }))
+        if (b.boundary_geojson) setAreas(a => ({ ...a, flood: initialArea(b, 'flood') }))
+      }
+    } catch { /* list reloads next time */ }
+  }
+
   const setAreaPoints = (key, points) => setAreas(a => ({ ...a, [key]: { points, custom: true } }))
   // The Residential tab is part of the flood map, so it shows the flood colors behind it.
   const bgHazard = areaTab === 'landslide' ? 'landslide' : 'flood'
@@ -209,7 +225,7 @@ export default function BarangayManagement() {
                     <div>
                       <p className="text-xs text-gray-500 mb-2">CLUP Landslide &amp; Flood Susceptibility Map (same as GIS Map → Map Layers). Click a colored area to change its color or drag its points. These changes save right away with "Save changes" below the map (separate from the Save button of this form).</p>
                       <ClupEditorMap s={clup} boundary={editingBarangay.boundary_geojson} others={barangays.filter(b => b.id !== editing && b.boundary_geojson)} />
-                      <div className="mt-2 max-w-md"><ClupPanel s={clup} /></div>
+                      <div className="mt-2 max-w-md"><ClupPanel s={clup} onFloodChanged={refreshAfterClupFlood} /></div>
                     </div>
                   ) : (<>
                   <p className="text-xs text-gray-500 mb-2">
