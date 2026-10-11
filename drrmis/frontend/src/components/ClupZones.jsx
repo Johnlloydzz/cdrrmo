@@ -19,11 +19,11 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import { getStoredUser } from '../utils/storage'
 
 export const CLUP_HAZARDS = [
-  { code: 'HL', color: '#dc2626', label: 'High Susceptibility to Landslide' },
-  { code: 'ML', color: '#15803d', label: 'Moderate Susceptibility to Landslide' },
-  { code: 'LL', color: '#eab308', label: 'Low Susceptibility to Landslide' },
-  { code: 'HF', color: '#7c3aed', label: 'High Susceptibility of Flooding' },
-  { code: 'LF', color: '#d6c9a8', label: 'Low Susceptibility of Flooding' },
+  { code: 'HL', color: '#dc2626', label: 'High Susceptibility to Landslide', short: 'High landslide' },
+  { code: 'ML', color: '#15803d', label: 'Moderate Susceptibility to Landslide', short: 'Moderate landslide' },
+  { code: 'LL', color: '#eab308', label: 'Low Susceptibility to Landslide', short: 'Low landslide' },
+  { code: 'HF', color: '#7c3aed', label: 'High Susceptibility of Flooding', short: 'High flood' },
+  { code: 'LF', color: '#d6c9a8', label: 'Low Susceptibility of Flooding', short: 'Low flood' },
 ]
 const COLOR = Object.fromEntries(CLUP_HAZARDS.map(h => [h.code, h.color]))
 const LABEL = Object.fromEntries(CLUP_HAZARDS.map(h => [h.code, h.label]))
@@ -166,7 +166,7 @@ function ColorChoices({ value, onChange }) {
         <label key={h.code} className={`flex items-center gap-2 text-xs cursor-pointer rounded px-1.5 py-1 ${value === h.code ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>
           <input type="radio" checked={value === h.code} onChange={() => onChange(h.code)} />
           <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-black/10" style={{ background: h.color }} />
-          {h.label}
+          {h.short}
         </label>
       ))}
     </div>
@@ -230,12 +230,10 @@ export function ClupPanel({ s, onFloodChanged }) {
       {!editMode && CLUP_HAZARDS.map(h => (
         <div key={h.code} className="flex items-center gap-2 text-xs">
           <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-black/10" style={{ background: h.color }} />
-          {h.label}
+          {h.short}
         </div>
       ))}
       {!loaded && !error && <p className="text-[11px] text-gray-400">Loading map…</p>}
-
-      {canEdit && !draft && !drawing && <FloodFromClup onChanged={onFloodChanged} />}
 
       {canEdit && !editMode && (
         <button type="button" onClick={() => setEditMode(true)} className="btn-secondary w-full text-xs py-1.5 flex items-center justify-center gap-1.5">
@@ -283,7 +281,6 @@ export function ClupPanel({ s, onFloodChanged }) {
         </div>
       )}
       {error && <p className="text-[11px] text-red-600" role="alert">{error}</p>}
-      <p className="text-[10px] text-gray-400 leading-snug">Source: Gingoog City CLUP (CPDO/MGB), traced from the printed map. Display only — does not change flood alerts.</p>
     </div>
   )
 }

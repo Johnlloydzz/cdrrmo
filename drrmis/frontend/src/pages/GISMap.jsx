@@ -6,7 +6,7 @@ import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
-import { useClupZones, ClupZonesLayer, ClupPanel, ClupLandslideLayer } from '../components/ClupZones'
+import { useClupZones, ClupZonesLayer, ClupLandslideLayer, CLUP_HAZARDS } from '../components/ClupZones'
 
 // Purok names are typed by users; escape them before putting them in a
 // map label's HTML so a name can never inject markup.
@@ -531,44 +531,44 @@ export default function GISMap() {
           </div>
         </div>
 
-        {/* Legend */}
+        {/* Legend — one clean list: the colors of the layer that is on, then
+            the map markers. Short labels so it is easy to read. */}
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3">Legend</h3>
-          <div className="space-y-2">
-            {hazardLayer === 'landslide' && [
-              { color: LANDSLIDE_COLOR.High, label: 'High Susceptibility to Landslide' },
-              { color: LANDSLIDE_COLOR.Moderate, label: 'Moderate Susceptibility to Landslide' },
-              { color: LANDSLIDE_COLOR.Low, label: 'Low Susceptibility to Landslide' },
-            ].map(l => (
-              <div key={l.label} className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
-                {l.label}
-              </div>
-            ))}
-            {hazardLayer === 'flood' && [
-              { color: FLOOD_COLOR.High, label: 'High Susceptibility of Flooding' },
-              { color: FLOOD_COLOR.Low, label: 'Low Susceptibility of Flooding' },
-              { color: '#facc15', label: 'Residential Area' },
-            ].map(l => (
-              <div key={l.label} className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: l.color }} />
-                {l.label}
-              </div>
-            ))}
-            {clupOn && <ClupPanel s={clup} onFloodChanged={loadMapData} />}
-            <div className="border-t border-gray-100 my-2" />
-            {[
-              { color: '#dc2626', label: 'Purok — High Flood-Risk Zone (Geofenced)' },
-              { color: '#2563eb', label: 'Purok — Outside High-Risk Zone' },
-              { color: '#0ea5e9', label: 'Selected Barangay Boundary' },
-              { color: '#059669', label: 'CDRRMO Office / Driving Route' },
-            ].map(l => (
-              <div key={l.label} className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                {l.label}
-              </div>
-            ))}
-          </div>
+          {(() => {
+            const areas = clupOn ? CLUP_HAZARDS.map(h => ({ color: h.color, label: h.short }))
+              : hazardLayer === 'landslide' ? [
+                  { color: LANDSLIDE_COLOR.High, label: 'High landslide' },
+                  { color: LANDSLIDE_COLOR.Moderate, label: 'Moderate landslide' },
+                  { color: LANDSLIDE_COLOR.Low, label: 'Low landslide' },
+                ]
+              : hazardLayer === 'flood' ? [
+                  { color: FLOOD_COLOR.High, label: 'High flood' },
+                  { color: FLOOD_COLOR.Low, label: 'Low flood' },
+                  { color: '#facc15', label: 'Residential area' },
+                ] : []
+            const markers = [
+              { color: '#dc2626', label: 'At-risk purok' },
+              { color: '#2563eb', label: 'Safe purok' },
+              { color: '#0ea5e9', label: 'Selected barangay' },
+              { color: '#059669', label: 'CDRRMO office / route' },
+            ]
+            return (
+              <ul className="space-y-1.5 text-xs text-gray-600">
+                {areas.map(l => (
+                  <li key={l.label} className="flex items-center gap-2 animate-fade-in">
+                    <span className="w-3.5 h-3.5 rounded flex-shrink-0 ring-1 ring-black/5" style={{ background: l.color }} />{l.label}
+                  </li>
+                ))}
+                {areas.length > 0 && <li className="border-t border-gray-100 !my-2.5" aria-hidden="true" />}
+                {markers.map(l => (
+                  <li key={l.label} className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 mx-0.5 rounded-full flex-shrink-0" style={{ background: l.color }} />{l.label}
+                  </li>
+                ))}
+              </ul>
+            )
+          })()}
         </div>
       </div>
 
