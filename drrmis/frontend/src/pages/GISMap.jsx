@@ -174,8 +174,10 @@ function FocusRoute({ trigger, coords }) {
 
 export default function GISMap() {
   const [activeLayer, setActiveLayer] = useState('street')
-  const [hazardLayer, setHazardLayer] = useState('landslide') // 'landslide' | 'flood' | 'none'
-  const [activeOverlays, setActiveOverlays] = useState(['Landslide Zones','Purok Boundaries'])
+  // Opens on the CLUP Landslide & Flood Map (its own colors, so the
+  // barangay hazard colors start off).
+  const [hazardLayer, setHazardLayer] = useState('none') // 'landslide' | 'flood' | 'none'
+  const [activeOverlays, setActiveOverlays] = useState([CLUP_LAYER])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
   // Per-purok counts + at-risk flags from the server (not every household).
