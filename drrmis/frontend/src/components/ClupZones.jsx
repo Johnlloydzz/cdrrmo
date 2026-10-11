@@ -204,6 +204,19 @@ function FloodFromClup({ onChanged }) {
           <Undo2 size={12} /> Undo (put back previous flood areas)
         </button>
       )}
+      <div className="border-t border-violet-200 pt-1.5">
+        <p className="text-[11px] text-gray-600 leading-snug">Urban barangays (Poblacion): <strong>CDRA Population Flooding Exposure Map</strong> — violet + yellow residential.{status?.cdra_can_undo ? ' (applied)' : ''}</p>
+        <button type="button" disabled={busy} className="btn-secondary w-full text-xs py-1.5 mt-1 flex items-center justify-center gap-1.5"
+          onClick={() => act('/clup-zones/apply-cdra', 'Replace the Flood area and Residential Area of the urban barangays (Poblacion, plus parts of San Juan, Murallon, Santiago and Daan-Lungsod) with the CDRA Population Flooding Exposure Map? You can Undo this.', r => `Done: CDRA map applied to ${r.updated} barangays (${r.high} with violet).`)}>
+          <Waves size={13} /> {busy ? 'Working…' : 'Use CDRA urban flood map'}
+        </button>
+        {status?.cdra_can_undo && (
+          <button type="button" disabled={busy} className="w-full text-[11px] text-gray-500 hover:text-red-600 flex items-center justify-center gap-1 py-0.5"
+            onClick={() => act('/clup-zones/undo-cdra', 'Put back the Flood and Residential areas from before the CDRA map was applied?', r => `Restored ${r.restored} barangays.`)}>
+            <Undo2 size={12} /> Undo CDRA (put back my previous drawing)
+          </button>
+        )}
+      </div>
       {msg && <p className="text-[11px] text-violet-700">{msg}</p>}
     </div>
   )

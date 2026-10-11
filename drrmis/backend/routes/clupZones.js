@@ -5,6 +5,7 @@
 const router = require('express').Router()
 const { all, get, run, getDb, seedClupZones } = require('../db/database')
 const { clupFloodAreas } = require('../utils/clupFlood')
+const cdra = require('../utils/cdraFlood')
 const { authenticate } = require('../middleware/auth')
 
 const HAZARDS = ['HL', 'ML', 'LL', 'HF', 'LF']
@@ -96,8 +97,11 @@ const BACKUP_KEY = 'clup_flood_backup'
 
 router.get('/flood-status', async (_req, res) => {
   try {
-    const row = await get('SELECT updated_at FROM system_settings WHERE key = ?', [BACKUP_KEY])
-    res.json({ can_undo: !!row, applied_at: row?.updated_at || null })
+    const [row, cdraRow] = await Promise.all([
+      get('SELECT updated_at FROM system_settings WHERE key = ?', [BACKUP_KEY]),
+      get('SELECT updated_at FROM system_settings WHERE key = ?', [cdra.BACKUP_KEY]),
+    ])
+    res.json({ can_undo: !!row, applied_at: row?.updated_at || null, cdra_can_undo: !!cdraRow, cdra_applied_at: cdraRow?.updated_at || null })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -137,6 +141,18 @@ router.post('/undo-flood', onlyCdrrmo, async (_req, res) => {
     await getDb().batch(stmts, 'write')
     res.json({ ok: true, restored: backup.length })
   } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// CDRA Urban Barangays — Population Flooding Exposure Map (violet + yellow
+// residential), applied automatically once on deploy; these let CDRRMO
+// re-apply it or undo it.
+router.post('/apply-cdra', onlyCdrrmo, async (_req, res) => {
+  try { const r = await cdra.applyCdraUrbanFlood(); res.status(r.ok ? 200 : 400).json(r) }
+  catch (err) { res.status(500).json({ error: err.message }) }
+})
+router.post('/undo-cdra', onlyCdrrmo, async (_req, res) => {
+  try { const r = await cdra.undoCdraUrbanFlood(); res.status(r.ok ? 200 : 400).json(r.ok ? r : { error: r.error }) }
+  catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 module.exports = router

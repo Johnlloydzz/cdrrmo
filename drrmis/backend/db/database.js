@@ -210,6 +210,8 @@ async function initDb() {
   await seedBarangays()
   // These don't depend on each other — run them at the same time.
   await Promise.all([seedDefaultAdmin(), seedBoundaries(), selfHealPurokNames(), seedClupZones()])
+  // After boundaries exist: trace of the CDRA urban flood map (once only).
+  try { await require('../utils/cdraFlood').seedCdraUrbanFlood() } catch (err) { console.log('CDRA flood seed skipped:', err.message) }
   console.log('Database initialized.')
 }
 
