@@ -703,6 +703,12 @@ export default function RiskAssessmentDashboard({ currentUser }) {
           <MapContainer center={CENTER} zoom={12} className="w-full h-full">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
             <MapResizeHandler />
+            {/* Drawn hazard areas (and residential) sit ABOVE every barangay's own
+                color, so a drawn area that goes a little past its barangay's
+                line keeps the same color instead of being covered by the
+                neighboring barangay. */}
+            <Pane name="hazard-areas" style={{ zIndex: 405 }} />
+            <Pane name="hazard-residential" style={{ zIndex: 406 }} />
             <FlyToHandler target={flyTarget} />
 
             {/* All barangays — colored by official CDRA flood susceptibility
@@ -730,7 +736,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               let area
               try { area = JSON.parse(areaStr) } catch { return null }
               return (
-                <GeoJSON key={`d-area-${b.id}-${b.updated_at}`} data={area}
+                <GeoJSON key={`d-area-${b.id}-${b.updated_at}`} data={area} pane="hazard-areas"
                   pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
                   eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip></GeoJSON>
               )
@@ -741,7 +747,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   let res
                   try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
                   return (
-                    <GeoJSON data={res} pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
+                    <GeoJSON data={res} pane="hazard-residential" pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
                       eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
                   )
                 })()}
