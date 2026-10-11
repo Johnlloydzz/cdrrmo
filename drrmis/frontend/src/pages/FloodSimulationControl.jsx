@@ -8,6 +8,7 @@ import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, Chevro
 import { prepareSessionHandoff } from '../utils/storage'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { apiGet, apiPut } from '../utils/api'
+import { useClupZones, ClupLandslideLayer } from '../components/ClupZones'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -321,6 +322,8 @@ export default function FloodSimulationControl() {
   const activeFloodLevel = floodLevel > 0 ? floodLevel : 1
 
   const isFlood = hazard === 'flood'
+  // CLUP areas for the Landslide view (loaded only when Landslide is picked).
+  const clupZones = useClupZones(!isFlood).zones
   const atRiskKey = isFlood ? 'in_flood_risk_zone' : 'in_landslide_risk_zone'
   const susceptKey = isFlood ? 'flood_susceptibility' : 'landslide_susceptibility'
   // A reported flood level is REAL (the system is used 24/7), so the server
@@ -660,9 +663,19 @@ export default function FloodSimulationControl() {
             <ClearOnMapClick onClear={() => setSelectedBarangay(null)} />
             {selectedBarangay?.centroid && <FlyToBarangay target={selectedBarangay.centroid} />}
 
+            {/* Landslide: the exact CLUP landslide colors (same as GIS Map);
+                the barangays below are then just clickable outlines. */}
+            {!isFlood && <ClupLandslideLayer zones={clupZones} />}
+
             {barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
               let geo
               try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+              if (!isFlood) return (
+                <GeoJSON key={`ls-${b.id}`} data={geo} pathOptions={{ color: '#555', weight: 0.5, fillOpacity: 0 }}
+                  eventHandlers={{ click: (e) => { markHandled(e); setSelectedBarangay(b) } }}>
+                  <Tooltip sticky>{b.name}</Tooltip>
+                </GeoJSON>
+              )
               const colorMap = isFlood ? FLOOD_COLOR : LANDSLIDE_COLOR
               const level = b[susceptKey] || 'Low'
               const color = colorMap[level] || colorMap.Low
