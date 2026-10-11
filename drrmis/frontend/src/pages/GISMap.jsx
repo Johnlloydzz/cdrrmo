@@ -1,6 +1,6 @@
 import React from 'react'
 import { useState, useEffect, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Polyline, Tooltip, useMap, Pane } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Polyline, Tooltip, useMap, Pane, ImageOverlay } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
@@ -62,7 +62,23 @@ const LAYERS = [
 // Roads Map Layers toggle — real data, not placeholders.
 const ROADS_OVERLAY_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
 
-const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Flood Zones','Landslide Zones']
+const CLUP_LAYER = 'CLUP Landslide & Flood Map'
+const OVERLAYS = ['Barangay Boundaries','Purok Boundaries','Roads','Flood Zones','Landslide Zones', CLUP_LAYER]
+
+// CLUP 2020–2029 "Landslide and Flood Susceptibility Map" of Gingoog City
+// (City Planning and Development Office / MGB), turned into a map image:
+// every color of the printed map was traced and placed on its real location.
+// The image was made from a photo of the printed map, so the edges are
+// approximate (about ±0.5 km). The official CPDO shapefile would be exact.
+const CLUP_IMAGE = '/clup-hazard-map.png'
+const CLUP_BOUNDS = [[8.579, 124.9473], [8.8962, 125.2749]]
+const CLUP_LEGEND = [
+  { color: '#dc2626', label: 'High Susceptibility to Landslide' },
+  { color: '#15803d', label: 'Moderate Susceptibility to Landslide' },
+  { color: '#eab308', label: 'Low Susceptibility to Landslide' },
+  { color: '#7c3aed', label: 'High Susceptibility of Flooding' },
+  { color: '#d6c9a8', label: 'Low Susceptibility of Flooding' },
+]
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors,
 // matching the City of Gingoog CLUP Landslide and Flood Susceptibility Map.
@@ -200,14 +216,15 @@ export default function GISMap() {
   // choropleth (a barangay can only be filled with one hazard's color at a
   // time), so checking one automatically unchecks the other — checking
   // both together isn't a state the map can actually render.
+  // The CLUP map already has its own landslide AND flood colors, so it also
+  // takes the place of the Flood/Landslide Zones colors while it is on.
   const toggleOverlay = (o) => {
-    if (o === 'Flood Zones' || o === 'Landslide Zones') {
+    if (o === 'Flood Zones' || o === 'Landslide Zones' || o === CLUP_LAYER) {
       const turningOn = !activeOverlays.includes(o)
-      setHazardLayer(turningOn ? (o === 'Flood Zones' ? 'flood' : 'landslide') : 'none')
+      setHazardLayer(turningOn && o !== CLUP_LAYER ? (o === 'Flood Zones' ? 'flood' : 'landslide') : 'none')
       setActiveOverlays(prev => {
-        const other = o === 'Flood Zones' ? 'Landslide Zones' : 'Flood Zones'
-        const withoutBoth = prev.filter(x => x !== 'Flood Zones' && x !== 'Landslide Zones')
-        return turningOn ? [...withoutBoth, o] : withoutBoth
+        const withoutAll = prev.filter(x => x !== 'Flood Zones' && x !== 'Landslide Zones' && x !== CLUP_LAYER)
+        return turningOn ? [...withoutAll, o] : withoutAll
       })
       return
     }
@@ -545,6 +562,18 @@ export default function GISMap() {
                 {l.label}
               </div>
             ))}
+            {activeOverlays.includes(CLUP_LAYER) && (
+              <>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">CLUP 2020–2029 Susceptibility Map</p>
+                {CLUP_LEGEND.map(l => (
+                  <div key={l.label} className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-black/10" style={{ background: l.color }} />
+                    {l.label}
+                  </div>
+                ))}
+                <p className="text-[10px] text-gray-400 leading-snug">Source: Gingoog City CLUP (CPDO/MGB). Traced from the printed map — edges are approximate.</p>
+              </>
+            )}
             <div className="border-t border-gray-100 my-2" />
             {[
               { color: '#dc2626', label: 'Purok — High Flood-Risk Zone (Geofenced)' },
@@ -577,11 +606,17 @@ export default function GISMap() {
                 neighboring barangay. */}
             <Pane name="hazard-areas" style={{ zIndex: 405 }} />
             <Pane name="hazard-residential" style={{ zIndex: 406 }} />
+            {/* CLUP map image: above the base map, below every boundary line */}
+            <Pane name="clup-map" style={{ zIndex: 350 }} />
           <TileLayer
             key={activeLayer}
             url={layer.url}
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
           />
+
+          {activeOverlays.includes(CLUP_LAYER) && (
+            <ImageOverlay url={CLUP_IMAGE} bounds={CLUP_BOUNDS} opacity={0.7} pane="clup-map" />
+          )}
 
           {/* Roads reference overlay — free public Esri tiles, no
               API key. Always mounted with opacity 0/1 (rather than
