@@ -209,7 +209,7 @@ async function initDb() {
   await ensureIndexes()
   await seedBarangays()
   // These don't depend on each other — run them at the same time.
-  await Promise.all([seedDefaultAdmin(), seedBoundaries(), selfHealPurokNames()])
+  await Promise.all([seedDefaultAdmin(), seedBoundaries(), selfHealPurokNames(), seedClupZones()])
   console.log('Database initialized.')
 }
 
@@ -394,4 +394,24 @@ async function seedBoundaries() {
   }
 }
 
-module.exports = { getDb, run, get, all, initDb, migrateResidentsHouseholdOptional }
+// CLUP Landslide & Flood colored areas (traced from the CLUP 2020–2029 map,
+// clipped to the city's barangay boundaries). Loaded once, the first time
+// the server starts with this feature; after that only CDRRMO's own edits
+// count (deleting every area does not bring the originals back — the
+// "Reset to CLUP original" button does).
+async function seedClupZones(force = false) {
+  if (!force) {
+    const done = await get("SELECT value FROM system_settings WHERE key = 'clup_zones_seeded'")
+    if (done) return
+  }
+  let zones
+  try { zones = require('./clup-zones.json') } catch { return }
+  const stmts = [{ sql: 'DELETE FROM clup_zones', args: [] }]
+  zones.forEach((z, i) => stmts.push({ sql: 'INSERT INTO clup_zones (hazard, geojson, sort_order) VALUES (?, ?, ?)', args: [z.hazard, JSON.stringify(z.geojson), i] }))
+  stmts.push({ sql: `INSERT INTO system_settings (key, value, updated_at) VALUES ('clup_zones_seeded', '1', datetime('now', '+8 hours'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, args: [] })
+  await getDb().batch(stmts, 'write')
+  console.log(`CLUP zones loaded: ${zones.length} areas.`)
+}
+
+module.exports = { getDb, run, get, all, initDb, migrateResidentsHouseholdOptional, seedClupZones }

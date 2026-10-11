@@ -140,6 +140,19 @@ const tables = [
     created_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
   `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, id)`,
+
+  // CLUP Landslide & Flood Susceptibility Map, as editable colored areas
+  // (shown in GIS Map → Map Layers). hazard: HL/ML/LL = High/Moderate/Low
+  // susceptibility to landslide, HF/LF = High/Low susceptibility of flooding.
+  // Drawn in sort_order (big areas first), so a smaller area drawn later sits
+  // on top of a bigger one. Display only — does not change flood alerts.
+  `CREATE TABLE IF NOT EXISTS clup_zones (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    hazard      TEXT    NOT NULL,
+    geojson     TEXT    NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT    DEFAULT (datetime('now', '+8 hours'))
+  )`,
 ]
 
 module.exports = tables
