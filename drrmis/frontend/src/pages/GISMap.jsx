@@ -598,6 +598,16 @@ export default function GISMap() {
           />
 
           {clupOn && <ClupZonesLayer s={clup} />}
+          {/* CLUP map: thin barangay lines on top of the colors (same look as
+              Landslide Zones); click a barangay to see its details. */}
+          {clupOn && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+            return (
+              <GeoJSON key={`clup-line-${b.id}`} data={geo} style={{ color: '#555', weight: 0.5, fillOpacity: 0 }}
+                eventHandlers={{ click: () => setSelectedBarangay(b) }} />
+            )
+          })}
           {hazardLayer === 'landslide' && <ClupLandslideLayer zones={clup.zones} />}
 
           {/* Roads reference overlay — free public Esri tiles, no
