@@ -95,7 +95,10 @@ function DrawClicks({ s }) {
 }
 
 // Map part — goes inside <MapContainer>.
-export function ClupZonesLayer({ s }) {
+// colors: optional { HF: '#…' } to show some CLUP types in another color
+// (GIS Map uses it to show the CLUP water as beige under the Flood Zones).
+export function ClupZonesLayer({ s, colors }) {
+  const colorOf = (h) => (colors && colors[h]) || COLOR[h]
   const { zones, editMode, selectedId, draft, setDraft, drawing } = s
   // In edit mode the areas sit above the boundary lines so they can be clicked.
   const pane = editMode ? 'clup-edit' : 'clup-view'
@@ -119,7 +122,7 @@ export function ClupZonesLayer({ s }) {
           pane={pane}
           positions={toLatLngs(z.geojson)}
           interactive={editMode}
-          pathOptions={{ color: editMode ? '#ffffff' : COLOR[z.hazard], weight: editMode ? 0.8 : 0.5, fillColor: COLOR[z.hazard], fillOpacity: 1 }}
+          pathOptions={{ color: editMode ? '#ffffff' : colorOf(z.hazard), weight: editMode ? 0.8 : 0.5, fillColor: colorOf(z.hazard), fillOpacity: 1 }}
           eventHandlers={editMode ? { click: (e) => {
             L.DomEvent.stopPropagation(e)
             // While drawing a new area, a click on an existing area adds a point.

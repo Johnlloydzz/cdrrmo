@@ -539,7 +539,7 @@ export default function GISMap() {
         <div className="card p-4">
           <h3 className="font-semibold text-sm mb-3">Legend</h3>
           {(() => {
-            const areas = clupOn ? CLUP_HAZARDS.map(h => ({ color: h.color, label: h.short }))
+            const areas = clupOn ? [...CLUP_HAZARDS.map(h => ({ color: h.color, label: h.short })), { color: '#facc15', label: 'Residential area' }]
               : hazardLayer === 'landslide' ? [
                   { color: LANDSLIDE_COLOR.High, label: 'High landslide' },
                   { color: LANDSLIDE_COLOR.Moderate, label: 'Moderate landslide' },
@@ -597,7 +597,25 @@ export default function GISMap() {
             attribution={layer.attribution || '&copy; OpenStreetMap contributors'}
           />
 
-          {clupOn && <ClupZonesLayer s={clup} />}
+          {/* CLUP map = CLUP landslide colors + the SAME flood areas as Flood
+              Zones / Flood Simulation Control (violet + yellow residential).
+              The CLUP's own water is shown beige underneath, so the flood
+              part looks exactly like the Flood view. */}
+          {clupOn && <ClupZonesLayer s={clup} colors={{ HF: FLOOD_COLOR.Low }} />}
+          {/* Drawn in the same see-through pane as the CLUP areas and after
+              them, so they fully cover the colors below (no mixed colors). */}
+          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.boundary_geojson && b.flood_susceptibility === 'High').map(b => {
+            let geo
+            try { geo = JSON.parse(b.flood_area_geojson || b.boundary_geojson) } catch { return null }
+            return <GeoJSON key={`clup-fl-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
+              style={{ stroke: false, fillColor: FLOOD_COLOR.High, fillOpacity: 1 }} />
+          })}
+          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.residential_area_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.residential_area_geojson) } catch { return null }
+            return <GeoJSON key={`clup-res-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
+              style={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 1 }} />
+          })}
           {/* CLUP map: thin barangay lines on top of the colors (same look as
               Landslide Zones); click a barangay to see its details. */}
           {clupOn && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
