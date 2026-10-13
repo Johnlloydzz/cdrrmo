@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown, ArrowLeft } from 'lucide-react'
 import { apiGet } from '../utils/api'
+import { flyToSafe } from '../utils/mapFly'
 import { Skeleton, SkeletonBlock, SkeletonList } from '../components/Skeleton'
 import { purokInHazardArea, effectiveThreshold } from '../utils/geofence'
 
@@ -60,7 +61,7 @@ const CENTER = [8.8231, 125.1109]
 function FlyToHandler({ target }) {
   const map = useMap()
   useEffect(() => {
-    if (target) map.flyTo(target, 17, { duration: 1 })
+    if (target) flyToSafe(map, target, 17, 1)
   }, [target, map])
   return null
 }

@@ -8,6 +8,7 @@ import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, Chevro
 import { prepareSessionHandoff } from '../utils/storage'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { apiGet, apiPut } from '../utils/api'
+import { flyToSafe, closeTooltipsOnDrag } from '../utils/mapFly'
 import { useClupZones, ClupLandslideLayer } from '../components/ClupZones'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -85,7 +86,7 @@ function ClearOnMapClick({ onClear }) {
 
 function FlyToBarangay({ target }) {
   const map = useMap()
-  useEffect(() => { if (target) map.flyTo(target, 15, { duration: 0.8 }) }, [target, map])
+  useEffect(() => { if (target) flyToSafe(map, target, 15) }, [target, map])
   return null
 }
 
@@ -94,6 +95,7 @@ function FlyToBarangay({ target }) {
 // never needs a real window resize (e.g. F11) to display correctly.
 function MapResizeHandler() {
   const map = useMap()
+  useEffect(() => closeTooltipsOnDrag(map), [map])
   useEffect(() => {
     const container = map.getContainer()
     const observer = new ResizeObserver(() => map.invalidateSize())

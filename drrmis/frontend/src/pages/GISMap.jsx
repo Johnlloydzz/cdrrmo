@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
+import { flyToSafe } from '../utils/mapFly'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { useClupZones, ClupZonesLayer, ClupLandslideLayer, CLUP_HAZARDS } from '../components/ClupZones'
 
@@ -155,7 +156,7 @@ function FlyToBoundary({ geojsonLayer, fallbackCenter }) {
       }
     }
     if (fallbackCenter) {
-      map.flyTo(fallbackCenter, 15, { duration: 0.8 })
+      flyToSafe(map, fallbackCenter, 15)
     }
   }, [geojsonLayer, fallbackCenter, map])
   return null
