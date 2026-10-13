@@ -5,6 +5,7 @@ const router = require('express').Router()
 const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
 const { all, get, run } = require('../db/database')
 const { authenticate, authorize } = require('../middleware/auth')
+const { clearAll } = require('../utils/cache')
 const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 // GET /api/account-requests/barangays — public, no auth. Only what the
@@ -124,6 +125,22 @@ router.put('/:id/approve', authorize('CDRRMO Personnel'), async (req, res) => {
       `UPDATE account_requests SET status='Approved', reviewed_by=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
       [req.user.id, req.params.id]
     )
+    // New barangay account → start their "My Barangay Contact Info" from the
+    // request: the contact number, and the name as Captain when the requester
+    // is the captain (position blank or Captain/Kapitan/Punong Barangay).
+    // Only fills what's still empty — never overwrites what the barangay set;
+    // they can change it any time in Settings (e.g. a new captain).
+    if (existing.barangay_id) {
+      const isCaptain = !String(existing.position || '').trim() || /captain|kapitan|punong/i.test(existing.position)
+      await run(
+        `UPDATE barangays SET
+           captain_name   = COALESCE(NULLIF(TRIM(captain_name), ''), ?),
+           contact_number = COALESCE(NULLIF(TRIM(contact_number), ''), ?)
+         WHERE id = ?`,
+        [isCaptain ? (existing.name || null) : null, existing.contact || null, existing.barangay_id]
+      ).then(() => clearAll()) // the map's barangay list is cached for a minute
+        .catch(err => console.error('Contact info prefill skipped:', err.message))
+    }
     res.json(await get('SELECT * FROM account_requests WHERE id = ?', [req.params.id]))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
