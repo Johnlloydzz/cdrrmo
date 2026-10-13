@@ -173,24 +173,33 @@ export default function FloodSimulationControl() {
   // or paused.
   const [autoStatus, setAutoStatus] = useState({})
 
-  const loadLiveData = () => {
-    setLiveLoading(true)
-    setLiveError(false)
+  // `silent` = the automatic refresh: keep showing the current numbers while
+  // the new ones load (no "Loading…" flash), and keep them if a refresh fails.
+  const loadLiveData = (silent = false) => {
+    if (!silent) { setLiveLoading(true); setLiveError(false) }
     Promise.all([
       // current rain + the last 24 hours of hourly rain, so a brief pause in
       // the rain doesn't make it look like nothing fell today
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&hourly=precipitation&past_days=1&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
       fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json()),
     ])
-      .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood); setLiveUpdatedAt(new Date()) })
-      .catch(() => setLiveError(true))
-      .finally(() => setLiveLoading(false))
+      .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood); setLiveUpdatedAt(new Date()); setLiveError(false) })
+      .catch(() => { if (!silent) setLiveError(true) })
+      .finally(() => { if (!silent) setLiveLoading(false) })
   }
 
+  // Refreshes by itself every 5 minutes (the weather model's "rain now"
+  // changes every 15 minutes, so faster gives nothing new), and right away
+  // when you come back to this tab — browsers pause timers in hidden tabs.
   useEffect(() => {
     loadLiveData()
-    const interval = setInterval(loadLiveData, 5 * 60000)
-    return () => clearInterval(interval)
+    let lastAuto = Date.now()
+    const interval = setInterval(() => { lastAuto = Date.now(); loadLiveData(true) }, 5 * 60000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastAuto > 60000) { lastAuto = Date.now(); loadLiveData(true) }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
   }, [])
 
   // Today's discharge vs. the last 30 days' average for this same river
@@ -493,7 +502,7 @@ export default function FloodSimulationControl() {
                       <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
                       Live Reference
                     </h3>
-                    <button type="button" onClick={loadLiveData} className="text-xs text-primary-600 hover:text-primary-800">Refresh</button>
+                    <button type="button" onClick={() => loadLiveData()} className="text-xs text-primary-600 hover:text-primary-800">Refresh</button>
                   </div>
                   {liveLoading ? (
                     <p className="text-xs text-gray-400">Loading live data…</p>
@@ -537,6 +546,7 @@ export default function FloodSimulationControl() {
                       <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                         Updated {liveUpdatedAt ? liveUpdatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—'}
+                        <span className="text-gray-400">· auto every 5 min</span>
                       </p>
                       <p className="text-[10px] text-gray-400 mt-1 cursor-help" title="Refreshes every 5 minutes. &quot;Rain now&quot; is the rain at this moment and shows 0 during a pause. River discharge is volume flow, not water depth.">
                         Source: Open-Meteo, GloFAS
