@@ -8,6 +8,17 @@
 // nearest whole zoom level, and the user's own movement then works normally.
 export function flyToSafe(map, target, zoom, duration = 0.8) {
   if (!map || !target) return
+  safeFlight(map, () => map.flyTo(target, zoom, { duration }))
+}
+
+// Same as flyToSafe, but flies to fit a whole area (e.g. a barangay boundary)
+// with a smooth fly animation instead of an instant jump.
+export function flyToBoundsSafe(map, bounds, { padding = [30, 30], duration = 0.9 } = {}) {
+  if (!map || !bounds || !bounds.isValid()) return
+  safeFlight(map, () => map.flyToBounds(bounds, { padding, duration }))
+}
+
+function safeFlight(map, start) {
   const el = map.getContainer()
   const events = ['mousedown', 'touchstart', 'wheel']
   let done = false
@@ -25,7 +36,7 @@ export function flyToSafe(map, target, zoom, duration = 0.8) {
   }
   events.forEach(ev => el.addEventListener(ev, interrupt, { capture: true, passive: true }))
   map.once('moveend', cleanup)
-  map.flyTo(target, zoom, { duration })
+  start()
 }
 
 // Closes hover labels (tooltips) when the user starts dragging the map, so a

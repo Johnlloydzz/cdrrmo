@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
-import { flyToSafe } from '../utils/mapFly'
+import { flyToSafe, flyToBoundsSafe } from '../utils/mapFly'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { useClupZones, ClupZonesLayer, ClupLandslideLayer, CLUP_HAZARDS } from '../components/ClupZones'
 
@@ -151,7 +151,7 @@ function FlyToBoundary({ geojsonLayer, fallbackCenter }) {
     if (geojsonLayer) {
       const bounds = geojsonLayer.getBounds()
       if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [30, 30] })
+        flyToBoundsSafe(map, bounds) // smooth fly, like the other maps
         return
       }
     }
