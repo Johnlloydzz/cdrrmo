@@ -33,6 +33,11 @@ function computeAge(birthdate) {
   return Math.floor(ageMs / (1000 * 60 * 60 * 24 * 365.25))
 }
 
+// Barangay Officials see their barangay's own numbering (RES-00001 = first
+// resident of their barangay); CDRRMO sees the city-wide resident ID.
+const residentNo = (r, user) =>
+  user?.role === 'Barangay Official' && r?.brgy_no ? `RES-${String(r.brgy_no).padStart(5, '0')}` : r?.resident_id
+
 export default function ResidentManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [search, setSearch] = useState('')
@@ -155,7 +160,7 @@ export default function ResidentManagement({ currentUser }) {
               {loading ? <SkeletonTableRows columns={10} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="table-cell font-mono text-primary-700">{r.resident_id}</td>
+                  <td className="table-cell font-mono text-primary-700">{residentNo(r, currentUser)}</td>
                   {!canAdd && <td className="table-cell">{r.barangay_name || '—'}</td>}
                   <td className="table-cell">{r.purok_name || '—'}</td>
                   <td className="table-cell font-mono text-xs">{r.hh_code || <span className="font-sans text-gray-400">Not assigned</span>}</td>

@@ -93,6 +93,18 @@ router.get('/stats', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// For a Barangay Official: the resident's number inside their barangay
+// (1st registered = 1), shown as RES-00001, RES-00002 … on their screens.
+// Counted on the fly — nothing extra is stored. CDRRMO keeps the city-wide ID.
+function brgyNoSql(req) {
+  if (req.user.role !== 'Barangay Official') return { sql: '', params: [] }
+  return {
+    sql: `, (SELECT COUNT(*) FROM residents r2 LEFT JOIN households h2 ON h2.id = r2.household_id
+             WHERE (r2.barangay_id = ? OR (r2.barangay_id IS NULL AND h2.barangay_id = ?)) AND r2.id <= r.id) AS brgy_no`,
+    params: [req.user.barangay_id, req.user.barangay_id],
+  }
+}
+
 // GET /api/residents?page=1&limit=50[&search=...] — one page + the total,
 // searched in the database (name, barangay or purok).
 async function listResidentsPage(req, res) {
@@ -103,11 +115,12 @@ async function listResidentsPage(req, res) {
     where += ' AND (r.name LIKE ? OR b.name LIKE ? OR p.name LIKE ?)'
     params = [...params, `%${search}%`, `%${search}%`, `%${search}%`]
   }
+  const no = brgyNoSql(req)
   const [countRow, rows] = await Promise.all([
     get(`SELECT COUNT(*) AS n ${RESIDENT_FROM} ${where}`, params),
     all(`SELECT r.*, h.household_id AS hh_code, b.name AS barangay_name, p.name AS purok_name,
-                COALESCE(h.purok_id, r.purok_id) AS effective_purok_id
-         ${RESIDENT_FROM} ${where} ORDER BY r.id LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]),
+                COALESCE(h.purok_id, r.purok_id) AS effective_purok_id${no.sql}
+         ${RESIDENT_FROM} ${where} ORDER BY r.id LIMIT ? OFFSET ?`, [...no.params, ...params, limit, (page - 1) * limit]),
   ])
   res.json({
     rows: rows.map(r => ({ ...r, age_bracket: computeAgeBracket(r.birthdate) || r.age_bracket })),
@@ -123,13 +136,14 @@ router.get('/', async (req, res) => {
     // A resident's barangay is their own barangay_id (set at registration,
     // since they can exist before being assigned to a household), falling
     // back to their household's barangay for older records.
-    let sql = `SELECT r.*, h.household_id as hh_code, b.name as barangay_name, p.name as purok_name
+    const no = brgyNoSql(req)
+    let sql = `SELECT r.*, h.household_id as hh_code, b.name as barangay_name, p.name as purok_name${no.sql}
                FROM residents r
                LEFT JOIN households h ON r.household_id = h.id
                LEFT JOIN barangays b ON b.id = COALESCE(r.barangay_id, h.barangay_id)
                LEFT JOIN puroks p ON p.id = COALESCE(h.purok_id, r.purok_id)
                WHERE 1=1`
-    const params = []
+    const params = [...no.params]
     // Barangay Officials only ever see residents of their own barangay —
     // enforced server-side, not just hidden in the UI.
     if (req.user.role === 'Barangay Official') { sql += ' AND (r.barangay_id = ? OR (r.barangay_id IS NULL AND h.barangay_id = ?))'; params.push(req.user.barangay_id, req.user.barangay_id) }

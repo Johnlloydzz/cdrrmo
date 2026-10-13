@@ -9,6 +9,11 @@ import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skel
 
 const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '' }
 
+// Barangay Officials see their barangay's own numbering (RES-00001 = first
+// resident of their barangay); CDRRMO sees the city-wide resident ID.
+const residentNo = (r, user) =>
+  user?.role === 'Barangay Official' && r?.brgy_no ? `RES-${String(r.brgy_no).padStart(5, '0')}` : r?.resident_id
+
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [search, setSearch] = useState('')
@@ -181,7 +186,7 @@ export default function HouseholdManagement({ currentUser }) {
                   <label className="label">Head of Family</label>
                   <select className="input" value={form.head_resident_id} onChange={e => setForm({...form, head_resident_id: e.target.value})} disabled={headsLoading}>
                     <option value="">{headsLoading ? 'Loading residents…' : 'Select the Head of Family…'}</option>
-                    {headOptions.map(r => <option key={r.id} value={r.id}>{r.name} ({r.resident_id})</option>)}
+                    {headOptions.map(r => <option key={r.id} value={r.id}>{r.name} ({residentNo(r, currentUser)})</option>)}
                   </select>
                   {!headsLoading && headOptions.length === 0 ? (
                     <p className="text-xs text-amber-600 mt-1">
