@@ -34,8 +34,11 @@ router.post('/', async (req, res) => {
     } else {
       return res.status(403).json({ error: 'You do not have permission to add puroks.' })
     }
-    const { name, boundary_geojson } = req.body
+    const { boundary_geojson } = req.body
+    const name = String(req.body.name || '').trim()
     if (!barangay_id || !name) return res.status(400).json({ error: 'barangay_id and name are required' })
+    const nameError = await purokNameError(barangay_id, name)
+    if (nameError) return res.status(400).json({ error: nameError })
     // Flood/landslide risk and threshold are official CDRA classifications —
     // only CDRRMO Personnel can set them. A Barangay Official adding a new
     // purok always gets the safe defaults here; a CDRRMO Personnel can set
@@ -59,6 +62,12 @@ router.post('/', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// A barangay can't have two puroks with the same name (case-insensitive).
+async function purokNameError(barangay_id, name, exceptId = null) {
+  const dup = await get('SELECT id FROM puroks WHERE barangay_id = ? AND LOWER(TRIM(name)) = LOWER(?) AND id != ?', [barangay_id, name, exceptId ?? -1])
+  return dup ? `There is already a purok named "${name}" in this barangay.` : null
+}
+
 // PUT /api/puroks/:id
 router.put('/:id', async (req, res) => {
   try {
@@ -76,7 +85,12 @@ router.put('/:id', async (req, res) => {
     // it. Conversely, only the Barangay Official can rename or redraw the
     // boundary of an existing purok — CDRRMO can view it but not touch it,
     // since only the barangay actually knows its own puroks' boundaries.
-    const name = req.user.role === 'CDRRMO Personnel' ? existing.name : (req.body.name ?? existing.name)
+    const name = req.user.role === 'CDRRMO Personnel' ? existing.name : String(req.body.name ?? existing.name).trim()
+    if (!name) return res.status(400).json({ error: 'Purok name is required.' })
+    if (name.toLowerCase() !== String(existing.name).toLowerCase()) {
+      const nameError = await purokNameError(existing.barangay_id, name, existing.id)
+      if (nameError) return res.status(400).json({ error: nameError })
+    }
     const boundary_geojson = req.user.role === 'CDRRMO Personnel' ? existing.boundary_geojson : (req.body.boundary_geojson ?? existing.boundary_geojson)
     const flood_risk = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_risk ?? existing.flood_risk) : existing.flood_risk
     const flood_threshold_m = req.user.role === 'CDRRMO Personnel' ? (req.body.flood_threshold_m ?? existing.flood_threshold_m) : existing.flood_threshold_m
