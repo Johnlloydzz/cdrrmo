@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Phone } from 'lucide-react'
 import { apiGet, apiPost } from '../../utils/api'
 import DropdownSelect from '../../components/DropdownSelect'
 import AuthCard, { FieldLabel, FieldError, SubmitButton, SuccessPanel } from '../../components/AuthCard'
@@ -123,10 +124,17 @@ export default function RequestAccount() {
               </div>
               <div>
                 <FieldLabel htmlFor="ra-contact" required hint={form.contact ? `${form.contact.length}/11` : ''}>Contact Number</FieldLabel>
-                <input id="ra-contact" data-field="contact" className={inputCls('contact')} type="tel" inputMode="numeric" maxLength={11}
-                  value={form.contact} onChange={e => set('contact', e.target.value.replace(/\D/g, '').slice(0, 11))}
-                  placeholder="09XXXXXXXXX" autoComplete="tel" aria-invalid={!!errors.contact} aria-describedby="ra-contact-err" />
+                <div className="relative">
+                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input id="ra-contact" data-field="contact" className={`${inputCls('contact')} pl-9`} type="tel" inputMode="numeric" maxLength={11}
+                    value={form.contact} onChange={e => set('contact', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="09XXXXXXXXX" autoComplete="tel" aria-invalid={!!errors.contact} aria-describedby="ra-contact-err" />
+                </div>
                 <FieldError id="ra-contact-err">{errors.contact}</FieldError>
+                {/* Live hint while typing (same as Register Resident), before Submit is pressed */}
+                {!errors.contact && form.contact && !/^09\d{9}$/.test(form.contact) && (
+                  <p className="text-xs text-amber-600 mt-1">{!/^0(9|$)/.test(form.contact) ? 'Must be a Philippine mobile number starting with 09.' : `Must be exactly 11 digits (${form.contact.length}/11).`}</p>
+                )}
               </div>
               <div>
                 <FieldLabel required>Barangay</FieldLabel>
