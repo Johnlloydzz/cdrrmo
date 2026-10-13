@@ -14,9 +14,15 @@ const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resi
 const residentNo = (r, user) =>
   user?.role === 'Barangay Official' && r?.brgy_no ? `RES-${String(r.brgy_no).padStart(5, '0')}` : r?.resident_id
 
+// Same for households: Barangay Officials see their barangay's own auto
+// numbering (HH-00001 …); typed numbers and CDRRMO's view stay as they are.
+const householdNo = (no, code, user) =>
+  user?.role === 'Barangay Official' && no ? `HH-${String(no).padStart(5, '0')}` : code
+
 export default function HouseholdManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [search, setSearch] = useState('')
+  const [editingNo, setEditingNo] = useState('')
   // One page of households at a time, searched on the server.
   const list = usePagedList('/households', { search })
   const { rows: households, loading } = list
@@ -76,8 +82,11 @@ export default function HouseholdManagement({ currentUser }) {
   }
   const openEdit = (h) => {
     setEditing(h.id)
+    // An auto number is shown as the barangay's own HH-xxxxx; the box stays
+    // blank (blank = keep the current number) so saving never renumbers it.
+    setEditingNo(householdNo(h.hh_no, h.household_id, currentUser))
     setForm({
-      household_code: h.household_id || '', barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_resident_id: '',
+      household_code: (currentUser?.role === 'Barangay Official' && h.hh_no) ? '' : (h.household_id || ''), barangay_id: h.barangay_id || '', purok_id: h.purok_id || '', head_resident_id: '',
     })
     loadHeads(h)
     setShowModal(true)
@@ -125,7 +134,7 @@ export default function HouseholdManagement({ currentUser }) {
               {loading ? <SkeletonTableRows columns={5} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(h => (
                 <tr key={h.id} className="hover:bg-gray-50">
-                  <td className="table-cell font-mono text-primary-700">{h.household_id}</td>
+                  <td className="table-cell font-mono text-primary-700">{householdNo(h.hh_no, h.household_id, currentUser)}</td>
                   {!canAdd && <td className="table-cell">{h.barangay_name || '—'}</td>}
                   <td className="table-cell">
                     {h.purok_name || '—'}
@@ -162,7 +171,7 @@ export default function HouseholdManagement({ currentUser }) {
                   <input
                     className="input"
                     maxLength={30}
-                    placeholder={editing ? 'Household number' : 'Leave blank to auto-generate (HH-00001…)'}
+                    placeholder={editing ? (editingNo || 'Household number') : 'Leave blank to auto-generate (HH-00001…)'}
                     value={form.household_code}
                     onChange={e => setForm({ ...form, household_code: e.target.value.toUpperCase() })}
                   />

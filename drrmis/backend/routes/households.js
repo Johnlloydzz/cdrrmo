@@ -6,6 +6,15 @@ const { loadRiskContext, withHouseholdRisk, purokRiskRows } = require('../utils/
 router.use(authenticate)
 
 
+// For a Barangay Official: an auto-numbered household's number inside their
+// barangay (1st = 1), shown as HH-00001, HH-00002 … on their screens.
+// Counted on the fly — nothing extra is stored. Typed household numbers are
+// shown as typed; CDRRMO keeps the city-wide number.
+const hhNoSql = (req) => req.user.role === 'Barangay Official'
+  ? `, CASE WHEN h.household_id GLOB 'HH-[0-9]*' THEN (SELECT COUNT(*) FROM households hx
+             WHERE hx.barangay_id = h.barangay_id AND hx.household_id GLOB 'HH-[0-9]*' AND hx.id <= h.id) END AS hh_no`
+  : ''
+
 // GET /api/households?page=1&limit=50[&search=&barangay_id=&purok_id=&at_risk=1&hazard=flood|landslide]
 // One page of households + the total, filtered and searched in the database
 // (not in the browser) so it stays fast with tens of thousands of records.
@@ -39,7 +48,7 @@ async function listHouseholdsPage(req, res) {
     get(`SELECT COUNT(*) AS n ${from}`, params),
     all(`SELECT h.id, h.household_id, h.barangay_id, h.purok_id, h.head_family, h.created_at,
                 b.name AS barangay_name, p.name AS purok_name,
-                (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count
+                (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count${hhNoSql(req)}
          ${from} ORDER BY h.id LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]),
   ])
   res.json({
@@ -64,7 +73,7 @@ router.get('/', async (req, res) => {
     const barangay_id = req.user.role === 'Barangay Official' ? req.user.barangay_id : req.query.barangay_id
     let sql = `SELECT h.*, b.name as barangay_name, b.flood_susceptibility as barangay_flood_susceptibility, b.flood_area_geojson as barangay_flood_area, b.landslide_area_geojson as barangay_landslide_area, p.name as purok_name, p.flood_risk as purok_flood_risk, p.flood_threshold_m, p.landslide_risk as purok_landslide_risk,
                       p.latitude as purok_point_lat, p.longitude as purok_point_lng, p.boundary_geojson as purok_boundary,
-                      (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count
+                      (SELECT COUNT(*) FROM residents r WHERE r.household_id = h.id) AS member_count${hhNoSql(req)}
                FROM households h
                LEFT JOIN barangays b ON h.barangay_id = b.id
                LEFT JOIN puroks p ON h.purok_id = p.id

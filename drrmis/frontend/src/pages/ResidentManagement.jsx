@@ -38,6 +38,11 @@ function computeAge(birthdate) {
 const residentNo = (r, user) =>
   user?.role === 'Barangay Official' && r?.brgy_no ? `RES-${String(r.brgy_no).padStart(5, '0')}` : r?.resident_id
 
+// Same for households: Barangay Officials see their barangay's own auto
+// numbering (HH-00001 …); typed numbers and CDRRMO's view stay as they are.
+const householdNo = (no, code, user) =>
+  user?.role === 'Barangay Official' && no ? `HH-${String(no).padStart(5, '0')}` : code
+
 export default function ResidentManagement({ currentUser }) {
   const canAdd = currentUser?.role === 'Barangay Official'
   const [search, setSearch] = useState('')
@@ -163,7 +168,7 @@ export default function ResidentManagement({ currentUser }) {
                   <td className="table-cell font-mono text-primary-700">{residentNo(r, currentUser)}</td>
                   {!canAdd && <td className="table-cell">{r.barangay_name || '—'}</td>}
                   <td className="table-cell">{r.purok_name || '—'}</td>
-                  <td className="table-cell font-mono text-xs">{r.hh_code || <span className="font-sans text-gray-400">Not assigned</span>}</td>
+                  <td className="table-cell font-mono text-xs">{householdNo(r.hh_no, r.hh_code, currentUser) || <span className="font-sans text-gray-400">Not assigned</span>}</td>
                   <td className="table-cell font-medium">{r.name}</td>
                   <td className="table-cell">{r.sex || '—'}</td>
                   <td className="table-cell">{formatBirthdate(r.birthdate)}</td>
@@ -210,7 +215,7 @@ export default function ResidentManagement({ currentUser }) {
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1.5 mb-2"><Home size={13} className="text-primary-500" /> Household</label>
                 <select className="input" value={form.household_id} onChange={e => setForm({...form, household_id: e.target.value})} disabled={!purokFilter}>
                   <option value="">No household yet — assign later</option>
-                  {households.filter(h => purokFilter && String(h.purok_id) === String(purokFilter)).map(h => <option key={h.id} value={h.id}>{h.household_id} — {h.head_family}</option>)}
+                  {households.filter(h => purokFilter && String(h.purok_id) === String(purokFilter)).map(h => <option key={h.id} value={h.id}>{householdNo(h.hh_no, h.household_id, currentUser)} — {h.head_family}</option>)}
                 </select>
                 {purokFilter && households.filter(h => String(h.purok_id) === String(purokFilter)).length === 0 && (
                   <p className="text-xs text-amber-600 mt-2">No households registered in this purok yet.</p>

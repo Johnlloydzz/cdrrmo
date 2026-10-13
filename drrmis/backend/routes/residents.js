@@ -94,13 +94,16 @@ router.get('/stats', async (req, res) => {
 })
 
 // For a Barangay Official: the resident's number inside their barangay
-// (1st registered = 1), shown as RES-00001, RES-00002 … on their screens.
+// (1st registered = 1), shown as RES-00001, RES-00002 … on their screens,
+// and the same for their household's auto number (HH-00001 …).
 // Counted on the fly — nothing extra is stored. CDRRMO keeps the city-wide ID.
 function brgyNoSql(req) {
   if (req.user.role !== 'Barangay Official') return { sql: '', params: [] }
   return {
     sql: `, (SELECT COUNT(*) FROM residents r2 LEFT JOIN households h2 ON h2.id = r2.household_id
-             WHERE (r2.barangay_id = ? OR (r2.barangay_id IS NULL AND h2.barangay_id = ?)) AND r2.id <= r.id) AS brgy_no`,
+             WHERE (r2.barangay_id = ? OR (r2.barangay_id IS NULL AND h2.barangay_id = ?)) AND r2.id <= r.id) AS brgy_no,
+          CASE WHEN h.household_id GLOB 'HH-[0-9]*' THEN (SELECT COUNT(*) FROM households hx
+             WHERE hx.barangay_id = h.barangay_id AND hx.household_id GLOB 'HH-[0-9]*' AND hx.id <= h.id) END AS hh_no`,
     params: [req.user.barangay_id, req.user.barangay_id],
   }
 }
