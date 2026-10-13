@@ -599,16 +599,8 @@ export default function GISMap() {
 
           {/* CLUP map = all CLUP colors (incl. its violet water in the rural
               barangays) + the SAME flood areas as Flood Zones / Flood
-              Simulation Control (violet + yellow residential) on top. The
-              Poblacion barangays (mapped in detail by the CDRA urban map) are
-              first painted beige, so there they look exactly like the Flood view. */}
+              Simulation Control (violet + yellow residential) on top. */}
           {clupOn && <ClupZonesLayer s={clup} />}
-          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.boundary_geojson && /\(Pob\.\)/.test(b.name)).map(b => {
-            let geo
-            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-            return <GeoJSON key={`clup-pob-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
-              style={{ stroke: false, fillColor: FLOOD_COLOR.Low, fillOpacity: 1 }} />
-          })}
           {/* Drawn in the same see-through pane as the CLUP areas and after
               them, so they fully cover the colors below (no mixed colors). */}
           {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.boundary_geojson && b.flood_susceptibility === 'High').map(b => {
