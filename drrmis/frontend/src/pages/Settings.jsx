@@ -52,6 +52,9 @@ export default function Settings({ currentUser }) {
     }
   }
 
+  // Emergency number: blank, or an 11-digit mobile number starting with 09.
+  const contactInvalid = !!myBarangay.contact_number && !/^09\d{9}$/.test(myBarangay.contact_number)
+
   const handleSaveBarangay = async () => {
     setBarangaySaving(true)
     setBarangayError('')
@@ -81,15 +84,18 @@ export default function Settings({ currentUser }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">Captain Name</label>
-              {brgyLoading ? <InputSkeleton /> : <input className="input" value={myBarangay.captain_name} onChange={e => setMyBarangay({ ...myBarangay, captain_name: e.target.value })} placeholder="e.g. Juan Dela Cruz" />}
+              {brgyLoading ? <InputSkeleton /> : <input className="input" maxLength={100} value={myBarangay.captain_name} onChange={e => setMyBarangay({ ...myBarangay, captain_name: e.target.value })} placeholder="e.g. Juan Dela Cruz" />}
             </div>
             <div>
               <label className="label">Emergency Contact Number</label>
-              {brgyLoading ? <InputSkeleton /> : <input className="input" type="tel" value={myBarangay.contact_number} onChange={e => setMyBarangay({ ...myBarangay, contact_number: e.target.value })} placeholder="09XXXXXXXXX" />}
+              {brgyLoading ? <InputSkeleton /> : <input className="input" type="tel" inputMode="numeric" maxLength={11} value={myBarangay.contact_number} onChange={e => setMyBarangay({ ...myBarangay, contact_number: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="09XXXXXXXXX" />}
+              {!brgyLoading && contactInvalid && (
+                <p className="text-xs text-amber-600 mt-1">{!/^0(9|$)/.test(myBarangay.contact_number) ? 'Must be a Philippine mobile number starting with 09.' : `Must be exactly 11 digits (${myBarangay.contact_number.length}/11).`}</p>
+              )}
             </div>
           </div>
           <div className="flex justify-end mt-5">
-            <button className="btn-primary flex items-center gap-2" onClick={handleSaveBarangay} disabled={barangaySaving || brgyLoading || brgyLoadFailed}>
+            <button className="btn-primary flex items-center gap-2" onClick={handleSaveBarangay} disabled={barangaySaving || brgyLoading || brgyLoadFailed || contactInvalid}>
               <Save size={15} /> {barangaySaving ? 'Saving…' : 'Save Contact Info'}
             </button>
           </div>
@@ -106,19 +112,19 @@ export default function Settings({ currentUser }) {
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="label">System Name</label>
-            {loading ? <InputSkeleton /> : <input className="input" value={system.name} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, name: e.target.value })} />}
+            {loading ? <InputSkeleton /> : <input className="input" maxLength={100} value={system.name} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, name: e.target.value })} />}
           </div>
           <div>
             <label className="label">Address</label>
-            {loading ? <InputSkeleton /> : <input className="input" value={system.address} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, address: e.target.value })} />}
+            {loading ? <InputSkeleton /> : <input className="input" maxLength={200} value={system.address} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, address: e.target.value })} />}
           </div>
           <div>
             <label className="label">Contact Number</label>
-            {loading ? <InputSkeleton /> : <input className="input" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value })} />}
+            {loading ? <InputSkeleton /> : <input className="input" type="tel" maxLength={20} placeholder="e.g. (088) 861-1234" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value.replace(/[^0-9+()\- ]/g, '') })} />}
           </div>
           <div className="col-span-2">
             <label className="label">Email</label>
-            {loading ? <InputSkeleton /> : <input className="input" type="email" value={system.email} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, email: e.target.value })} />}
+            {loading ? <InputSkeleton /> : <input className="input" type="email" maxLength={100} value={system.email} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, email: e.target.value })} />}
           </div>
         </div>
       </div>

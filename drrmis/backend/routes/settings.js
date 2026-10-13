@@ -241,7 +241,14 @@ router.put('/system-info', async (req, res) => {
     if (req.user.role !== 'CDRRMO Personnel') {
       return res.status(403).json({ error: 'Only CDRRMO Personnel can update system information.' })
     }
-    const { name, address, contact, email } = req.body
+    const name = String(req.body.name ?? '').trim()
+    const address = String(req.body.address ?? '').trim()
+    const contact = String(req.body.contact ?? '').trim()
+    const email = String(req.body.email ?? '').trim()
+    if (name.length > 100 || address.length > 200) return res.status(400).json({ error: 'System name or address is too long.' })
+    // Office number may be a landline or hotline, e.g. (088) 861-1234 or 911.
+    if (contact && !/^[0-9+()\- ]{3,20}$/.test(contact)) return res.status(400).json({ error: 'Contact number may only use digits, spaces, +, - and ( ) (max 20 characters).' })
+    if (email && (email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return res.status(400).json({ error: 'Enter a valid email address.' })
     const entries = [['system_name', name], ['system_address', address], ['system_contact', contact], ['system_email', email]]
     await Promise.all(entries.map(([key, value]) =>
       run(

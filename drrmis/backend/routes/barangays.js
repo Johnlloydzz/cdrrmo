@@ -166,7 +166,13 @@ router.put('/:id/contact', async (req, res) => {
     }
     const current = await get('SELECT id FROM barangays WHERE id = ?', [req.params.id])
     if (!current) return res.status(404).json({ error: 'Not found' })
-    const { captain_name, contact_number } = req.body
+    const captain_name = String(req.body.captain_name ?? '').trim()
+    const contact_number = String(req.body.contact_number ?? '').trim()
+    if (captain_name.length > 100) return res.status(400).json({ error: 'Captain name is too long (max 100 characters).' })
+    // Same rule as residents: a Philippine mobile number, 11 digits, 09…
+    if (contact_number && (!/^09\d{9}$/.test(contact_number) || /^09(\d)\1{8}$/.test(contact_number))) {
+      return res.status(400).json({ error: 'Enter a valid Philippine mobile number: 11 digits starting with 09.' })
+    }
     await run(
       `UPDATE barangays SET captain_name=?, contact_number=?, updated_at=datetime('now', '+8 hours') WHERE id=?`,
       [captain_name || null, contact_number || null, req.params.id]
