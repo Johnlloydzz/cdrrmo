@@ -33,6 +33,19 @@ function getRainfallWarning(mm) {
   return { level: 'None', color: '#16a34a', bg: '#f0fdf4', message: 'No heavy rainfall.' }
 }
 
+// What the weather model says it is doing right now (WMO weather code from
+// Open-Meteo). Light drizzle is often less than 0.1 mm, so "Rain now" can
+// read 0 mm while the model itself says it is raining — this label shows it.
+function weatherCodeLabel(code) {
+  if (code == null) return null
+  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle'
+  if (code === 61 || code === 80) return 'Light rain'
+  if (code === 63 || code === 81) return 'Moderate rain'
+  if (code === 65 || code === 82) return 'Heavy rain'
+  if (code >= 95) return 'Thunderstorm'
+  return null
+}
+
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors —
 // same palette as Hazard Map & Geofencing, matching the City of Gingoog CLUP
 // Landslide and Flood Susceptibility Map.
@@ -180,7 +193,7 @@ export default function FloodSimulationControl() {
     Promise.all([
       // current rain + the last 24 hours of hourly rain, so a brief pause in
       // the rain doesn't make it look like nothing fell today
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain&hourly=precipitation&past_days=1&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CENTER[0]}&longitude=${CENTER[1]}&current=precipitation,rain,weather_code&hourly=precipitation&past_days=1&forecast_days=1&timezone=Asia%2FManila`).then(r => r.json()),
       fetch(`https://flood-api.open-meteo.com/v1/flood?latitude=${CENTER[0]}&longitude=${CENTER[1]}&daily=river_discharge&forecast_days=3&past_days=30`).then(r => r.json()),
     ])
       .then(([weather, flood]) => { setLiveWeather(weather); setLiveFlood(flood); setLiveUpdatedAt(new Date()); setLiveError(false) })
@@ -532,6 +545,9 @@ export default function FloodSimulationControl() {
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.precipitation ?? '—'} mm</p>
                           <p className="text-[9px] text-gray-500 uppercase">Rain now</p>
+                          {weatherCodeLabel(liveWeather?.current?.weather_code) && (
+                            <p className="text-[9px] text-blue-600 leading-tight mt-0.5">{weatherCodeLabel(liveWeather.current.weather_code)}</p>
+                          )}
                         </div>
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-blue-700">{rain24h ?? '—'} mm</p>
