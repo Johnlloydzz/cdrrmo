@@ -3,6 +3,25 @@ const router = require('express').Router()
 const { hashPassword } = require('../utils/password')
 const { all, get, run, getDb } = require('../db/database')
 const { authenticate, authorize, forgetUser } = require('../middleware/auth')
+const { clearAll } = require('../utils/cache')
+
+// The barangay's Captain / Contact belong to its Barangay Official. When the
+// barangay no longer has an official account (deleted, moved to another
+// barangay, or changed to CDRRMO — e.g. a new captain after an election), clear
+// them so the next official starts fresh (and the account-request prefill can
+// fill them again).
+async function clearContactIfNoOfficial(barangayId) {
+  if (!barangayId) return
+  try {
+    const r = await run(
+      `UPDATE barangays SET captain_name = NULL, contact_number = NULL, updated_at = datetime('now', '+8 hours')
+       WHERE id = ? AND (captain_name IS NOT NULL OR contact_number IS NOT NULL)
+         AND NOT EXISTS (SELECT 1 FROM users WHERE role = 'Barangay Official' AND barangay_id = ?)`,
+      [barangayId, barangayId]
+    )
+    if (r?.changes) clearAll() // the map's barangay list is cached for a minute
+  } catch (err) { console.error('Clear barangay contact skipped:', err.message) }
+}
 
 // Sends the username + password to the user's email. Never throws: returns
 // { email_sent, email_error } for the User Management screen.
@@ -83,7 +102,7 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
 router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const isSelf = String(req.params.id) === String(req.user.id)
-    const target = await get('SELECT id FROM users WHERE id = ?', [req.params.id])
+    const target = await get('SELECT id, role, barangay_id FROM users WHERE id = ?', [req.params.id])
     if (!target) return res.status(404).json({ error: 'User not found.' })
     const { name, email, password } = req.body
     // You can't demote or deactivate your own account (you'd lock yourself out).
@@ -106,6 +125,9 @@ router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
       )
     }
     forgetUser(req.params.id) // role / barangay / Inactive applies on their next click
+    if (target.role === 'Barangay Official' && (role !== 'Barangay Official' || Number(barangay_id) !== Number(target.barangay_id))) {
+      await clearContactIfNoOfficial(target.barangay_id)
+    }
     const user = await get('SELECT id, name, username, email, role, barangay_id, status FROM users WHERE id = ?', [req.params.id])
     // A new password was set → email it to the account holder.
     const email_result = password && password.trim()
@@ -124,6 +146,7 @@ router.delete('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
     // Clear everything that points at this user first, in one atomic batch,
     // so the delete works whether or not the database enforces foreign keys.
     const id = req.params.id
+    const old = await get('SELECT role, barangay_id FROM users WHERE id = ?', [id])
     await getDb().batch([
       { sql: 'UPDATE account_requests SET reviewed_by = NULL WHERE reviewed_by = ?', args: [id] },
       { sql: 'UPDATE password_reset_requests SET reviewed_by = NULL WHERE reviewed_by = ?', args: [id] },
@@ -133,6 +156,7 @@ router.delete('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
       { sql: 'DELETE FROM users WHERE id = ?', args: [id] },
     ], 'write')
     forgetUser(id) // signed out on their next click
+    if (old?.role === 'Barangay Official') await clearContactIfNoOfficial(old.barangay_id)
     res.json({ message: 'Deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })

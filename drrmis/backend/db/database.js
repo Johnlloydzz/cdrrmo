@@ -200,6 +200,21 @@ async function ensureIndexes() {
   }
 }
 
+// One-time cleanup: Captain / Contact left on barangays whose Barangay
+// Official account was deleted before routes/users.js started clearing them.
+async function clearOrphanBarangayContacts() {
+  try {
+    const done = await get("SELECT value FROM system_settings WHERE key = 'orphan_contacts_cleared'")
+    if (done) return
+    const r = await run(`UPDATE barangays SET captain_name = NULL, contact_number = NULL
+      WHERE (captain_name IS NOT NULL OR contact_number IS NOT NULL)
+        AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role = 'Barangay Official' AND u.barangay_id = barangays.id)`)
+    await run(`INSERT INTO system_settings (key, value, updated_at) VALUES ('orphan_contacts_cleared', '1', datetime('now', '+8 hours'))
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`)
+    console.log(`Barangay contacts without an official account cleared: ${r?.changes || 0}.`)
+  } catch (err) { console.log('Orphan contact cleanup skipped:', err.message) }
+}
+
 async function initDb() {
   const schema = require('./schema')
   // All CREATE TABLE IF NOT EXISTS statements in one round trip.
@@ -210,6 +225,7 @@ async function initDb() {
   await seedBarangays()
   // These don't depend on each other — run them at the same time.
   await Promise.all([seedDefaultAdmin(), seedBoundaries(), selfHealPurokNames(), seedClupZones()])
+  await clearOrphanBarangayContacts()
   // After boundaries exist: trace of the CDRA urban flood map (once only).
   try { await require('../utils/cdraFlood').seedCdraUrbanFlood() } catch (err) { console.log('CDRA flood seed skipped:', err.message) }
   console.log('Database initialized.')
