@@ -1,8 +1,10 @@
 // PDRA (Pre-Disaster Risk Assessment) — Database Schema
 // Gingoog City CDRRMO
-// 5 tables only, matching Chapter 1 Section 1.5 (Scope):
-// Household and Population Management, Web-Based Hazard Mapping,
-// Geofencing, Risk Assessment Dashboard, User Management
+// Main tables (Chapter 1 Section 1.5 scope): users, barangays, puroks,
+// households, residents. Supporting tables: system_settings, password_resets,
+// account_requests, password_reset_requests, notifications, clup_zones.
+// This is the full, current structure (same as Appendix D). Older databases
+// get any missing column added by selfHealColumns() in database.js.
 
 const tables = [
   // ── Users (2 roles: CDRRMO Personnel, Barangay Official) ──────────────────
@@ -16,6 +18,7 @@ const tables = [
     barangay_id   INTEGER REFERENCES barangays(id),
     status        TEXT    NOT NULL DEFAULT 'Active',
     last_login    TEXT,
+    last_active   TEXT,
     created_at    TEXT    DEFAULT (datetime('now', '+8 hours')),
     updated_at    TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
@@ -27,8 +30,14 @@ const tables = [
     risk_level             TEXT    DEFAULT 'Low',
     flood_susceptibility     TEXT  DEFAULT 'Low',    -- High / Low  (CDRA)
     landslide_susceptibility TEXT  DEFAULT 'Low',    -- High / Moderate / Low  (CDRA)
+    landslide_rest_level   TEXT    DEFAULT 'Low',    -- level outside the drawn landslide area
     population             INTEGER DEFAULT 0,
+    captain_name           TEXT,
+    contact_number         TEXT,
     boundary_geojson       TEXT,
+    flood_area_geojson     TEXT,
+    landslide_area_geojson TEXT,
+    residential_area_geojson TEXT,
     created_at             TEXT    DEFAULT (datetime('now', '+8 hours')),
     updated_at             TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
@@ -41,6 +50,9 @@ const tables = [
     flood_risk        TEXT    DEFAULT 'Low',
     flood_threshold_m REAL    DEFAULT 1.0,
     landslide_risk    TEXT    DEFAULT 'Low',
+    latitude          REAL,
+    longitude         REAL,
+    boundary_geojson  TEXT,
     created_at        TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 
@@ -51,9 +63,9 @@ const tables = [
     barangay_id   INTEGER NOT NULL REFERENCES barangays(id),
     purok_id      INTEGER NOT NULL REFERENCES puroks(id),
     head_family   TEXT    NOT NULL,
+    contact       TEXT,
     latitude      REAL,
     longitude     REAL,
-    contact       TEXT,
     created_at    TEXT    DEFAULT (datetime('now', '+8 hours')),
     updated_at    TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
@@ -65,10 +77,15 @@ const tables = [
     household_id      INTEGER REFERENCES households(id) ON DELETE SET NULL, -- optional: residents are registered first, then assigned
     barangay_id       INTEGER REFERENCES barangays(id),
     purok_id          INTEGER REFERENCES puroks(id),
+    last_name         TEXT,
+    first_name        TEXT,
+    middle_name       TEXT,
     name              TEXT    NOT NULL,
+    sex               TEXT,
     birthdate         TEXT    NOT NULL,
     age_bracket       TEXT,
     relation_to_head  TEXT,
+    contact_number    TEXT,
     created_at        TEXT    DEFAULT (datetime('now', '+8 hours'))
   )`,
 
