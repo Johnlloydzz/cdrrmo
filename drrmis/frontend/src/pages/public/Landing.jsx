@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   LayoutDashboard, Map, Users, Waves, Bell, ShieldCheck, Building2, Home,
-  ClipboardList, AlertTriangle, Lock, Phone, MapPin, ArrowRight, Menu, X, Mountain, CloudRain,
+  ClipboardList, AlertTriangle, Lock, Phone, MapPin, ArrowRight, Menu, X, Mountain, CloudRain, Check,
 } from 'lucide-react'
 import CookieConsent from '../../components/CookieConsent'
 import RequestAccountTutorial from '../../components/RequestAccountTutorial'
@@ -55,7 +55,7 @@ const FEATURES = [
   { icon: Map, title: 'Hazard Map & Geofencing', text: 'Flood and landslide susceptibility on one map. Puroks inside a flood-prone area are flagged automatically.' },
   { icon: Users, title: 'Household & Population Registry', text: 'Barangays register residents and households per purok, so every family is counted where they live.' },
   { icon: Waves, title: 'Live Flood Monitoring', text: 'Rainfall and river discharge readings with PAGASA rainfall warnings, plus the flood level reported by CDRRMO.' },
-  { icon: Bell, title: 'Role-based Notifications', text: 'CDRRMO and each barangay receive only the alerts meant for them — flood levels, new requests, classification updates.' },
+  { icon: Bell, title: 'Role-based Notifications', text: 'CDRRMO and each barangay receive only the alerts meant for them: flood levels, new requests, classification updates.' },
   { icon: ShieldCheck, title: 'Secure Access', text: 'Accounts are created and approved by CDRRMO. Each official sees only their own barangay’s records.' },
 ]
 
@@ -87,8 +87,8 @@ const ROLES = [
 const STEPS = [
   { icon: ClipboardList, title: 'Barangays register', text: 'Puroks, residents and households are recorded by each Barangay Official.' },
   { icon: Map, title: 'CDRRMO classifies', text: 'Hazard areas and purok risk levels are set from the city’s CDRA data.' },
-  { icon: Waves, title: 'Conditions are monitored', text: 'Rainfall, river levels and reported flood levels are checked continuously.' },
-  { icon: AlertTriangle, title: 'At-risk households are flagged', text: 'Everyone sees who needs help first — before the disaster happens.' },
+  { icon: Waves, title: 'Conditions are monitored', text: 'Rainfall, river levels and reported flood levels are checked every five minutes.' },
+  { icon: AlertTriangle, title: 'At-risk households are flagged', text: 'Everyone sees who needs help first, before the disaster happens.' },
 ]
 
 const HAZARDS = [
@@ -248,73 +248,73 @@ export default function Landing() {
 
         {/* Features */}
         <section id="features" className="scroll-mt-20 py-16 md:py-24">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div data-reveal className="max-w-2xl">
-              <p className="text-sm font-semibold text-primary-700">What PDRA does</p>
-              <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">Everything disaster preparedness needs, in one place</h2>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
+            <div data-reveal className="lg:sticky lg:top-28 self-start">
+              <h2 className={`text-3xl md:text-4xl font-bold text-blue-950 tracking-tight`}>What PDRA does</h2>
+              <p className="mt-4 text-gray-600 leading-relaxed max-w-md">
+                One system for the hazard maps and the people they cover. Records stay with each barangay; the city sees the whole picture.
+              </p>
             </div>
-            <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <dl className="grid sm:grid-cols-2 gap-x-10">
               {FEATURES.map(({ icon: Icon, title, text }, i) => (
-                <div key={title} data-reveal style={{ '--d': `${(i % 3) * 90}ms` }}>
-                <div className="h-full rounded-2xl border border-gray-100 bg-white p-6 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
-                  <span className="w-10 h-10 rounded-xl bg-primary-50 text-primary-700 flex items-center justify-center">
-                    <Icon size={20} aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-4 font-semibold text-gray-900">{title}</h3>
-                  <p className="mt-1.5 text-sm text-gray-600 leading-relaxed">{text}</p>
-                </div>
+                <div key={title} data-reveal style={{ '--d': `${(i % 2) * 80}ms` }} className="py-6 border-t border-gray-200">
+                  <dt className="flex items-center gap-3 font-semibold text-gray-900">
+                    <Icon size={20} className="text-primary-700 flex-shrink-0" aria-hidden="true" />
+                    {title}
+                  </dt>
+                  <dd className="mt-2 text-sm text-gray-600 leading-relaxed">{text}</dd>
                 </div>
               ))}
-            </div>
+            </dl>
           </div>
         </section>
 
         {/* Roles */}
-        <section id="roles" className="scroll-mt-20 py-16 md:py-24 bg-gray-50 border-y border-gray-100">
+        <section id="roles" className="scroll-mt-20 py-16 md:py-24 bg-slate-50 border-y border-gray-100">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div data-reveal className="max-w-2xl">
-              <p className="text-sm font-semibold text-primary-700">Who it’s for</p>
-              <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">Built for the people who keep Gingoog safe</h2>
-            </div>
+            <h2 data-reveal className={`text-3xl md:text-4xl font-bold text-blue-950 tracking-tight max-w-3xl [text-wrap:balance]`}>Built for the people who keep Gingoog safe</h2>
             <div className="mt-10 grid md:grid-cols-2 gap-5">
-              {ROLES.map(({ icon: Icon, title, lead, items }, i) => (
-                <div key={title} data-reveal style={{ '--d': `${i * 110}ms` }} className="rounded-2xl bg-white border border-gray-100 p-6 md:p-8 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="w-11 h-11 rounded-xl bg-blue-900 text-white flex items-center justify-center">
-                      <Icon size={20} aria-hidden="true" />
-                    </span>
-                    <div>
-                      <h3 className="font-bold text-gray-900">{title}</h3>
-                      <p className="text-sm text-gray-500">{lead}</p>
+              {ROLES.map(({ icon: Icon, title, lead, items }, i) => {
+                const dark = i === 0
+                return (
+                  <div key={title} data-reveal style={{ '--d': `${i * 110}ms` }}
+                    className={`rounded-2xl p-7 md:p-9 ${dark ? 'bg-blue-950 text-white' : 'bg-white border border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-11 h-11 rounded-xl flex items-center justify-center ${dark ? 'bg-white/10 text-white' : 'bg-primary-50 text-primary-700'}`}>
+                        <Icon size={20} aria-hidden="true" />
+                      </span>
+                      <div>
+                        <h3 className={`text-lg font-bold ${dark ? 'text-white' : 'text-blue-950'}`}>{title}</h3>
+                        <p className={`text-sm ${dark ? 'text-blue-200' : 'text-gray-500'}`}>{lead}</p>
+                      </div>
                     </div>
+                    <ul className="mt-6 space-y-3">
+                      {items.map(it => (
+                        <li key={it} className={`flex gap-3 text-[15px] ${dark ? 'text-blue-50' : 'text-gray-700'}`}>
+                          <Check size={18} className={`flex-shrink-0 mt-0.5 ${dark ? 'text-blue-300' : 'text-primary-600'}`} aria-hidden="true" />
+                          <span>{it}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="mt-5 space-y-2.5">
-                    {items.map(it => (
-                      <li key={it} className="flex gap-2.5 text-sm text-gray-700">
-                        <ShieldCheck size={16} className="text-primary-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-                        <span>{it}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </section>
 
-        {/* How it works */}
+        {/* How it works: a real sequence, so the steps are numbered */}
         <section id="how" className="scroll-mt-20 py-16 md:py-24">
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <div data-reveal className="max-w-2xl">
-              <p className="text-sm font-semibold text-primary-700">How it works</p>
-              <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">From barangay records to early action</h2>
-            </div>
-            <ol className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <h2 data-reveal className={`text-3xl md:text-4xl font-bold text-blue-950 tracking-tight max-w-3xl [text-wrap:balance]`}>From barangay records to early action</h2>
+            <ol className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10 relative">
+              <span aria-hidden="true" className="hidden lg:block absolute left-5 right-5 top-5 h-px bg-primary-200" />
               {STEPS.map(({ icon: Icon, title, text }, i) => (
-                <li key={title} data-reveal style={{ '--d': `${i * 90}ms` }} className="relative rounded-2xl border border-gray-100 p-6">
-                  <span className="absolute top-5 right-5 text-3xl font-bold text-gray-100 select-none" aria-hidden="true">{i + 1}</span>
-                  <Icon size={22} className="text-primary-700" aria-hidden="true" />
-                  <h3 className="mt-4 font-semibold text-gray-900">{title}</h3>
+                <li key={title} data-reveal style={{ '--d': `${i * 90}ms` }} className="relative">
+                  <span className={`relative z-10 w-10 h-10 rounded-full bg-blue-950 text-white font-bold flex items-center justify-center ring-8 ring-white`}>{i + 1}</span>
+                  <h3 className="mt-5 font-semibold text-gray-900 flex items-center gap-2">
+                    <Icon size={18} className="text-primary-700" aria-hidden="true" /> {title}
+                  </h3>
                   <p className="mt-1.5 text-sm text-gray-600 leading-relaxed">{text}</p>
                 </li>
               ))}
@@ -323,19 +323,18 @@ export default function Landing() {
         </section>
 
         {/* Tutorial */}
-        <section id="tutorial" className="scroll-mt-20 py-16 md:py-24 bg-gray-50 border-y border-gray-100">
+        <section id="tutorial" className="scroll-mt-20 py-16 md:py-24 bg-slate-50 border-y border-gray-100">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 grid lg:grid-cols-[1fr_1.4fr] gap-10 items-center">
             <div data-reveal>
-              <p className="text-sm font-semibold text-primary-700">Tutorial</p>
-              <h2 className="mt-2 text-2xl md:text-3xl font-bold text-gray-900">How to request an account</h2>
-              <p className="mt-3 text-gray-600 leading-relaxed">
-                New Barangay Official? Watch this short guide — it walks you through the request form step by step, with voice and captions.
+              <h2 className={`text-3xl md:text-4xl font-bold text-blue-950 tracking-tight`}>How to request an account</h2>
+              <p className="mt-4 text-gray-600 leading-relaxed">
+                New Barangay Official? Watch this short guide. It walks you through the request form step by step, with voice and captions.
               </p>
               <ol className="mt-6 space-y-3 text-sm text-gray-700">
                 {[
                   'Click “Request access”.',
                   'Fill in your name, email, mobile number and barangay.',
-                  'Submit — once CDRRMO approves it, your login details are emailed to you.',
+                  'Submit. Once CDRRMO approves it, your login details are emailed to you.',
                 ].map((t, i) => (
                   <li key={t} className="flex gap-3">
                     <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">{i + 1}</span>
@@ -344,7 +343,7 @@ export default function Landing() {
                 ))}
               </ol>
               <Link to="/request-account" className="mt-7 inline-flex items-center gap-2 btn-primary px-5 py-2.5 transition-all active:scale-[0.98]">
-                Request access <ArrowRight size={16} aria-hidden="true" />
+                Request access
               </Link>
             </div>
             <div data-reveal style={{ '--d': '120ms' }}>
@@ -357,14 +356,14 @@ export default function Landing() {
         <section className="py-14 bg-blue-950 text-white">
           <div data-reveal className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-[1fr_auto] gap-8 items-center">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold">Authorized personnel only</h2>
-              <p className="mt-2 text-blue-200 max-w-2xl leading-relaxed">
+              <h2 className={`text-2xl md:text-3xl font-bold`}>Authorized personnel only</h2>
+              <p className="mt-3 text-blue-200 max-w-2xl leading-relaxed">
                 PDRA holds residents’ personal information. Access is limited to CDRRMO Personnel and Barangay Officials with an approved account, and all data is handled in accordance with the Data Privacy Act of 2012 (RA 10173).
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to="/login" className="inline-flex items-center gap-2 rounded-lg bg-white text-blue-900 font-semibold px-5 py-3 hover:bg-blue-50 transition-all active:scale-[0.98]">
-                Sign in <ArrowRight size={16} aria-hidden="true" />
+              <Link to="/login" className="inline-flex items-center gap-2 rounded-lg bg-white text-blue-950 font-semibold px-5 py-3 hover:bg-blue-50 transition-all active:scale-[0.98]">
+                Sign in
               </Link>
               <Link to="/request-account" className="inline-flex items-center rounded-lg border border-white/30 px-5 py-3 font-medium hover:bg-white/10 transition-colors">
                 Request access
@@ -375,41 +374,44 @@ export default function Landing() {
 
         {/* Contact */}
         <section id="contact" className="scroll-mt-20 py-16 md:py-20">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-5">
-            <div data-reveal className="rounded-2xl border border-red-100 bg-red-50 p-6">
-              <Phone size={20} className="text-red-600" aria-hidden="true" />
-              <h3 className="mt-3 font-semibold text-gray-900">In an emergency</h3>
-              <p className="mt-1 text-sm text-gray-600">Call the national emergency hotline.</p>
-              <a href="tel:911" className="mt-3 inline-block text-2xl font-bold text-red-600 hover:text-red-700">911</a>
-            </div>
-            <div data-reveal style={{ '--d': '90ms' }} className="rounded-2xl border border-gray-100 p-6">
-              <MapPin size={20} className="text-primary-700" aria-hidden="true" />
-              <h3 className="mt-3 font-semibold text-gray-900">City Government of Gingoog</h3>
-              <p className="mt-1 text-sm text-gray-600 leading-relaxed">
-                Peoples Palace, City Hall Complex<br />Brgy. 22-A, Gingoog City<br />Misamis Oriental 9014
-              </p>
-            </div>
-            <div data-reveal style={{ '--d': '180ms' }} className="rounded-2xl border border-gray-100 p-6">
-              <ShieldCheck size={20} className="text-primary-700" aria-hidden="true" />
-              <h3 className="mt-3 font-semibold text-gray-900">Need access or help?</h3>
-              <p className="mt-1 text-sm text-gray-600 leading-relaxed">Barangay Officials can request an account. Forgot your password? Reset it with a code sent to your email.</p>
-              <div className="mt-3 flex flex-col gap-1.5 text-sm">
-                <Link to="/request-account" className="font-medium text-primary-700 hover:text-primary-800">Request access →</Link>
-                <Link to="/forgot-password" className="font-medium text-primary-700 hover:text-primary-800">Reset your password →</Link>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <h2 data-reveal className={`text-3xl md:text-4xl font-bold text-blue-950 tracking-tight`}>Contact</h2>
+            <div className="mt-8 grid md:grid-cols-3 gap-5">
+              <div data-reveal className="rounded-2xl bg-red-600 text-white p-6">
+                <Phone size={20} aria-hidden="true" />
+                <h3 className="mt-3 font-semibold">In an emergency</h3>
+                <p className="mt-1 text-sm text-red-100">Call the national emergency hotline.</p>
+                <a href="tel:911" className={`mt-2 inline-block text-4xl font-extrabold hover:underline`}>911</a>
+              </div>
+              <div data-reveal style={{ '--d': '90ms' }} className="rounded-2xl border border-gray-200 p-6">
+                <MapPin size={20} className="text-primary-700" aria-hidden="true" />
+                <h3 className="mt-3 font-semibold text-gray-900">City Government of Gingoog</h3>
+                <p className="mt-1 text-sm text-gray-600 leading-relaxed">
+                  Peoples Palace, City Hall Complex<br />Brgy. 22-A, Gingoog City<br />Misamis Oriental 9014
+                </p>
+              </div>
+              <div data-reveal style={{ '--d': '180ms' }} className="rounded-2xl border border-gray-200 p-6">
+                <ShieldCheck size={20} className="text-primary-700" aria-hidden="true" />
+                <h3 className="mt-3 font-semibold text-gray-900">Need access or help?</h3>
+                <p className="mt-1 text-sm text-gray-600 leading-relaxed">Barangay Officials can request an account. Forgot your password? Reset it with a code sent to your email.</p>
+                <div className="mt-3 flex flex-col gap-1.5 text-sm">
+                  <Link to="/request-account" className="font-medium text-primary-700 hover:text-primary-800 underline-offset-4 hover:underline">Request access</Link>
+                  <Link to="/forgot-password" className="font-medium text-primary-700 hover:text-primary-800 underline-offset-4 hover:underline">Reset your password</Link>
+                </div>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="bg-gray-900 text-gray-400 text-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <footer className="bg-blue-950 text-blue-200 text-sm border-t border-white/10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Seal size={32} className="w-8 h-8 object-contain" />
-            <span>© {new Date().getFullYear()} Gingoog City CDRRMO · PDRA</span>
+            <span>© {new Date().getFullYear()} Gingoog City CDRRMO. Pre-Disaster Risk Assessment System.</span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <button type="button" onClick={() => setDevsOpen(true)} className="text-gray-300 hover:text-white transition-colors">
+          <div className="flex items-center gap-3 text-xs text-blue-300">
+            <button type="button" onClick={() => setDevsOpen(true)} className="text-blue-100 hover:text-white transition-colors">
               Meet the Developers
             </button>
             <span aria-hidden="true">|</span>
