@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Facebook } from 'lucide-react'
 
@@ -71,15 +71,29 @@ function Avatar({ person }) {
 }
 
 export default function MeetTheDevelopers({ open, onClose }) {
+  // Closing plays a short fade/slide-out first (about 0.45 s) instead of
+  // vanishing at once. Skipped for users who turned on "reduce motion".
+  const CLOSE_MS = 450
+  const [closing, setClosing] = useState(false)
+  const timer = useRef(null)
+  const requestClose = useCallback(() => {
+    if (timer.current) return
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) { onClose(); return }
+    setClosing(true)
+    timer.current = setTimeout(() => { timer.current = null; setClosing(false); onClose() }, CLOSE_MS)
+  }, [onClose])
+  useEffect(() => () => clearTimeout(timer.current), [])
+
   // Close with Esc, and stop the page behind from scrolling while open.
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e) => { if (e.key === 'Escape') requestClose() }
     window.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
-  }, [open, onClose])
+  }, [open, requestClose])
 
   if (!open) return null
 
@@ -88,7 +102,7 @@ export default function MeetTheDevelopers({ open, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="devs-title"
-      className="fixed inset-0 z-[3000] overflow-y-auto bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 text-white animate-fade-in"
+      className={`fixed inset-0 z-[3000] overflow-y-auto bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 text-white ${closing ? 'dev-out' : 'animate-fade-in'}`}
     >
       {/* soft glow + dots */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0">
@@ -101,6 +115,8 @@ export default function MeetTheDevelopers({ open, onClose }) {
           @keyframes dev-glow  { 0%,100% { transform: translate(-50%,0) scale(1); opacity:.5 } 50% { transform: translate(-50%,30px) scale(1.12); opacity:.8 } }
           .dev-dot  { animation: dev-float var(--t) ease-in-out var(--delay) infinite; }
           .dev-glow { animation: dev-glow 12s ease-in-out infinite; }
+          @keyframes dev-out { from { opacity: 1; transform: none } to { opacity: 0; transform: translateY(24px) scale(.98) } }
+          .dev-out { animation: dev-out ${CLOSE_MS}ms cubic-bezier(.4, 0, .2, 1) forwards; pointer-events: none; }
           @media (prefers-reduced-motion: reduce) { .dev-dot, .dev-glow { animation: none; } }
         `}</style>
         <div className="dev-glow absolute -top-40 left-1/2 w-[900px] h-[600px] rounded-full bg-blue-500/20 blur-3xl" />
@@ -121,7 +137,7 @@ export default function MeetTheDevelopers({ open, onClose }) {
 
       <button
         type="button"
-        onClick={onClose}
+        onClick={requestClose}
         aria-label="Close"
         className="fixed top-4 right-4 sm:top-6 sm:right-8 z-10 p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
       >
