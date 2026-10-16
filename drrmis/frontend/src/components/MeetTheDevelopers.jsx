@@ -14,28 +14,28 @@ const TEAM = [
     role: 'Project Manager',
     text: 'Plans the project and keeps the team on schedule.',
     photo: '/team/lourynz.jpg',
-    facebook: ''
+    facebook: 'https://www.facebook.com/lourynz.glier'
   },
   {
     name: 'John Lloyd Obligacion',
     role: 'Technical Lead',
     text: 'Builds the system, the database and the hazard map.',
     photo: '/team/loyd.jpg',
-    facebook: ''
+    facebook: 'https://www.facebook.com/johnlloyd.obligacion.9'
   },
   {
     name: 'Januarene Fernandez',
     role: 'Research Lead',
     text: 'Gathers the data and studies the hazard maps and related works.',
     photo: '/team/januarene.jpg',
-    facebook: ''
+    facebook: 'https://www.facebook.com/JanuareneFernandez13'
   },
   {
     name: 'Tristan Jan Enriquez',
     role: 'Documentation Lead',
     text: 'Writes the paper, the user manual and the system guides.',
     photo: '/team/tristan.jpg',
-    facebook: ''
+    facebook: 'https://www.facebook.com/tristan.ignalig'
   },
 ]
 
