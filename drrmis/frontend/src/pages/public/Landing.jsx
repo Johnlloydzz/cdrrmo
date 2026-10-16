@@ -108,6 +108,39 @@ export default function Landing() {
   const go = (id) => { setMenuOpen(false); scrollToId(id) }
   const pageRef = useRef(null)
 
+  // Start the hero entrance only when the page can actually be seen: after
+  // the logo is decoded and the first frame is painted, and (if the tab was
+  // opened in the background) once the tab is shown. Before, on a slow first
+  // load or a background tab, the animation had already finished by the time
+  // anything appeared, so it looked like there was none. Coming back with the
+  // browser's Back button (page restored from cache) plays it again.
+  const [ready, setReady] = useState(false)
+  const [replay, setReplay] = useState(0)
+  useEffect(() => {
+    let cancelled = false, raf1 = 0, raf2 = 0
+    const start = () => {
+      raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => { if (!cancelled) setReady(true) }) })
+    }
+    const whenVisible = () => new Promise(resolve => {
+      if (document.visibilityState === 'visible') return resolve()
+      const on = () => { if (document.visibilityState === 'visible') { document.removeEventListener('visibilitychange', on); resolve() } }
+      document.addEventListener('visibilitychange', on)
+    })
+    const imgs = [...(pageRef.current?.querySelectorAll('header img, .land-pop img') || [])]
+    const imagesReady = Promise.all(imgs.map(img => {
+      if (img.complete) return null
+      const p = img.decode ? img.decode() : new Promise(r => { img.onload = img.onerror = r })
+      return p.catch(() => {})
+    }))
+    const fontsReady = document.fonts?.ready ?? Promise.resolve()
+    const giveUp = new Promise(r => setTimeout(r, 1200)) // never wait longer than this
+    Promise.race([Promise.all([imagesReady, fontsReady]), giveUp]).catch(() => {}).then(whenVisible).then(start)
+
+    const onShow = (e) => { if (e.persisted) setReplay(n => n + 1) }
+    window.addEventListener('pageshow', onShow)
+    return () => { cancelled = true; cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); window.removeEventListener('pageshow', onShow) }
+  }, [])
+
   // Sections slide/fade in as they scroll into view (each once), so the page
   // feels alive instead of everything appearing at once.
   useEffect(() => {
@@ -121,7 +154,7 @@ export default function Landing() {
   }, [])
 
   return (
-    <div ref={pageRef} className="min-h-screen bg-white text-gray-800">
+    <div ref={pageRef} className={`min-h-screen bg-white text-gray-800 land-wait ${ready ? 'land-ready' : ''}`}>
       {/* Government strip */}
       <div className="bg-blue-950 text-blue-200 text-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-1.5 flex items-center justify-between gap-4">
@@ -131,7 +164,7 @@ export default function Landing() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100 land-down">
+      <header key={`h${replay}`} className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-100 land-down">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-3 min-w-0" aria-label="PDRA home">
             <Seal size={40} className="w-10 h-10 object-contain flex-shrink-0" />
@@ -167,7 +200,7 @@ export default function Landing() {
 
       <main>
         {/* Hero */}
-        <section className="relative overflow-hidden bg-gradient-to-br from-blue-950 via-blue-900 to-blue-800 text-white">
+        <section key={`s${replay}`} className="relative overflow-hidden bg-gradient-to-br from-blue-950 via-blue-900 to-blue-800 text-white">
           <svg className="absolute bottom-0 left-0 w-full h-32 md:h-48 opacity-90 pointer-events-none" viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
             <path d="M0 220 L0 150 L90 90 L160 150 L230 60 L310 150 L400 100 L470 150 L560 70 L650 150 L720 110 L800 150 L800 220 Z" fill="#0c1f4a" opacity="0.6" />
             <path d="M0 220 L0 180 L120 140 L210 180 L300 130 L390 180 L480 140 L570 180 L660 150 L800 180 L800 220 Z" fill="#0a1836" opacity="0.85" />

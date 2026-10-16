@@ -189,6 +189,10 @@
 .land-in   { animation: land-rise .7s cubic-bezier(.22, 1, .36, 1) var(--d, 0ms) both; }
 .land-pop  { animation: land-pop .8s cubic-bezier(.22, 1, .36, 1) var(--d, 0ms) both; }
 .land-down { animation: land-down .5s cubic-bezier(.22, 1, .36, 1) both; }
+/* Landing page: hold the entrance (first frame, hidden) until the page is
+   ready to be seen, then play it — see Landing.jsx. */
+.land-wait .land-in, .land-wait .land-pop, .land-wait .land-down { animation-play-state: paused; }
+.land-wait.land-ready .land-in, .land-wait.land-ready .land-pop, .land-wait.land-ready .land-down { animation-play-state: running; }
 [data-reveal] {
   opacity: 0;
   transform: translateY(26px);
