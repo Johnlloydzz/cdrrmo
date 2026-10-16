@@ -212,6 +212,16 @@ export default function RequestAccountTutorial() {
   useEffect(() => () => { runId.current++; clearTimers(); stopSpeech() }, [])
 
   const start = (from = 0) => { setStarted(true); setPlaying(true); playScene(from) }
+  // First play: a short "loading" spinner on the cover, like a real video
+  // buffering, then it starts.
+  const [loading, setLoading] = useState(false)
+  const loadTimer = useRef(null)
+  const firstPlay = () => {
+    if (loading) return
+    setLoading(true)
+    loadTimer.current = setTimeout(() => { setLoading(false); start(0) }, 900)
+  }
+  useEffect(() => () => clearTimeout(loadTimer.current), [])
   const pause = () => { runId.current++; clearTimers(); stopSpeech(); setPlaying(false) }
   const togglePlay = () => {
     if (playing) pause()
@@ -381,14 +391,18 @@ export default function RequestAccountTutorial() {
           </div>
         )}
 
-        {/* Start overlay */}
+        {/* Cover before the first play: only the play button, nothing behind it */}
         {!started && (
-          <button type="button" onClick={() => start(0)} className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-blue-950/80 backdrop-blur-[2px] hover:bg-blue-950/75 transition-colors group" aria-label="Play tutorial: how to request an account">
-            <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white text-primary-700 flex items-center justify-center shadow-xl group-hover:scale-105 transition-transform">
-              <Play size={26} className="ml-1 fill-current" aria-hidden="true" />
-            </span>
-            <span className="text-white text-sm sm:text-base font-semibold drop-shadow">How to request an account</span>
-            <span className="text-blue-100 text-xs">About 1 minute · with voice</span>
+          <button type="button" onClick={firstPlay} disabled={loading}
+            className="absolute inset-0 z-30 flex items-center justify-center bg-gradient-to-b from-blue-900 via-blue-950 to-[#050b1f] group"
+            aria-label={loading ? 'Loading tutorial' : 'Play tutorial: how to request an account'}>
+            {loading ? (
+              <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-white/25 border-t-white animate-spin" aria-hidden="true" />
+            ) : (
+              <span className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-white text-blue-900 flex items-center justify-center shadow-xl group-hover:scale-105 transition-transform">
+                <Play size={30} className="ml-1 fill-current" aria-hidden="true" />
+              </span>
+            )}
           </button>
         )}
       </div>
@@ -402,7 +416,7 @@ export default function RequestAccountTutorial() {
 
       {/* Controls */}
       <div className="flex items-center gap-2 sm:gap-3 px-3 py-2.5 bg-gray-900 text-white">
-        <button type="button" onClick={started ? togglePlay : () => start(0)} className="p-1.5 rounded-md hover:bg-white/10 transition-colors" aria-label={playing ? 'Pause' : 'Play'}>
+        <button type="button" onClick={started ? togglePlay : firstPlay} className="p-1.5 rounded-md hover:bg-white/10 transition-colors" aria-label={playing ? 'Pause' : 'Play'}>
           {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
         </button>
         <button type="button" onClick={restart} className="p-1.5 rounded-md hover:bg-white/10 transition-colors" aria-label="Restart">
