@@ -391,14 +391,26 @@ export default function FloodSimulationControl() {
           <Link
             to="/"
             onClick={(e) => {
-              // Opened from the sidebar in its own tab: go back to the
-              // system tab that opened it (this tab closes) instead of
-              // turning this tab into a second copy of the system.
-              const opener = window.opener
-              if (window.name === 'pdra-flood-control' && opener && !opener.closed) {
-                e.preventDefault()
-                try { opener.focus() } catch { /* ignore */ }
+              // Opened from the sidebar in its own tab: switch to the main
+              // system tab (found by its name, "pdra-main", so it works even
+              // if the tabs were dragged to other places), show its
+              // Dashboard, and close this tab. Chrome would otherwise jump to
+              // whatever tab is next to this one (Gmail, Facebook, …).
+              if (window.name !== 'pdra-flood-control') return // opened directly: normal link
+              e.preventDefault()
+              let main = null
+              try { main = window.open('', 'pdra-main') } catch { /* blocked */ }
+              let found = false
+              try { found = !!main && main.location.href !== 'about:blank' } catch { found = false }
+              if (found) {
+                try { if (main.location.pathname !== '/') main.location.href = '/' } catch { /* ignore */ }
+                try { main.focus() } catch { /* ignore */ }
                 window.close()
+              } else {
+                // The system tab was already closed: use this tab instead.
+                try { main?.close() } catch { /* ignore */ }
+                window.name = 'pdra-main'
+                window.location.href = '/'
               }
             }}
             className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-primary-600 mb-1"

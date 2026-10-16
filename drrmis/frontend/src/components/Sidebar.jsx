@@ -5,7 +5,7 @@ import {
   FileText, BarChart2, ClipboardList, Settings, ChevronDown,
   Building2, TreePine, LogOut, Archive, Waves, ExternalLink
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ROLE_ACCESS, ROLE_COLORS } from '../data/users'
 import { prepareSessionHandoff } from '../utils/storage'
 
@@ -42,6 +42,9 @@ const navGroups = [
 // SAME one: clicking it again just switches to that tab instead of opening
 // another copy.
 const FLOOD_TAB = 'pdra-flood-control'
+// Name of the main system tab, so the Flood Simulation Control tab's
+// "Back to system" can find it again even after tabs were moved around.
+const MAIN_TAB = 'pdra-main'
 function openFullPageTab(e, to) {
   e.preventDefault()
   prepareSessionHandoff() // lets the new tab keep a "Remember me"-unchecked login
@@ -90,6 +93,10 @@ function canAccess(role, path) {
 export default function Sidebar({ onLogout, currentUser, mobileOpen, onClose }) {
   const [collapsed, setCollapsed] = useState({})
   const role = currentUser?.role || 'Viewer'
+
+  useEffect(() => {
+    if (!window.name || window.name === MAIN_TAB) window.name = MAIN_TAB
+  }, [])
 
   const toggleGroup = (label) =>
     setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }))
