@@ -143,11 +143,11 @@ async function sendAccountEmail(toEmail, name, username, password, { isReset = f
         : 'Your request for an account in the Pre-Disaster Risk Assessment (PDRA) System has been approved, and your account is now active. Please use the login details below to sign in.'}</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px;">
         ${row('Username', username)}
-        ${row('Temporary Password', password)}
+        ${row('Password', password)}
       </table>
       ${button(`${url}/login`, 'Sign in to PDRA')}
       <p style="margin:16px 0 0; padding:12px 14px; background:#fffbeb; border-left:4px solid #f59e0b; border-radius:6px; color:#78350f; font-size:14px;">
-        <strong>Important:</strong> For your security, please change this temporary password after your first sign-in (Profile menu &rarr; Change Password). Do not share your login details with anyone.
+        <strong>Important:</strong> Please keep your login details private and do not share them with anyone. You may change your password anytime in the system (Profile menu &rarr; Change Password).
       </p>`,
       { preheader: isReset ? 'Your PDRA password has been reset.' : 'Your PDRA account is now active.', url }),
   })
