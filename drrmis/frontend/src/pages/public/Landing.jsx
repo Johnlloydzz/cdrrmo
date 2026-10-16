@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import CookieConsent from '../../components/CookieConsent'
 import RequestAccountTutorial from '../../components/RequestAccountTutorial'
+import MeetTheDevelopers from '../../components/MeetTheDevelopers'
 
 // Public landing page for government staff (CDRRMO Personnel and Barangay
 // Officials). Styled after the official LGU site: a "Republic of the
@@ -103,6 +104,7 @@ function scrollToId(id) {
 
 export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [devsOpen, setDevsOpen] = useState(false)
   const go = (id) => { setMenuOpen(false); scrollToId(id) }
   const pageRef = useRef(null)
 
@@ -373,10 +375,17 @@ export default function Landing() {
             <Seal size={32} className="w-8 h-8 object-contain" />
             <span>© {new Date().getFullYear()} Gingoog City CDRRMO · PDRA</span>
           </div>
-          <span className="text-xs text-gray-500">Gingoog City, Misamis Oriental, Philippines</span>
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <button type="button" onClick={() => setDevsOpen(true)} className="text-gray-300 hover:text-white transition-colors">
+              Meet the Developers
+            </button>
+            <span aria-hidden="true">|</span>
+            <span>Gingoog City, Misamis Oriental, Philippines</span>
+          </div>
         </div>
       </footer>
 
+      <MeetTheDevelopers open={devsOpen} onClose={() => setDevsOpen(false)} />
       <CookieConsent />
     </div>
   )
