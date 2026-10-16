@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Play, Pause, RotateCcw, Volume2, VolumeX, MousePointer2, Check, ChevronDown } from 'lucide-react'
 
 // "How to request an account" tutorial, played like a short video.
 //
-// It isn't a video file: it's an animated walkthrough of the real Request an
+// It isn't a video file: it's an animated walkthrough of the real Request
 // Account form, narrated by the browser's built-in text-to-speech voice
 // (Web Speech API). Nothing to download, it always matches the current form,
 // and captions are always shown — so it works even with the sound off or on
@@ -20,7 +20,7 @@ const SAMPLE = {
 // Each scene: what's on screen, which field is active, what gets typed, and
 // what the narrator says (also the caption).
 const SCENES = [
-  { view: 'landing', say: 'To get a PDRA account, open the PDRA website and click "Request an account".' },
+  { view: 'landing', say: 'To get a PDRA account, open the PDRA website and click "Request access".' },
   { view: 'form', field: 'name', type: SAMPLE.name, say: 'Type your full name.' },
   { view: 'form', field: 'email', type: SAMPLE.email, say: 'Enter your email address. Your username and password will be sent here once your account is ready.' },
   { view: 'form', field: 'contact', type: SAMPLE.contact, say: 'Enter your mobile number. It must be eleven digits and start with zero nine. CDRRMO may call or text you here.' },
@@ -274,10 +274,38 @@ export default function RequestAccountTutorial() {
   const s = SCENES[scene]
   const active = s.field
 
+  // One mouse pointer that glides from target to target (the "Request
+  // access" button, then each field, then Submit) and "clicks" when it
+  // arrives, like a screen recording.
+  const screenRef = useRef(null)
+  const [cursor, setCursor] = useState({ x: 72, y: 88, show: false, instant: true })
+  const [clickKey, setClickKey] = useState(0)
+  const target = s.view === 'landing' ? 'request' : s.view === 'form' ? active : null
+  useLayoutEffect(() => {
+    if (!started) return
+    const box = screenRef.current
+    const place = (instant) => {
+      const el = target && box?.querySelector(`[data-cur="${target}"]`)
+      if (!box || !el) { setCursor(c => ({ ...c, show: false })); return }
+      const b = box.getBoundingClientRect(), r = el.getBoundingClientRect()
+      // a bit inside the right side of the target
+      const x = ((r.left - b.left) + r.width * 0.78) / b.width * 100
+      const y = ((r.top - b.top) + r.height * 0.62) / b.height * 100
+      setCursor({ x, y, show: true, instant })
+    }
+    // A new screen (landing → form) starts the pointer from the lower right.
+    if (scene === 0 || SCENES[scene - 1]?.view !== s.view) setCursor({ x: 78, y: 92, show: !!target, instant: true })
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => place(false)))
+    const click = setTimeout(() => setClickKey(k => k + 1), 950)
+    const onResize = () => place(true)
+    window.addEventListener('resize', onResize)
+    return () => { cancelAnimationFrame(raf); clearTimeout(click); window.removeEventListener('resize', onResize) }
+  }, [scene, started, target, s.view])
+
   return (
     <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-xl bg-gray-900 select-none">
       {/* Screen */}
-      <div className="relative aspect-video bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 overflow-hidden">
+      <div ref={screenRef} className="relative aspect-video bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 overflow-hidden">
         {/* Scene: landing */}
         {s.view === 'landing' && (
           <div key="landing" className="absolute inset-0 flex flex-col justify-center px-[8%] text-white animate-fade-in">
@@ -285,9 +313,8 @@ export default function RequestAccountTutorial() {
             <p className="mt-1 text-base sm:text-2xl font-bold leading-tight">Pre-Disaster Risk Assessment<br />for Gingoog City</p>
             <div className="mt-3 sm:mt-5 flex gap-2">
               <span className="rounded-md bg-white text-blue-900 text-[10px] sm:text-sm font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2">Sign in to PDRA</span>
-              <span className="relative rounded-md border border-white/40 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 ring-4 ring-yellow-300/80 animate-pulse">
-                Request an account
-                <MousePointer2 size={20} className="absolute -right-3 -bottom-4 text-white fill-white drop-shadow" aria-hidden="true" />
+              <span data-cur="request" className="relative rounded-md border border-white/40 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 ring-4 ring-yellow-300/80 animate-pulse">
+                Request access
               </span>
             </div>
           </div>
@@ -297,7 +324,7 @@ export default function RequestAccountTutorial() {
         {s.view === 'form' && (
           <div key="form" className="absolute inset-0 flex items-center justify-center p-[3%] animate-fade-in">
             <div className="w-full max-w-[560px] bg-white rounded-xl shadow-2xl p-3 sm:p-5 text-left">
-              <p className="text-[11px] sm:text-base font-semibold text-gray-900">Request an Account</p>
+              <p className="text-[11px] sm:text-base font-semibold text-gray-900">Request Access</p>
               <div className="mt-2 sm:mt-3 grid grid-cols-2 gap-x-2 sm:gap-x-3 gap-y-1.5 sm:gap-y-2.5">
                 {[
                   ['name', 'Full Name', 'Juan Dela Cruz'],
@@ -311,21 +338,19 @@ export default function RequestAccountTutorial() {
                   return (
                     <div key={key} className={key === 'position' ? 'col-span-2' : ''}>
                       <p className="text-[8px] sm:text-xs font-medium text-gray-600 mb-0.5">{label}{key !== 'position' && <span className="text-red-500">*</span>}</p>
-                      <div className={`relative h-5 sm:h-8 rounded border text-[8px] sm:text-xs px-1.5 sm:px-2.5 flex items-center justify-between transition-all duration-300 ${isActive ? 'border-primary-500 ring-2 ring-primary-300' : 'border-gray-300'}`}>
+                      <div data-cur={key} className={`relative h-5 sm:h-8 rounded border text-[8px] sm:text-xs px-1.5 sm:px-2.5 flex items-center justify-between transition-all duration-300 ${isActive ? 'border-primary-500 ring-2 ring-primary-300' : 'border-gray-300'}`}>
                         <span className={value ? 'text-gray-900' : 'text-gray-400'}>
                           {value || ph}
                           {isActive && value !== SCENES[scene].type && <span className="inline-block w-px h-2.5 sm:h-3.5 bg-gray-900 ml-px align-middle animate-pulse" />}
                         </span>
                         {key === 'barangay' && <ChevronDown size={12} className="text-gray-400" aria-hidden="true" />}
-                        {isActive && <MousePointer2 size={16} className="absolute -right-1 top-3 sm:top-5 text-gray-900 fill-white drop-shadow" aria-hidden="true" />}
                       </div>
                     </div>
                   )
                 })}
               </div>
-              <div className={`relative mt-2 sm:mt-4 rounded bg-primary-600 text-white text-[9px] sm:text-sm font-medium text-center py-1 sm:py-2 transition-all duration-300 ${active === 'submit' ? 'ring-4 ring-yellow-300/80 scale-[1.02]' : ''}`}>
+              <div data-cur="submit" className={`relative mt-2 sm:mt-4 rounded bg-primary-600 text-white text-[9px] sm:text-sm font-medium text-center py-1 sm:py-2 transition-all duration-300 ${active === 'submit' ? 'ring-4 ring-yellow-300/80 scale-[1.02]' : ''}`}>
                 Submit Request
-                {active === 'submit' && <MousePointer2 size={18} className="absolute right-[30%] top-3 sm:top-5 text-gray-900 fill-white drop-shadow" aria-hidden="true" />}
               </div>
             </div>
           </div>
@@ -341,6 +366,18 @@ export default function RequestAccountTutorial() {
               <p className="mt-2 text-xs sm:text-lg font-semibold text-gray-900">Request sent</p>
               <p className="mt-1 text-[9px] sm:text-sm text-gray-500">CDRRMO reviews your request, then emails your username and password to {SAMPLE.email}.</p>
             </div>
+          </div>
+        )}
+
+        {/* Moving mouse pointer */}
+        {started && (
+          <div aria-hidden="true" className="pointer-events-none absolute z-20"
+            style={{
+              left: `${cursor.x}%`, top: `${cursor.y}%`, opacity: cursor.show ? 1 : 0,
+              transition: cursor.instant ? 'opacity .2s' : 'left .85s cubic-bezier(.45,0,.25,1), top .85s cubic-bezier(.45,0,.25,1), opacity .2s',
+            }}>
+            {clickKey > 0 && <span key={clickKey} className="tut-click absolute -left-3 -top-3 w-6 h-6 rounded-full bg-yellow-300/70" />}
+            <MousePointer2 key={`p${clickKey}`} size={20} className="tut-press relative text-gray-900 fill-white drop-shadow-md" />
           </div>
         )}
 

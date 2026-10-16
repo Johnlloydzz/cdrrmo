@@ -205,3 +205,9 @@
   .land-in, .land-pop, .land-down { animation: none; }
   [data-reveal] { opacity: 1; transform: none; transition: none; }
 }
+/* Request-account tutorial: the pointer "clicks" when it reaches a target. */
+@keyframes tut-click { from { transform: scale(.3); opacity: .9; } to { transform: scale(1.8); opacity: 0; } }
+@keyframes tut-press { 0%, 100% { transform: scale(1); } 40% { transform: scale(.82); } }
+.tut-click { animation: tut-click .55s ease-out forwards; }
+.tut-press { animation: tut-press .3s ease-out; }
+@media (prefers-reduced-motion: reduce) { .tut-click, .tut-press { animation: none; } }
