@@ -155,9 +155,9 @@ export default function MeetTheDevelopers({ open, onClose }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`${p.name} on Facebook`}
-                  className="mt-6 w-11 h-11 rounded-full border border-white/20 flex items-center justify-center text-blue-100 hover:text-white hover:bg-white/10 transition-colors"
+                  className="mt-6 w-11 h-11 rounded-full bg-gray-100 shadow-md flex items-center justify-center text-[#1877F2] hover:bg-white hover:scale-110 transition-all"
                 >
-                  <Facebook size={18} />
+                  <Facebook size={22} fill="currentColor" strokeWidth={0} />
                 </a>
               )}
             </div>
