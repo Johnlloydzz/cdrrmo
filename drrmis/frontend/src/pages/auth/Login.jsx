@@ -141,8 +141,9 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Left — branding panel */}
-      <div className="relative md:w-[46%] min-h-[280px] md:min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 overflow-hidden flex flex-col items-center justify-center px-8 py-12 text-center">
+      {/* Left — branding panel (desktop/tablet only; on a phone only the
+          sign-in card shows) */}
+      <div className="relative hidden md:flex md:w-[46%] md:min-h-screen bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 overflow-hidden flex-col items-center justify-center px-8 py-12 text-center">
         {/* Ambient mountain/city silhouette */}
         <svg
           className="absolute bottom-0 left-0 w-full h-40 md:h-56 opacity-90"
