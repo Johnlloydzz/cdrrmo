@@ -41,10 +41,12 @@ const TEAM = [
 
 const initials = (name) => name.split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 
-// Small floating dots in the background (fixed positions, so no re-render jumps).
+// Small dots that slowly drift and twinkle in the background (CSS only;
+// stops for users who turned on "reduce motion").
 const DOTS = [
   [8, 12, 4], [22, 70, 3], [35, 18, 5], [48, 85, 3], [62, 8, 4], [74, 55, 3],
   [86, 22, 5], [93, 78, 3], [15, 45, 3], [55, 40, 2], [80, 92, 4], [4, 88, 3],
+  [28, 35, 2], [42, 60, 3], [68, 30, 2], [90, 50, 3], [12, 62, 2], [58, 72, 3],
 ]
 
 function Avatar({ person }) {
@@ -94,8 +96,26 @@ export default function MeetTheDevelopers({ open, onClose }) {
           <path d="M0 220 L0 150 L90 90 L160 150 L230 60 L310 150 L400 100 L470 150 L560 70 L650 150 L720 110 L800 150 L800 220 Z" fill="#0c1f4a" opacity="0.6" />
           <path d="M0 220 L0 180 L120 140 L210 180 L300 130 L390 180 L480 140 L570 180 L660 150 L800 180 L800 220 Z" fill="#0a1836" opacity="0.85" />
         </svg>
+        <style>{`
+          @keyframes dev-float { 0%,100% { transform: translate(0,0); opacity:.35 } 50% { transform: translate(var(--dx),var(--dy)); opacity:.9 } }
+          @keyframes dev-glow  { 0%,100% { transform: translate(-50%,0) scale(1); opacity:.5 } 50% { transform: translate(-50%,30px) scale(1.12); opacity:.8 } }
+          .dev-dot  { animation: dev-float var(--t) ease-in-out var(--delay) infinite; }
+          .dev-glow { animation: dev-glow 12s ease-in-out infinite; }
+          @media (prefers-reduced-motion: reduce) { .dev-dot, .dev-glow { animation: none; } }
+        `}</style>
+        <div className="dev-glow absolute -top-40 left-1/2 w-[900px] h-[600px] rounded-full bg-blue-500/20 blur-3xl" />
         {DOTS.map(([x, y, s], i) => (
-          <span key={i} className="absolute rounded-full bg-blue-300/40" style={{ left: `${x}%`, top: `${y}%`, width: s * 2, height: s * 2 }} />
+          <span
+            key={i}
+            className="dev-dot absolute rounded-full bg-blue-200/60"
+            style={{
+              left: `${x}%`, top: `${y}%`, width: s * 2, height: s * 2,
+              '--dx': `${(i % 2 ? 1 : -1) * (12 + (i * 7) % 20)}px`,
+              '--dy': `${-(30 + (i * 13) % 40)}px`,
+              '--t': `${7 + (i % 5) * 2}s`,
+              '--delay': `${-(i * 1.3)}s`,
+            }}
+          />
         ))}
       </div>
 
