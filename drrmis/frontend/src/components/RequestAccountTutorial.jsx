@@ -1,400 +1,107 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Play, Pause, RotateCcw, Volume2, VolumeX, MousePointer2, Check, ChevronDown } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Play } from 'lucide-react'
 
-// "How to request an account" tutorial, played like a short video.
+// "How to request an account" tutorial: a real screen recording of the PDRA
+// site (landing page → Request access → filling in the form → Request sent),
+// with captions and chapter buttons to jump to a step.
 //
-// It isn't a video file: it's an animated walkthrough of the real Request
-// Account form, narrated by the browser's built-in text-to-speech voice
-// (Web Speech API). Nothing to download, it always matches the current form,
-// and captions are always shown — so it works even with the sound off or on
-// a device without a voice.
+// Files (in drrmis/frontend/public/tutorial/):
+//   request-access.mp4  the recording (H.264, ~1 MB)
+//   request-access.webm same recording (VP9) for browsers without H.264
+//   request-access.jpg  still frame shown before it plays
+//   request-access.vtt  captions
+// To re-record after the form changes, replace those three files.
 
-const SAMPLE = {
-  name: 'Juan Dela Cruz',
-  email: 'juan.delacruz@gmail.com',
-  contact: '09171234567',
-  barangay: 'San Juan',
-  position: 'Barangay Secretary',
-}
+const MP4 = '/tutorial/request-access.mp4'
+const WEBM = '/tutorial/request-access.webm'
+const POSTER = '/tutorial/request-access.jpg'
+const CAPTIONS = '/tutorial/request-access.vtt'
 
-// Each scene: what's on screen, which field is active, what gets typed, and
-// what the narrator says (also the caption).
-const SCENES = [
-  { view: 'landing', say: 'To get a PDRA account, open the PDRA website and click "Request access".' },
-  { view: 'form', field: 'name', type: SAMPLE.name, say: 'Type your full name.' },
-  { view: 'form', field: 'email', type: SAMPLE.email, say: 'Enter your email address. Your username and password will be sent here once your account is ready.' },
-  { view: 'form', field: 'contact', type: SAMPLE.contact, say: 'Enter your mobile number. It must be eleven digits and start with zero nine. CDRRMO may call or text you here.' },
-  { view: 'form', field: 'barangay', type: SAMPLE.barangay, say: 'Choose your barangay from the list.' },
-  { view: 'form', field: 'position', type: SAMPLE.position, say: 'Your position is optional, but it helps CDRRMO confirm who you are.' },
-  { view: 'form', field: 'submit', say: 'Check your details, then click "Submit Request".' },
-  { view: 'done', say: 'Done! CDRRMO will review your request. Once approved, your username and password are sent to your email.' },
+// Where each step starts in the video (seconds).
+const CHAPTERS = [
+  { t: 0, label: 'Open PDRA' },
+  { t: 6, label: 'Request access' },
+  { t: 9.3, label: 'Full name' },
+  { t: 12.5, label: 'Email' },
+  { t: 16.7, label: 'Contact number' },
+  { t: 19.7, label: 'Barangay' },
+  { t: 24, label: 'Position' },
+  { t: 27.6, label: 'Submit' },
+  { t: 30.1, label: 'Request sent' },
 ]
 
-const FIELD_ORDER = ['name', 'email', 'contact', 'barangay', 'position']
-const TYPE_MS = 55 // per character
-
-// Expected length of a scene (ms) — drives the time display and the line.
-function sceneMs(s, voiced) {
-  const words = s.say.split(' ').length
-  const readMs = Math.max(2500, words * 330)
-  const typeMs = s.type ? 600 + s.type.length * TYPE_MS : 0
-  const talkMs = voiced ? 120 + words * 400 : 0
-  return Math.max(readMs, typeMs, talkMs) + 700
-}
-const sceneOffsets = (voiced) => {
-  const out = []; let t = 0
-  SCENES.forEach(s => { out.push(t); t += sceneMs(s, voiced) })
-  return { offsets: out, total: t }
-}
-// 65000 → "1:05"
-const clock = (ms) => {
-  const sec = Math.max(0, Math.round(ms / 1000))
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
-}
-
-// A clear English voice if the device has one.
-function pickVoice() {
-  const voices = window.speechSynthesis?.getVoices?.() || []
-  return voices.find(v => /en-PH/i.test(v.lang))
-    || voices.find(v => /en-(US|GB)/i.test(v.lang) && /female|samantha|google|zira|aria|jenny/i.test(v.name))
-    || voices.find(v => /^en/i.test(v.lang))
-    || null
-}
+const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
 export default function RequestAccountTutorial() {
-  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window
-  const [started, setStarted] = useState(false)
-  const [playing, setPlaying] = useState(false)
-  const [muted, setMuted] = useState(!canSpeak)
-  const draggingRef = useRef(null) // { wasPlaying } while the dot is held
-  const [dragging, setDragging] = useState(false)
-  const voiceEndRef = useRef(null) // ends the current narration early (used when muting)
-  const muteRef = useRef(!canSpeak) // read by running scenes, so mute/unmute never restarts the video
-  const [scene, setScene] = useState(0)
-  const [typed, setTyped] = useState({}) // field -> text shown so far
-  const timers = useRef([])
-  const runId = useRef(0) // bumps on every pause/seek so stale callbacks stop
-  const utterRef = useRef(null) // keeps the current narration alive (Chrome GC bug)
-  const sceneClock = useRef({ start: 0, ms: 1 }) // when the current scene began + its expected length
-  const [elapsed, setElapsed] = useState(0) // ms watched so far (shown like a video's time)
+  const video = useRef(null)
+  const [started, setStarted] = useState(false) // cover removed
+  const [loading, setLoading] = useState(false) // spinner on the cover
+  const [now, setNow] = useState(0)
+  const pending = useRef(null) // chapter to jump to once the video is ready
 
-  const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = [] }
-  const stopSpeech = () => { if (canSpeak) window.speechSynthesis.cancel() }
-
-  // Fields filled in by the scenes before `index` (so jumping ahead looks right).
-  const filledBefore = (index) => {
-    const t = {}
-    SCENES.slice(0, index).forEach(s => { if (s.field && s.type) t[s.field] = s.type })
-    return t
-  }
-
-  // What the form shows `offset` ms into scene `index` (for dragging/seeking).
-  const typedAt = (index, offset) => {
-    const t = filledBefore(index)
-    const s = SCENES[index]
-    if (s.type) {
-      const k = Math.max(0, Math.min(s.type.length, Math.floor((offset - 600) / TYPE_MS)))
-      if (k > 0) t[s.field] = s.type.slice(0, k)
-    }
-    return t
-  }
-
-  // `offset` = start this many ms into the scene (after dragging the dot).
-  const playScene = useCallback((index, offset = 0) => {
-    const id = ++runId.current
-    clearTimers(); stopSpeech()
-    setScene(index)
-    setTyped(typedAt(index, offset))
-    const s = SCENES[index]
-
-    let typingDone = !s.type || offset >= 600 + s.type.length * TYPE_MS
-    let speechDone = false
-    const next = () => {
-      if (id !== runId.current || !typingDone || !speechDone) return
-      timers.current.push(setTimeout(() => {
-        if (id !== runId.current) return
-        if (index + 1 < SCENES.length) playScene(index + 1)
-        else setPlaying(false)
-      }, 700))
-    }
-
-    // Typing animation
-    if (s.type && !typingDone) {
-      for (let i = 1; i <= s.type.length; i++) {
-        if (600 + i * TYPE_MS <= offset) continue // already shown
-        timers.current.push(setTimeout(() => {
-          if (id !== runId.current) return
-          setTyped(t => ({ ...t, [s.field]: s.type.slice(0, i) }))
-          if (i === s.type.length) { typingDone = true; next() }
-        }, 600 + i * TYPE_MS - offset))
-      }
-    }
-
-    // Narration. A scene never ends before its caption could be read, even if
-    // the voice fails or ends early, so the video doesn't cut ahead.
-    // The scene always lasts the same time, voice on or off, so muting never
-    // changes the video's length or makes it jump.
-    const words = s.say.split(' ').length
-    const readMs = Math.max(800, sceneMs(s, canSpeak) - 700 - offset)
-    // Dropped in mid-sentence (drag): skip that step's voice, captions stay.
-    const isMuted = muteRef.current || offset > 1000
-    let readDone = false
-    let voiceDone = isMuted || !canSpeak
-    const finish = () => {
-      if (id !== runId.current || speechDone || !readDone || !voiceDone) return
-      speechDone = true; next()
-    }
-    timers.current.push(setTimeout(() => { readDone = true; finish() }, readMs))
-
-    // Expected length of this scene, used to move the time and line smoothly.
-    sceneClock.current = { start: performance.now() - offset, ms: sceneMs(s, canSpeak) }
-
-    if (!isMuted && canSpeak) {
-      const u = new SpeechSynthesisUtterance(s.say)
-      const v = pickVoice()
-      if (v) { u.voice = v; u.lang = v.lang } else u.lang = 'en-US'
-      u.rate = 0.98
-      const voiceEnd = () => { if (id === runId.current) { voiceDone = true; finish() } }
-      voiceEndRef.current = voiceEnd
-      u.onend = voiceEnd
-      u.onerror = voiceEnd
-      // Chrome drops speech whose utterance object gets garbage-collected
-      // (it stops mid-sentence) — keep a reference while it plays.
-      utterRef.current = u
-      // Chrome also skips an utterance spoken right after cancel(); wait a beat.
-      timers.current.push(setTimeout(() => {
-        if (id !== runId.current) return
-        if (muteRef.current) { voiceEnd(); return } // muted in the meantime
-        window.speechSynthesis.resume()
-        window.speechSynthesis.speak(u)
-      }, 120))
-      // Safety net: some browsers never fire onend (e.g. no voice installed).
-      timers.current.push(setTimeout(voiceEnd, Math.max(4000, words * 450) + 3000))
-    }
-  }, [canSpeak])
-
-  const timeline = useMemo(() => sceneOffsets(canSpeak), [canSpeak])
-  const progress = Math.min(1, elapsed / timeline.total)
-
-  // Progress line: moves continuously while playing (like a video player).
-  useEffect(() => {
-    if (!playing) return
-    let raf
-    const tick = () => {
-      if (draggingRef.current) { raf = requestAnimationFrame(tick); return }
-      const { start, ms } = sceneClock.current
-      const within = Math.min(0.98, (performance.now() - start) / ms)
-      setElapsed(timeline.offsets[scene] + within * ms)
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [playing, scene, timeline])
-
-  // Finished the last scene → line full.
-  useEffect(() => {
-    if (!playing && started && scene === SCENES.length - 1 && runId.current > 0) {
-      const { start, ms } = sceneClock.current
-      if (performance.now() - start >= ms - 800) setElapsed(timeline.total)
-    }
-  }, [playing, started, scene, timeline])
-
-  // Voices load late in some browsers.
-  useEffect(() => {
-    if (!canSpeak) return
-    window.speechSynthesis.getVoices()
-    const h = () => window.speechSynthesis.getVoices()
-    window.speechSynthesis.addEventListener?.('voiceschanged', h)
-    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', h)
-  }, [canSpeak])
-
-  // Stop everything when leaving the page.
-  useEffect(() => () => { runId.current++; clearTimers(); stopSpeech() }, [])
-
-  const start = (from = 0) => { setStarted(true); setPlaying(true); playScene(from) }
-  // First play: a short "loading" spinner on the cover, like a real video
-  // buffering, then it starts.
-  const [loading, setLoading] = useState(false)
-  const loadTimer = useRef(null)
-  const firstPlay = () => {
+  // First play: show a short loading spinner (at least ~0.7 s, or until the
+  // video is actually ready), then start.
+  const begin = (from = 0) => {
     if (loading) return
     setLoading(true)
-    loadTimer.current = setTimeout(() => { setLoading(false); start(0) }, 900)
-  }
-  useEffect(() => () => clearTimeout(loadTimer.current), [])
-  const pause = () => { runId.current++; clearTimers(); stopSpeech(); setPlaying(false) }
-  const togglePlay = () => {
-    if (playing) pause()
-    else start(scene === SCENES.length - 1 ? 0 : scene)
-  }
-  const restart = () => { setElapsed(0); start(0) }
-  const seek = (i) => { if (playing) { setStarted(true); playScene(i) } else { runId.current++; clearTimers(); stopSpeech(); setStarted(true); setScene(i); setElapsed(timeline.offsets[i]); setTyped({ ...filledBefore(i), ...(SCENES[i].type ? { [SCENES[i].field]: SCENES[i].type } : {}) }) } }
-  // Drag the dot (hold left click) like YouTube: it follows the mouse, the
-  // picture/time update live, and playback continues from where you let go.
-  const timeAtPointer = (e, el) => {
-    const r = el.getBoundingClientRect()
-    return Math.min(0.999, Math.max(0, (e.clientX - r.left) / r.width)) * timeline.total
-  }
-  const sceneAtTime = (t) => {
-    let i = 0
-    while (i + 1 < SCENES.length && timeline.offsets[i + 1] <= t) i++
-    return i
-  }
-  const scrubTo = (t) => {
-    const i = sceneAtTime(t)
-    setElapsed(t)
-    setScene(i)
-    setTyped(typedAt(i, t - timeline.offsets[i]))
-  }
-  const onScrubStart = (e) => {
-    if (e.button !== 0) return
-    e.preventDefault()
-    e.currentTarget.setPointerCapture?.(e.pointerId)
-    draggingRef.current = { wasPlaying: playing }
-    runId.current++; clearTimers(); stopSpeech() // hold the video while dragging
-    setStarted(true)
-    setDragging(true)
-    scrubTo(timeAtPointer(e, e.currentTarget))
-  }
-  const onScrubMove = (e) => {
-    if (!draggingRef.current) return
-    scrubTo(timeAtPointer(e, e.currentTarget))
-  }
-  const onScrubEnd = (e) => {
-    const d = draggingRef.current
-    if (!d) return
-    draggingRef.current = null
-    setDragging(false)
-    const t = timeAtPointer(e, e.currentTarget)
-    const i = sceneAtTime(t)
-    scrubTo(t)
-    if (d.wasPlaying) { setPlaying(true); playScene(i, t - timeline.offsets[i]) }
+    pending.current = from
+    const v = video.current
+    const minWait = new Promise(r => setTimeout(r, 700))
+    const giveUp = new Promise(r => setTimeout(r, 6000)) // slow connection: start anyway
+    const ready = new Promise(r => {
+      if (v.readyState >= 3) return r()
+      const ok = () => { v.removeEventListener('canplay', ok); r() }
+      v.addEventListener('canplay', ok)
+      v.load()
+    })
+    Promise.all([minWait, Promise.race([ready, giveUp])]).then(() => {
+      v.currentTime = pending.current || 0
+      setStarted(true)
+      setLoading(false)
+      v.play().catch(() => {})
+    })
   }
 
-  // Like a video's speaker button: only the voice changes — the picture,
-  // typing and time keep running. Muting stops the voice now; unmuting
-  // brings it back from the next step.
-  const toggleMute = () => {
-    const m = !muted
-    setMuted(m)
-    muteRef.current = m
-    if (m) { stopSpeech(); voiceEndRef.current?.() }
+  const jump = (t) => {
+    if (!started) { begin(t); return }
+    const v = video.current
+    v.currentTime = t
+    v.play().catch(() => {})
   }
 
-  const s = SCENES[scene]
-  const active = s.field
+  // Captions on by default.
+  useEffect(() => {
+    const v = video.current
+    const on = () => { for (const tr of v.textTracks) tr.mode = 'showing' }
+    on()
+    v.textTracks.addEventListener?.('addtrack', on)
+    return () => v.textTracks.removeEventListener?.('addtrack', on)
+  }, [])
 
-  // One mouse pointer that glides from target to target (the "Request
-  // access" button, then each field, then Submit) and "clicks" when it
-  // arrives, like a screen recording.
-  const screenRef = useRef(null)
-  const [cursor, setCursor] = useState({ x: 72, y: 88, show: false, instant: true })
-  const [clickKey, setClickKey] = useState(0)
-  const target = s.view === 'landing' ? 'request' : s.view === 'form' ? active : null
-  useLayoutEffect(() => {
-    if (!started) return
-    const box = screenRef.current
-    const place = (instant) => {
-      const el = target && box?.querySelector(`[data-cur="${target}"]`)
-      if (!box || !el) { setCursor(c => ({ ...c, show: false })); return }
-      const b = box.getBoundingClientRect(), r = el.getBoundingClientRect()
-      // a bit inside the right side of the target
-      const x = ((r.left - b.left) + r.width * 0.78) / b.width * 100
-      const y = ((r.top - b.top) + r.height * 0.62) / b.height * 100
-      setCursor({ x, y, show: true, instant })
-    }
-    // A new screen (landing → form) starts the pointer from the lower right.
-    if (scene === 0 || SCENES[scene - 1]?.view !== s.view) setCursor({ x: 78, y: 92, show: !!target, instant: true })
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => place(false)))
-    const click = setTimeout(() => setClickKey(k => k + 1), 950)
-    const onResize = () => place(true)
-    window.addEventListener('resize', onResize)
-    return () => { cancelAnimationFrame(raf); clearTimeout(click); window.removeEventListener('resize', onResize) }
-  }, [scene, started, target, s.view])
+  const current = CHAPTERS.reduce((a, c, i) => (now >= c.t - 0.05 ? i : a), 0)
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-xl bg-gray-900 select-none">
-      {/* Screen */}
-      <div ref={screenRef} className="relative aspect-video bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 overflow-hidden">
-        {/* Scene: landing */}
-        {s.view === 'landing' && (
-          <div key="landing" className="absolute inset-0 flex flex-col justify-center px-[8%] text-white animate-fade-in">
-            <p className="text-[10px] sm:text-xs text-blue-200">For authorized government personnel</p>
-            <p className="mt-1 text-base sm:text-2xl font-bold leading-tight">Pre-Disaster Risk Assessment<br />for Gingoog City</p>
-            <div className="mt-3 sm:mt-5 flex gap-2">
-              <span className="rounded-md bg-white text-blue-900 text-[10px] sm:text-sm font-semibold px-2.5 sm:px-4 py-1.5 sm:py-2">Sign in to PDRA</span>
-              <span data-cur="request" className="relative rounded-md border border-white/40 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2 ring-4 ring-yellow-300/80 animate-pulse">
-                Request access
-              </span>
-            </div>
-          </div>
-        )}
+    <div>
+      <div className="relative rounded-2xl overflow-hidden border border-gray-200 shadow-xl bg-blue-950 aspect-video">
+        <video
+          ref={video}
+          className="absolute inset-0 w-full h-full object-contain bg-blue-950"
+          poster={POSTER}
+          preload="none"
+          playsInline
+          controls={started}
+          onTimeUpdate={e => setNow(e.currentTarget.currentTime)}
+          aria-label="Screen recording: how to request a PDRA account"
+        >
+          <source src={MP4} type="video/mp4" />
+          <source src={WEBM} type="video/webm" />
+          <track kind="captions" src={CAPTIONS} srcLang="en" label="English" default />
+        </video>
 
-        {/* Scene: the form */}
-        {s.view === 'form' && (
-          <div key="form" className="absolute inset-0 flex items-center justify-center p-[3%] animate-fade-in">
-            <div className="w-full max-w-[560px] bg-white rounded-xl shadow-2xl p-3 sm:p-5 text-left">
-              <p className="text-[11px] sm:text-base font-semibold text-gray-900">Request Access</p>
-              <div className="mt-2 sm:mt-3 grid grid-cols-2 gap-x-2 sm:gap-x-3 gap-y-1.5 sm:gap-y-2.5">
-                {[
-                  ['name', 'Full Name', 'Juan Dela Cruz'],
-                  ['email', 'Email Address', 'you@example.com'],
-                  ['contact', 'Contact Number', '09XXXXXXXXX'],
-                  ['barangay', 'Barangay', 'Select your barangay…'],
-                  ['position', 'Position', 'e.g. Barangay Secretary'],
-                ].map(([key, label, ph]) => {
-                  const isActive = active === key
-                  const value = typed[key]
-                  return (
-                    <div key={key} className={key === 'position' ? 'col-span-2' : ''}>
-                      <p className="text-[8px] sm:text-xs font-medium text-gray-600 mb-0.5">{label}{key !== 'position' && <span className="text-red-500">*</span>}</p>
-                      <div data-cur={key} className={`relative h-5 sm:h-8 rounded border text-[8px] sm:text-xs px-1.5 sm:px-2.5 flex items-center justify-between transition-all duration-300 ${isActive ? 'border-primary-500 ring-2 ring-primary-300' : 'border-gray-300'}`}>
-                        <span className={value ? 'text-gray-900' : 'text-gray-400'}>
-                          {value || ph}
-                          {isActive && value !== SCENES[scene].type && <span className="inline-block w-px h-2.5 sm:h-3.5 bg-gray-900 ml-px align-middle animate-pulse" />}
-                        </span>
-                        {key === 'barangay' && <ChevronDown size={12} className="text-gray-400" aria-hidden="true" />}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div data-cur="submit" className={`relative mt-2 sm:mt-4 rounded bg-primary-600 text-white text-[9px] sm:text-sm font-medium text-center py-1 sm:py-2 transition-all duration-300 ${active === 'submit' ? 'ring-4 ring-yellow-300/80 scale-[1.02]' : ''}`}>
-                Submit Request
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Scene: done */}
-        {s.view === 'done' && (
-          <div key="done" className="absolute inset-0 flex items-center justify-center p-[4%] animate-fade-in">
-            <div className="bg-white rounded-xl shadow-2xl p-4 sm:p-6 text-center max-w-[420px]">
-              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto animate-modal-in">
-                <Check size={20} className="text-green-600" aria-hidden="true" />
-              </div>
-              <p className="mt-2 text-xs sm:text-lg font-semibold text-gray-900">Request sent</p>
-              <p className="mt-1 text-[9px] sm:text-sm text-gray-500">CDRRMO reviews your request, then emails your username and password to {SAMPLE.email}.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Moving mouse pointer */}
-        {started && (
-          <div aria-hidden="true" className="pointer-events-none absolute z-20"
-            style={{
-              left: `${cursor.x}%`, top: `${cursor.y}%`, opacity: cursor.show ? 1 : 0,
-              transition: cursor.instant ? 'opacity .2s' : 'left .85s cubic-bezier(.45,0,.25,1), top .85s cubic-bezier(.45,0,.25,1), opacity .2s',
-            }}>
-            {clickKey > 0 && <span key={clickKey} className="tut-click absolute -left-3 -top-3 w-6 h-6 rounded-full bg-yellow-300/70" />}
-            <MousePointer2 key={`p${clickKey}`} size={20} className="tut-press relative text-gray-900 fill-white drop-shadow-md" />
-          </div>
-        )}
-
-        {/* Cover before the first play: only the play button, nothing behind it */}
+        {/* Cover before the first play: only the play button */}
         {!started && (
-          <button type="button" onClick={firstPlay} disabled={loading}
-            className="absolute inset-0 z-30 flex items-center justify-center bg-gradient-to-b from-blue-900 via-blue-950 to-[#050b1f] group"
+          <button type="button" onClick={() => begin(0)} disabled={loading}
+            className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-blue-900 via-blue-950 to-[#050b1f] group"
             aria-label={loading ? 'Loading tutorial' : 'Play tutorial: how to request an account'}>
             {loading ? (
               <span className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border-4 border-white/25 border-t-white animate-spin" aria-hidden="true" />
@@ -407,64 +114,19 @@ export default function RequestAccountTutorial() {
         )}
       </div>
 
-      {/* Captions — under the picture so they never cover the form */}
-      <div className="min-h-[3.25rem] px-4 py-2.5 bg-black text-center flex items-center justify-center" aria-live="polite">
-        <p key={started ? scene : 'idle'} className="text-xs sm:text-sm text-white leading-snug animate-fade-in">
-          {started ? s.say : 'Press play to start the tutorial.'}
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center gap-2 sm:gap-3 px-3 py-2.5 bg-gray-900 text-white">
-        <button type="button" onClick={started ? togglePlay : firstPlay} className="p-1.5 rounded-md hover:bg-white/10 transition-colors" aria-label={playing ? 'Pause' : 'Play'}>
-          {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-        </button>
-        <button type="button" onClick={restart} className="p-1.5 rounded-md hover:bg-white/10 transition-colors" aria-label="Restart">
-          <RotateCcw size={16} aria-hidden="true" />
-        </button>
-
-        {/* Progress: one continuous line with a dot, like a video player.
-            Click anywhere on it to jump to that step. */}
-        <div
-          className="group flex-1 relative h-4 flex items-center cursor-pointer touch-none select-none"
-          role="slider"
-          aria-label="Tutorial progress"
-          aria-valuemin={1}
-          aria-valuemax={SCENES.length}
-          aria-valuenow={scene + 1}
-          tabIndex={0}
-          onPointerDown={onScrubStart}
-          onPointerMove={onScrubMove}
-          onPointerUp={onScrubEnd}
-          onPointerCancel={onScrubEnd}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowRight' && scene < SCENES.length - 1) seek(scene + 1)
-            if (e.key === 'ArrowLeft' && scene > 0) seek(scene - 1)
-          }}
-        >
-          {/* Track → red fill → dot at the fill's end. The dot lives inside the
-              fill, so the two always move as one and can't drift apart. */}
-          <div className={`relative w-full rounded-full bg-white/20 transition-[height] duration-150 ${dragging ? 'h-1.5' : 'h-1 group-hover:h-1.5'}`}>
-            <div className="absolute inset-y-0 left-0 bg-red-600 rounded-full" style={{ width: `${progress * 100}%` }}>
-              <span
-                className={`absolute right-0 top-1/2 rounded-full bg-red-600 shadow translate-x-1/2 -translate-y-1/2 transition-[width,height] duration-150 ${dragging ? 'w-4 h-4' : 'w-3 h-3 group-hover:w-3.5 group-hover:h-3.5'}`}
-                aria-hidden="true"
-              />
-            </div>
-          </div>
-        </div>
-
-        <span className="text-xs text-gray-300 tabular-nums whitespace-nowrap">{clock(elapsed)} / {clock(timeline.total)}</span>
-        <button
-          type="button"
-          onClick={toggleMute}
-          disabled={!canSpeak}
-          className="p-1.5 rounded-md hover:bg-white/10 transition-colors disabled:opacity-40"
-          aria-label={muted ? 'Turn voice on' : 'Turn voice off'}
-          title={canSpeak ? '' : 'This browser has no built-in voice — captions only.'}
-        >
-          {muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
-        </button>
+      {/* Chapters: jump to a step */}
+      <div className="mt-3 flex flex-wrap gap-2" aria-label="Jump to a step">
+        {CHAPTERS.map((c, i) => (
+          <button key={c.label} type="button" onClick={() => jump(c.t)}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+              started && i === current
+                ? 'border-primary-600 bg-primary-50 text-primary-800'
+                : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:text-primary-700'
+            }`}>
+            <span className="tabular-nums text-gray-400">{clock(c.t)}</span>
+            {c.label}
+          </button>
+        ))}
       </div>
     </div>
   )

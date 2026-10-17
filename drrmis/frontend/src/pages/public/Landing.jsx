@@ -328,7 +328,7 @@ export default function Landing() {
             <div data-reveal>
               <h2 className={`text-3xl md:text-4xl font-bold text-blue-950 tracking-tight`}>How to request an account</h2>
               <p className="mt-4 text-gray-600 leading-relaxed">
-                New Barangay Official? Watch this short guide. It walks you through the request form step by step, with voice and captions.
+                New Barangay Official? Watch this short recording of the request form being filled in, step by step, with captions.
               </p>
               <ol className="mt-6 space-y-3 text-sm text-gray-700">
                 {[
