@@ -3,10 +3,10 @@ import { Play } from 'lucide-react'
 
 // "How to request an account" tutorial: a real screen recording of the PDRA
 // site (landing page → Request access → filling in the form → Request sent),
-// with captions and chapter buttons to jump to a step.
+// with a voice guide, captions, and chapter buttons to jump to a step.
 //
 // Files (in drrmis/frontend/public/tutorial/):
-//   request-access.mp4  the recording (H.264, ~1 MB)
+//   request-access.mp4  the recording with voice guide + soft music (H.264 + AAC, ~1.8 MB)
 //   request-access.webm same recording (VP9) for browsers without H.264
 //   request-access.jpg  still frame shown before it plays
 //   request-access.vtt  captions
@@ -14,7 +14,7 @@ import { Play } from 'lucide-react'
 
 // "?v=" makes browsers fetch the files fresh after an update (bump it when
 // the files are replaced), so an old cached copy is never shown.
-const V = '?v=3'
+const V = '?v=5'
 const MP4 = '/tutorial/request-access.mp4' + V
 const WEBM = '/tutorial/request-access.webm' + V
 const POSTER = '/tutorial/request-access.jpg' + V
@@ -23,14 +23,14 @@ const CAPTIONS = '/tutorial/request-access.vtt' + V
 // Where each step starts in the video (seconds).
 const CHAPTERS = [
   { t: 0, label: 'Open PDRA' },
-  { t: 5, label: 'Request access' },
-  { t: 8.3, label: 'Full name' },
-  { t: 11.5, label: 'Email' },
-  { t: 15.7, label: 'Contact number' },
-  { t: 18.7, label: 'Barangay' },
-  { t: 23, label: 'Position' },
-  { t: 26.6, label: 'Submit' },
-  { t: 29.1, label: 'Request sent' },
+  { t: 8.9, label: 'Request access' },
+  { t: 11.7, label: 'Full name' },
+  { t: 14.9, label: 'Email' },
+  { t: 19.4, label: 'Contact number' },
+  { t: 24.4, label: 'Barangay' },
+  { t: 28.7, label: 'Position' },
+  { t: 33.9, label: 'Submit' },
+  { t: 36.9, label: 'Request sent' },
 ]
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
