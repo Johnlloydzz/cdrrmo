@@ -14,7 +14,7 @@ import { Play } from 'lucide-react'
 
 // "?v=" makes browsers fetch the files fresh after an update (bump it when
 // the files are replaced), so an old cached copy is never shown.
-const V = '?v=5'
+const V = '?v=6'
 const MP4 = '/tutorial/request-access.mp4' + V
 const WEBM = '/tutorial/request-access.webm' + V
 const POSTER = '/tutorial/request-access.jpg' + V
@@ -23,14 +23,14 @@ const CAPTIONS = '/tutorial/request-access.vtt' + V
 // Where each step starts in the video (seconds).
 const CHAPTERS = [
   { t: 0, label: 'Open PDRA' },
-  { t: 8.9, label: 'Request access' },
-  { t: 11.7, label: 'Full name' },
-  { t: 14.9, label: 'Email' },
-  { t: 19.4, label: 'Contact number' },
-  { t: 24.4, label: 'Barangay' },
-  { t: 28.7, label: 'Position' },
-  { t: 33.9, label: 'Submit' },
-  { t: 36.9, label: 'Request sent' },
+  { t: 9.2, label: 'Request access' },
+  { t: 12.1, label: 'Full name' },
+  { t: 15.3, label: 'Email' },
+  { t: 19.8, label: 'Contact number' },
+  { t: 24.8, label: 'Barangay' },
+  { t: 29, label: 'Position' },
+  { t: 34.1, label: 'Submit' },
+  { t: 37.2, label: 'Request sent' },
 ]
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
