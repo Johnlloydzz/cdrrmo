@@ -12,22 +12,25 @@ import { Play } from 'lucide-react'
 //   request-access.vtt  captions
 // To re-record after the form changes, replace those three files.
 
-const MP4 = '/tutorial/request-access.mp4'
-const WEBM = '/tutorial/request-access.webm'
-const POSTER = '/tutorial/request-access.jpg'
-const CAPTIONS = '/tutorial/request-access.vtt'
+// "?v=" makes browsers fetch the files fresh after an update (bump it when
+// the files are replaced), so an old cached copy is never shown.
+const V = '?v=3'
+const MP4 = '/tutorial/request-access.mp4' + V
+const WEBM = '/tutorial/request-access.webm' + V
+const POSTER = '/tutorial/request-access.jpg' + V
+const CAPTIONS = '/tutorial/request-access.vtt' + V
 
 // Where each step starts in the video (seconds).
 const CHAPTERS = [
   { t: 0, label: 'Open PDRA' },
-  { t: 6, label: 'Request access' },
-  { t: 9.3, label: 'Full name' },
-  { t: 12.5, label: 'Email' },
-  { t: 16.7, label: 'Contact number' },
-  { t: 19.7, label: 'Barangay' },
-  { t: 24, label: 'Position' },
-  { t: 27.6, label: 'Submit' },
-  { t: 30.1, label: 'Request sent' },
+  { t: 5, label: 'Request access' },
+  { t: 8.3, label: 'Full name' },
+  { t: 11.5, label: 'Email' },
+  { t: 15.7, label: 'Contact number' },
+  { t: 18.7, label: 'Barangay' },
+  { t: 23, label: 'Position' },
+  { t: 26.6, label: 'Submit' },
+  { t: 29.1, label: 'Request sent' },
 ]
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
