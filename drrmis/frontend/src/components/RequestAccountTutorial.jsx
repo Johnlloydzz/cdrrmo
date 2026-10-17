@@ -14,7 +14,7 @@ import { Play } from 'lucide-react'
 
 // "?v=" makes browsers fetch the files fresh after an update (bump it when
 // the files are replaced), so an old cached copy is never shown.
-const V = '?v=6'
+const V = '?v=7'
 const MP4 = '/tutorial/request-access.mp4' + V
 const WEBM = '/tutorial/request-access.webm' + V
 const POSTER = '/tutorial/request-access.jpg' + V
@@ -85,10 +85,12 @@ export default function RequestAccountTutorial() {
 
   return (
     <div>
+      {/* Captions: one short line, centered, readable on a phone too */}
+      <style>{`video.pdra-tut::cue { font-size: clamp(11px, 1.6vw, 17px); line-height: 1.35; color: #fff; background: rgba(0, 0, 0, .78); }`}</style>
       <div className="relative rounded-2xl overflow-hidden border border-gray-200 shadow-xl bg-blue-950 aspect-video">
         <video
           ref={video}
-          className="absolute inset-0 w-full h-full object-contain bg-blue-950"
+          className="pdra-tut absolute inset-0 w-full h-full object-contain bg-blue-950"
           poster={POSTER}
           preload="none"
           playsInline

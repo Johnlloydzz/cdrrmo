@@ -1,28 +1,43 @@
 WEBVTT
 
-00:00.800 --> 00:09.190
-Welcome to PDRA, the Pre-Disaster Risk Assessment System of Gingoog City. Here's how to request an account.
+00:00.800 --> 00:05.635 line:82% align:center
+Welcome to PDRA, the Pre-Disaster Risk Assessment System of Gingoog City.
 
-00:09.240 --> 00:12.010
+00:05.635 --> 00:09.190 line:82% align:center
+Here's how to request an account.
+
+00:09.240 --> 00:12.010 line:82% align:center
 On the home page, click Request access.
 
-00:12.060 --> 00:15.230
+00:12.060 --> 00:15.230 line:82% align:center
 Type your full name.
 
-00:15.280 --> 00:19.730
-Enter your email address. Your username and password will be sent here.
+00:15.280 --> 00:16.726 line:82% align:center
+Enter your email address.
 
-00:19.780 --> 00:24.750
-Enter your mobile number. It must have eleven digits, and start with zero nine.
+00:16.726 --> 00:19.730 line:82% align:center
+Your username and password will be sent here.
 
-00:24.800 --> 00:28.900
+00:19.780 --> 00:21.245 line:82% align:center
+Enter your mobile number.
+
+00:21.245 --> 00:24.750 line:82% align:center
+It must have eleven digits, and start with zero nine.
+
+00:24.800 --> 00:28.900 line:82% align:center
 Choose your barangay from the list.
 
-00:28.950 --> 00:34.090
+00:28.950 --> 00:34.090 line:82% align:center
 Your position is optional, but it helps the CDRRMO confirm who you are.
 
-00:34.140 --> 00:37.100
+00:34.140 --> 00:37.100 line:82% align:center
 Check your details, then click Submit Request.
 
-00:37.150 --> 00:46.590
-That's it! The CDRRMO will review your request. Once it's approved, your login details will be emailed to you.
+00:37.150 --> 00:37.812 line:82% align:center
+That's it!
+
+00:37.812 --> 00:40.195 line:82% align:center
+The CDRRMO will review your request.
+
+00:40.195 --> 00:46.590 line:82% align:center
+Once it's approved, your login details will be emailed to you.
