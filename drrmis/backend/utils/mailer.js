@@ -64,11 +64,29 @@ async function sendEmail({ to, toName, subject, html }) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const siteUrl = (u) => (u || process.env.FRONTEND_URL || 'https://cdrrmo-gingoog.web.app').replace(/\/+$/, '')
 
+// CDRRMO's contact details from Settings → System Information, shown in
+// every email so recipients know who to reach. Read fresh for each email
+// (emails are rare); blank when not set, and never blocks sending.
+async function officeContact() {
+  try {
+    const { get } = require('../db/database')
+    const [c, e] = await Promise.all([
+      get("SELECT value FROM system_settings WHERE key = 'system_contact'"),
+      get("SELECT value FROM system_settings WHERE key = 'system_email'"),
+    ])
+    return { contact: c?.value || '', email: e?.value || '' }
+  } catch { return { contact: '', email: '' } }
+}
+
 // One formal, mobile-friendly frame for every PDRA email. Built with tables
 // and inline styles (what email apps support): full width on a phone,
 // 560px wide on a computer.
-function layout(inner, { preheader = '', url } = {}) {
+function layout(inner, { preheader = '', url, office = {} } = {}) {
   const site = siteUrl(url)
+  const reach = [
+    office.contact && `Tel. ${esc(office.contact)}`,
+    office.email && `<a href="mailto:${esc(office.email)}" style="color:#1d4ed8; text-decoration:none;">${esc(office.email)}</a>`,
+  ].filter(Boolean).join(' &middot; ')
   return `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="x-apple-disable-message-reformatting"></head>
 <body style="margin:0; padding:0; background:#eef2f7;">
@@ -92,9 +110,10 @@ function layout(inner, { preheader = '', url } = {}) {
           <p style="margin:0;">Respectfully,</p>
           <p style="margin:0; font-weight:bold;">City Disaster Risk Reduction and Management Office</p>
           <p style="margin:0; color:#6b7280; font-size:13px;">Gingoog City, Misamis Oriental</p>
+          ${reach ? `<p style="margin:0; color:#6b7280; font-size:13px;">${reach}</p>` : ''}
         </td></tr>
         <tr><td style="background:#f8fafc; border-top:1px solid #e5e7eb; padding:16px 24px; color:#6b7280; font-size:12px; line-height:1.5;">
-          This is a system-generated message from the Pre-Disaster Risk Assessment (PDRA) System. Please do not reply to this email. If you did not expect this message, please inform the CDRRMO.
+          This is a system-generated message from the Pre-Disaster Risk Assessment (PDRA) System. Please do not reply to this email. If you did not expect this message, please inform the CDRRMO${reach ? ' using the contact details above' : ''}.
         </td></tr>
       </table>
     </td></tr>
@@ -110,6 +129,7 @@ const button = (href, label) => `
   </tr></table>`
 
 async function sendOtpEmail(toEmail, name, otp) {
+  const office = await officeContact()
   await sendEmail({
     to: toEmail,
     toName: name,
@@ -119,7 +139,7 @@ async function sendOtpEmail(toEmail, name, otp) {
       <p style="margin:0 0 16px;">We received a request to reset the password of your PDRA account. Please use the one-time code below to continue. This code will expire in <strong>10 minutes</strong>.</p>
       <div style="margin:0 0 16px; padding:18px 12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; text-align:center; font-size:30px; font-weight:bold; letter-spacing:8px; color:#1e3a8a; font-family:'Courier New', monospace;">${esc(otp)}</div>
       <p style="margin:0 0 16px; color:#4b5563; font-size:14px;">If you did not request a password reset, you may ignore this email. Your password will remain unchanged.</p>`,
-      { preheader: `Your PDRA password reset code is ${otp}. It expires in 10 minutes.` }),
+      { preheader: `Your PDRA password reset code is ${otp}. It expires in 10 minutes.`, office }),
   })
 }
 
@@ -127,6 +147,7 @@ async function sendOtpEmail(toEmail, name, otp) {
 // reset (isReset=true).
 async function sendAccountEmail(toEmail, name, username, password, { isReset = false, siteUrl: site } = {}) {
   const url = siteUrl(site)
+  const office = await officeContact()
   const row = (label, value) => `
     <tr><td style="padding:10px 16px; border-bottom:1px solid #e5e7eb;">
       <div style="color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.5px;">${label}</div>
@@ -149,7 +170,7 @@ async function sendAccountEmail(toEmail, name, username, password, { isReset = f
       <p style="margin:16px 0 0; padding:12px 14px; background:#fffbeb; border-left:4px solid #f59e0b; border-radius:6px; color:#78350f; font-size:14px;">
         <strong>Important:</strong> Please keep your login details private and do not share them with anyone. You may change your password anytime in the system (Profile menu &rarr; Change Password).
       </p>`,
-      { preheader: isReset ? 'Your PDRA password has been reset.' : 'Your PDRA account is now active.', url }),
+      { preheader: isReset ? 'Your PDRA password has been reset.' : 'Your PDRA account is now active.', url, office }),
   })
 }
 

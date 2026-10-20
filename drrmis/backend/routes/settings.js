@@ -5,6 +5,19 @@ const { authenticate } = require('../middleware/auth')
 const { cached } = require('../utils/cache')
 const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
+// GET /api/settings/contact — CDRRMO's office number and email (public, so
+// the Request Account and Forgot Password pages can show who to contact).
+// Only these two fields; cached briefly and cleared whenever settings change.
+router.get('/contact', cached(300, () => 'office-contact'), async (req, res) => {
+  try {
+    const [c, e] = await Promise.all([
+      get("SELECT value FROM system_settings WHERE key = 'system_contact'"),
+      get("SELECT value FROM system_settings WHERE key = 'system_email'"),
+    ])
+    res.json({ contact: c?.value || '', email: e?.value || '' })
+  } catch { res.json({ contact: '', email: '' }) }
+})
+
 router.use(authenticate)
 
 // GET /api/settings/flood-level — the current flood water level (meters).

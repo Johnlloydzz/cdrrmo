@@ -1,11 +1,29 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Check, Shield } from 'lucide-react'
+import { apiGet } from '../utils/api'
+
+// CDRRMO's office number and email (Settings → System Information). Fetched
+// once per visit and shared by every auth page; shows nothing if not set.
+let contactPromise = null
+function useOfficeContact() {
+  const [office, setOffice] = useState(null)
+  useEffect(() => {
+    contactPromise ??= apiGet('/settings/contact').catch(() => null)
+    let alive = true
+    contactPromise.then(v => { if (alive) setOffice(v) })
+    return () => { alive = false }
+  }, [])
+  return office
+}
 
 // Shared frame for the public auth pages (Request an Account, Request a
 // Password Reset): blue background, PDRA badge, white card, Back to Login.
 // The form card is shown right away (like Facebook's login) so people can
 // start typing immediately; only the PDRA badge and footer animate in.
 export default function AuthCard({ maxWidth = 'max-w-lg', children }) {
+  const office = useOfficeContact()
+  const hasContact = office && (office.contact || office.email)
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center px-4 py-8">
       <div className={`w-full ${maxWidth}`}>
@@ -24,7 +42,16 @@ export default function AuthCard({ maxWidth = 'max-w-lg', children }) {
           {children}
         </div>
 
-        <p style={{ '--d': '450ms' }} className="land-in text-center text-blue-200/80 text-xs mt-5">
+        {hasContact && (
+          <p className="text-center text-blue-100 text-xs mt-4 leading-relaxed animate-fade-in">
+            Need help? Contact CDRRMO<br />
+            {office.contact && <a href={`tel:${office.contact.replace(/[^0-9+]/g, '')}`} className="font-semibold text-white hover:underline whitespace-nowrap">{office.contact}</a>}
+            {office.contact && office.email && <span className="mx-1.5 text-blue-300">·</span>}
+            {office.email && <a href={`mailto:${office.email}`} className="font-semibold text-white hover:underline whitespace-nowrap">{office.email}</a>}
+          </p>
+        )}
+
+        <p style={{ '--d': '450ms' }} className={`land-in text-center text-blue-200/80 text-xs ${hasContact ? 'mt-2' : 'mt-5'}`}>
           © {new Date().getFullYear()} Gingoog City CDRRMO. All rights reserved.
         </p>
       </div>

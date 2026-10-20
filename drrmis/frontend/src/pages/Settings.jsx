@@ -120,12 +120,13 @@ export default function Settings({ currentUser }) {
           </div>
           <div>
             <label className="label">Contact Number</label>
-            {loading ? <InputSkeleton /> : <input className="input" type="tel" maxLength={20} placeholder="e.g. (088) 861-1234" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value.replace(/[^0-9+()\- ]/g, '') })} />}
+            {loading ? <InputSkeleton /> : <input className="input" type="tel" maxLength={20} placeholder="e.g. 09171234567 or (088) 861-1234" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value.replace(/[^0-9+()\- ]/g, '') })} />}
           </div>
           <div className="col-span-2">
             <label className="label">Email</label>
-            {loading ? <InputSkeleton /> : <input className="input" type="email" maxLength={100} value={system.email} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, email: e.target.value })} />}
+            {loading ? <InputSkeleton /> : <input className="input" type="email" maxLength={100} placeholder="e.g. cdrrmo@example.com" value={system.email} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, email: e.target.value })} />}
           </div>
+          <p className="col-span-2 text-xs text-gray-400 -mt-1">The contact number and email are shown in system emails and on the Request Account and Forgot Password pages.</p>
         </div>
       </div>
 
