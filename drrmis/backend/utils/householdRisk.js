@@ -61,8 +61,6 @@ function effectiveThreshold() {
 // Current flood situation. A purok turns red ONLY while its barangay has
 // HEAVY RAIN right now:
 //  - the live auto-detect flagged the barangay (real rainfall + river data), or
-//  - CDRRMO reported flooding in that barangay (Flood Simulation Control →
-//    "Flooding reported in"), or
 //  - CDRRMO switched on "Simulate heavy rain" (test switch for demos/drills),
 //    which counts as heavy rain in every barangay.
 // The flood level typed on Flood Simulation Control is the water depth to
@@ -70,23 +68,17 @@ function effectiveThreshold() {
 // typed, heavy rain is treated as a 1 m flood.
 async function loadRiskContext() {
   await expireStaleFloodData()
-  const [levelRow, sourceRow, autoRow, simRow, reportedRow] = await Promise.all([
+  const [levelRow, sourceRow, autoRow, simRow] = await Promise.all([
     get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_m']),
     get('SELECT value FROM system_settings WHERE key = ?', ['current_flood_level_source']),
     get('SELECT value FROM system_settings WHERE key = ?', ['auto_flooded_barangay_ids']),
     get('SELECT value FROM system_settings WHERE key = ?', ['simulate_heavy_rain']),
-    get('SELECT value FROM system_settings WHERE key = ?', ['reported_flood_barangay_ids']),
   ])
   const floodLevel = levelRow ? parseFloat(levelRow.value) : 0
   const manualActive = (sourceRow?.value || 'manual') === 'manual' && floodLevel > 0
   const simulateRain = simRow?.value === '1'
   let autoBarangayIds = []
   try { autoBarangayIds = autoRow ? JSON.parse(autoRow.value) : [] } catch { autoBarangayIds = [] }
-  // Barangays where CDRRMO reported flooding (e.g. Agay-Ayan only) count
-  // the same as detected heavy rain — only those barangays, not the whole city.
-  let reportedIds = []
-  try { reportedIds = reportedRow ? JSON.parse(reportedRow.value) : [] } catch { reportedIds = [] }
-  autoBarangayIds = [...new Set([...autoBarangayIds, ...reportedIds].map(Number))]
   if (simulateRain) autoBarangayIds = (await all('SELECT id FROM barangays')).map(b => b.id)
   return { floodLevel, manualActive, simulateRain, autoBarangayIds: autoBarangayIds.map(Number) }
 }

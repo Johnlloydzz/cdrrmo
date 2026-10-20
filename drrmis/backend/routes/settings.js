@@ -2,7 +2,7 @@ const router = require('express').Router()
 const { expireStaleFloodData } = require('../db/floodLevel')
 const { all, get, run } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
-const { cached, clearAll } = require('../utils/cache')
+const { cached } = require('../utils/cache')
 const { notify, notifyAutoFlood, CDRRMO, OFFICIAL } = require('../utils/notify')
 
 router.use(authenticate)
@@ -62,13 +62,6 @@ router.put('/flood-level', async (req, res) => {
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
       [source]
     )
-    // Reset to Normal also clears the barangays where flooding was reported.
-    if (level === 0 && source === 'manual') {
-      await run(
-        `INSERT INTO system_settings (key, value, updated_at) VALUES ('reported_flood_barangay_ids', '[]', datetime('now', '+8 hours'))
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-      )
-    }
     if (level !== prevLevel) {
       const how = source === 'auto' ? ' (auto-detected)' : ''
       const msg = level > 0
@@ -102,13 +95,6 @@ router.get('/auto-flood-barangays', cached(10, () => 'auto-flood'), async (req, 
     const reasonsRow = await get('SELECT value FROM system_settings WHERE key = ?', ['auto_flood_reasons'])
     let reasons = {}
     try { reasons = reasonsRow ? JSON.parse(reasonsRow.value) : {} } catch { reasons = {} }
-    // Barangays where CDRRMO reported flooding count like detected heavy rain.
-    const reportedRow = await get("SELECT value FROM system_settings WHERE key = 'reported_flood_barangay_ids'")
-    let reported_ids = []
-    try { reported_ids = reportedRow ? JSON.parse(reportedRow.value).map(Number) : [] } catch { reported_ids = [] }
-    const detected_ids = barangay_ids.map(Number)
-    for (const id of reported_ids) if (!detected_ids.includes(id)) reasons[id] = 'Flooding reported by CDRRMO'
-    barangay_ids = [...new Set([...detected_ids, ...reported_ids])]
     // "Simulate heavy rain" test switch: every barangay counts as having
     // heavy rain, exactly like the live auto-detect flagging it.
     const simulate = (await get("SELECT value FROM system_settings WHERE key = 'simulate_heavy_rain'"))?.value === '1'
@@ -118,7 +104,7 @@ router.get('/auto-flood-barangays', cached(10, () => 'auto-flood'), async (req, 
       for (const id of barangay_ids) if (!live.has(id)) reasons[id] = 'TEST: simulated heavy rain'
     }
     const status = await require('./internal').getStatus()
-    res.json({ barangay_ids, detected_ids, reported_ids, reasons, simulate, status })
+    res.json({ barangay_ids, reasons, simulate, status })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -202,45 +188,6 @@ router.post('/flood-check-browser', async (req, res) => {
     const ratio = typeof req.body?.discharge_ratio === 'number' && isFinite(req.body.discharge_ratio) && req.body.discharge_ratio >= 0 && req.body.discharge_ratio < 100
       ? req.body.discharge_ratio : null
     res.json(await internal.applyResults(plan, pointData, ratio, 'browser'))
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
-
-// PUT /api/settings/reported-flood-barangays — body: { barangay_ids: [..] }.
-// CDRRMO Personnel only. The barangays where flooding is actually reported
-// (by the barangay, rescue teams, etc.), even if heavy rain wasn't detected
-// there. Only these barangays (plus any with detected heavy rain) get their
-// flood-prone puroks flagged — the rest of the city is not affected.
-// Cleared by Reset to Normal.
-router.put('/reported-flood-barangays', async (req, res) => {
-  try {
-    if (req.user.role !== 'CDRRMO Personnel') {
-      return res.status(403).json({ error: 'Only CDRRMO Personnel can report flooded barangays.' })
-    }
-    const wanted = Array.isArray(req.body.barangay_ids) ? [...new Set(req.body.barangay_ids.map(Number).filter(Number.isInteger))] : []
-    const valid = wanted.length
-      ? (await all(`SELECT id, name FROM barangays WHERE id IN (${wanted.map(() => '?').join(',')})`, wanted))
-      : []
-    const ids = valid.map(b => b.id)
-    const prevRow = await get("SELECT value FROM system_settings WHERE key = 'reported_flood_barangay_ids'")
-    let prevIds = []
-    try { prevIds = prevRow ? JSON.parse(prevRow.value).map(Number) : [] } catch { prevIds = [] }
-    await run(
-      `INSERT INTO system_settings (key, value, updated_at) VALUES ('reported_flood_barangay_ids', ?, datetime('now', '+8 hours'))
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      [JSON.stringify(ids)]
-    )
-    // Tell only the barangays that were just added or removed.
-    for (const b of valid.filter(b => !prevIds.includes(b.id))) {
-      await notify({ role: OFFICIAL, barangay_ids: [b.id], type: 'alert', title: 'Flooding reported in your barangay',
-        body: `CDRRMO reported flooding in Brgy. ${b.name}. Puroks in its flood-prone area are flagged at risk. Check your households.`, link: '/households' })
-    }
-    const removed = prevIds.filter(id => !ids.includes(id))
-    if (removed.length) {
-      await notify({ role: OFFICIAL, barangay_ids: removed, type: 'system', title: 'Flood report cleared',
-        body: 'CDRRMO cleared the flood report for your barangay.', link: '/households' })
-    }
-    clearAll()
-    res.json({ reported_ids: ids })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
