@@ -203,6 +203,22 @@ export default function GISMap() {
   }
   useEffect(() => { loadMapData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep the map current without a page reload: when a purok is added,
+  // renamed or deleted (e.g. by a barangay official in another tab or on
+  // another computer), it shows up here within 30 seconds, and right away
+  // when coming back to this tab. Quiet refresh: no loading spinner, and
+  // the map does not move.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.hidden) return
+      apiGet('/barangays').then(setBarangays).catch(() => {})
+      apiGet('/risk-assessment/puroks').then(setPurokRows).catch(() => {})
+    }
+    const interval = setInterval(refresh, 30000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh) }
+  }, [])
+
   // "Flood Zones" and "Landslide Zones" drive the same underlying hazard
   // choropleth (a barangay can only be filled with one hazard's color at a
   // time), so checking one automatically unchecks the other — checking
@@ -245,14 +261,18 @@ export default function GISMap() {
     b.name.toLowerCase().includes(search.toLowerCase())
   )
 
+  // Latest data for the selected barangay (after a quiet refresh). The map
+  // still flies using `selectedBarangay`, so a refresh never moves the map.
+  const liveSelected = (selectedBarangay && barangays.find(b => b.id === selectedBarangay.id)) || selectedBarangay
+
   // Purok label position for puroks WITHOUT a drawn boundary: the purok's
   // own geocoded location (households are no longer pinned individually).
   const purokLabelPositions = useMemo(() => {
-    if (!selectedBarangay) return []
-    return (selectedBarangay.puroks || [])
+    if (!liveSelected) return []
+    return (liveSelected.puroks || [])
       .filter(p => p.latitude && p.longitude)
       .map(p => ({ purokId: p.id, name: p.name, lat: p.latitude, lng: p.longitude, residents: p.resident_count ?? 0 }))
-  }, [selectedBarangay])
+  }, [liveSelected])
 
   // Geofencing is per purok: a purok is red when its households fall in a
   // high flood-risk zone (same rules the backend applies to each household).
@@ -400,30 +420,30 @@ export default function GISMap() {
               />
             )}
             <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain_name || '—'}</p>
-            <p className="text-xs text-gray-500">Population: {(selectedBarangay.resident_count || 0).toLocaleString()}</p>
+            <p className="text-xs text-gray-500">Population: {(liveSelected.resident_count || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
             <div className="grid grid-cols-3 gap-2 mt-2 mb-1">
               <button
                 type="button"
                 onClick={() => setShowPurokList(v => !v)}
-                disabled={!selectedBarangay.purok_count}
+                disabled={!liveSelected.purok_count}
                 className="bg-primary-50 hover:bg-primary-100 rounded-lg py-2 text-center disabled:cursor-default disabled:hover:bg-primary-50"
               >
-                <p className="text-lg font-bold text-primary-700">{selectedBarangay.purok_count ?? 0}</p>
-                <p className="text-[10px] text-gray-500 uppercase">Puroks {selectedBarangay.purok_count > 0 && (showPurokList ? '▲' : '▼')}</p>
+                <p className="text-lg font-bold text-primary-700">{liveSelected.purok_count ?? 0}</p>
+                <p className="text-[10px] text-gray-500 uppercase">Puroks {liveSelected.purok_count > 0 && (showPurokList ? '▲' : '▼')}</p>
               </button>
               <div className="bg-primary-50 rounded-lg py-2 text-center">
-                <p className="text-lg font-bold text-primary-700">{selectedBarangay.household_count ?? 0}</p>
+                <p className="text-lg font-bold text-primary-700">{liveSelected.household_count ?? 0}</p>
                 <p className="text-[10px] text-gray-500 uppercase">Households</p>
               </div>
               <div className="bg-primary-50 rounded-lg py-2 text-center">
-                <p className="text-lg font-bold text-primary-700">{selectedBarangay.resident_count ?? 0}</p>
+                <p className="text-lg font-bold text-primary-700">{liveSelected.resident_count ?? 0}</p>
                 <p className="text-[10px] text-gray-500 uppercase">Residents</p>
               </div>
             </div>
-            {showPurokList && selectedBarangay.puroks?.length > 0 && (
+            {showPurokList && liveSelected.puroks?.length > 0 && (
               <div className="mb-2 max-h-40 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
-                {selectedBarangay.puroks.map(p => (
+                {liveSelected.puroks.map(p => (
                   <div key={p.id} className="flex items-center justify-between px-2 py-1.5 text-xs">
                     <span className="text-gray-700">{p.name}</span>
                     <span className={
@@ -765,7 +785,7 @@ export default function GISMap() {
               try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
               return (
                 <GeoJSON
-                  key={`purok-boundary-${p.id}-${purokRisk.get(p.id)?.atRisk ? 'risk' : 'ok'}`}
+                  key={`purok-boundary-${p.id}-${p.boundary_geojson.length}-${purokRisk.get(p.id)?.atRisk ? 'risk' : 'ok'}`}
                   data={geo}
                   style={purokRisk.get(p.id)?.atRisk
                     ? { color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.18 }
