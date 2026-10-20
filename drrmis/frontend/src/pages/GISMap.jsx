@@ -178,7 +178,9 @@ export default function GISMap() {
   // Opens on the CLUP Landslide & Flood Map (its own colors, so the
   // barangay hazard colors start off).
   const [hazardLayer, setHazardLayer] = useState('none') // 'landslide' | 'flood' | 'none'
-  const [activeOverlays, setActiveOverlays] = useState([CLUP_LAYER])
+  // Purok Boundaries on by default, so the selected barangay's puroks show
+  // right away (same as on Flood Simulation Control).
+  const [activeOverlays, setActiveOverlays] = useState(['Purok Boundaries', CLUP_LAYER])
   const [search, setSearch] = useState('')
   const [barangays, setBarangays] = useState([])
   // Per-purok counts + at-risk flags from the server (not every household).
