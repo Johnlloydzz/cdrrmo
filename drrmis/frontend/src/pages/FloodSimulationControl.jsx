@@ -128,6 +128,13 @@ function MapResizeHandler() {
   return null
 }
 
+// "2026-10-09 22:36:25" -> "Oct 9, 10:36 PM" (falls back to the raw text).
+function shortDateTime(v) {
+  const d = new Date(String(v).replace(' ', 'T'))
+  if (isNaN(d)) return v
+  return d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 export default function FloodSimulationControl() {
   const isDisplayMode = useLocation().pathname === '/flood-control/display'
   const [hazard, setHazard] = useState('flood') // 'flood' | 'landslide'
@@ -463,7 +470,7 @@ export default function FloodSimulationControl() {
         {/* Side panel (Barangays list, Flood Level Controls) — hidden on the
             big-screen display, which shows only the map. Hidden with CSS
             rather than removed, so its background checks keep running. */}
-        <div className={`${isDisplayMode ? 'hidden' : ''} w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto lg:order-2`}>
+        <div className={`${isDisplayMode ? 'hidden' : ''} w-full lg:w-72 xl:w-80 lg:flex-shrink-0 space-y-3 lg:overflow-y-auto lg:order-2`}>
           <div className="card p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm flex items-center gap-2"><Building2 size={15} /> Barangays</h3>
@@ -509,7 +516,7 @@ export default function FloodSimulationControl() {
               </span>
               <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${showControls ? 'rotate-180' : ''}`} />
             </button>
-            {(floodLevel > 0 || autoFloodedIds.length > 0) && (
+            {!showControls && (floodLevel > 0 || autoFloodedIds.length > 0) && (
               <div className="px-4 pb-2 flex flex-wrap gap-1.5">
                 {floodLevel > 0 && <span className={`${heavyRain ? 'badge-red' : 'badge-yellow'} text-[10px]`}>Flood level: {floodLevel}m ({heavyRain ? 'active' : 'standby'})</span>}
                 {simulateRain
@@ -555,20 +562,21 @@ export default function FloodSimulationControl() {
                         )
                       })()}
                       <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-blue-50 rounded-lg p-2 text-center">
-                          <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.precipitation ?? '—'} mm</p>
-                          <p className="text-[9px] text-gray-500 uppercase">Rain now</p>
+                        <div className="bg-blue-50 rounded-lg px-1 py-2 text-center min-w-0">
+                          <p className="text-sm font-bold text-blue-700 whitespace-nowrap">{liveWeather?.current?.precipitation ?? '—'}<span className="text-[10px] font-semibold"> mm</span></p>
+                          <p className="text-[9px] text-gray-500 uppercase whitespace-nowrap">Rain now</p>
                           {weatherCodeLabel(liveWeather?.current?.weather_code, liveWeather?.current?.precipitation) && (
                             <p className="text-[9px] text-blue-600 leading-tight mt-0.5">{weatherCodeLabel(liveWeather.current.weather_code, liveWeather.current.precipitation)}</p>
                           )}
                         </div>
-                        <div className="bg-blue-50 rounded-lg p-2 text-center" title={rain24h > 0 && rain24hInfo?.peakLabel ? `Rain was ${rain24hInfo.peakLabel}` : undefined}>
-                          <p className="text-sm font-bold text-blue-700">{rain24h ?? '—'} mm</p>
-                          <p className="text-[9px] text-gray-500 uppercase">Last 24 hrs</p>
+                        <div className="bg-blue-50 rounded-lg px-1 py-2 text-center min-w-0" title={rain24h > 0 && rain24hInfo?.peakLabel ? `Rain was ${rain24hInfo.peakLabel}` : undefined}>
+                          <p className="text-sm font-bold text-blue-700 whitespace-nowrap">{rain24h ?? '—'}<span className="text-[10px] font-semibold"> mm</span></p>
+                          <p className="text-[9px] text-gray-500 uppercase whitespace-nowrap">Last 24 hrs</p>
                         </div>
-                        <div className="bg-amber-50 rounded-lg p-2 text-center">
-                          <p className="text-sm font-bold text-amber-700">{todayDischarge ?? '—'}</p>
-                          <p className="text-[9px] text-gray-500 uppercase">River m³/s{dischargeRatio != null ? ` · ${dischargeRatio.toFixed(1)}× normal` : ''}</p>
+                        <div className="bg-amber-50 rounded-lg px-1 py-2 text-center min-w-0" title="River discharge in m³/s, compared with the normal level.">
+                          <p className="text-sm font-bold text-amber-700 whitespace-nowrap">{todayDischarge ?? '—'}</p>
+                          <p className="text-[9px] text-gray-500 uppercase whitespace-nowrap">River m³/s</p>
+                          {dischargeRatio != null && <p className="text-[9px] text-amber-700 leading-tight mt-0.5 whitespace-nowrap">{dischargeRatio.toFixed(1)}× normal</p>}
                         </div>
                       </div>
                       <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1 cursor-help"
@@ -583,22 +591,26 @@ export default function FloodSimulationControl() {
                 {/* Flood-only manual water level input */}
                 {isFlood ? (
                   <div className="border-t border-gray-100 pt-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input type="number" step="0.1" min="0" className="input w-24 py-1.5 text-sm" placeholder="0.0" value={input} onChange={e => setInput(e.target.value)} />
-                      <span className="text-xs text-gray-500">meters</span>
-                      <button className="btn-primary text-xs px-3 py-1.5" onClick={handleUpdate} disabled={saving}>{saving ? 'Updating…' : 'Update'}</button>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1 min-w-0">
+                        <input type="number" step="0.1" min="0" className="input w-full py-1.5 pr-8 text-sm" placeholder="0.0" value={input} onChange={e => setInput(e.target.value)} aria-label="Flood level in meters" />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">m</span>
+                      </div>
+                      <button className="btn-primary text-xs px-3 py-1.5 flex-shrink-0" onClick={handleUpdate} disabled={saving}>{saving ? 'Updating…' : 'Update'}</button>
                     </div>
-                    {floodLevel > 0 && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving} title="The flood level stays in effect until you change it or reset it.">Reset to Normal</button>}
                     {floodLevel > 0 ? (
-                      <p className={`text-xs font-medium mt-2 flex items-start gap-1.5 cursor-help ${heavyRain ? 'text-red-600' : 'text-amber-700'}`}
-                        title={heavyRain ? 'Heavy rain detected: puroks in flood-prone areas are red.' : 'Puroks turn red only when heavy rain is detected.'}>
-                        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        <span>Flood level <strong>{floodLevel} m</strong>: {heavyRain ? 'ACTIVE' : 'Standby'}</span>
-                      </p>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className={`text-xs font-medium flex items-center gap-1.5 cursor-help min-w-0 ${heavyRain ? 'text-red-600' : 'text-amber-700'}`}
+                          title={heavyRain ? 'Heavy rain detected: puroks in flood-prone areas are red.' : 'Puroks turn red only when heavy rain is detected.'}>
+                          <AlertTriangle size={13} className="flex-shrink-0" />
+                          <span className="whitespace-nowrap"><strong>{floodLevel} m</strong> · {heavyRain ? 'ACTIVE' : 'Standby'}</span>
+                        </p>
+                        <button type="button" className="text-xs text-gray-500 hover:text-red-600 underline underline-offset-2 flex-shrink-0" onClick={handleReset} disabled={saving} title="The flood level stays in effect until you change it or reset it.">Reset</button>
+                      </div>
                     ) : (
                       <p className="text-xs text-gray-500 mt-2 cursor-help" title="During heavy rain, a 1 m flood is used.">No flood level set.</p>
                     )}
-                    {updatedAt && floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Set {updatedAt}</p>}
+                    {updatedAt && floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Set {shortDateTime(updatedAt)}</p>}
 
                     {!simulateRain && autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
