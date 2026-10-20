@@ -562,26 +562,19 @@ export default function FloodSimulationControl() {
                             <p className="text-[9px] text-blue-600 leading-tight mt-0.5">{weatherCodeLabel(liveWeather.current.weather_code, liveWeather.current.precipitation)}</p>
                           )}
                         </div>
-                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                        <div className="bg-blue-50 rounded-lg p-2 text-center" title={rain24h > 0 && rain24hInfo?.peakLabel ? `Rain was ${rain24hInfo.peakLabel}` : undefined}>
                           <p className="text-sm font-bold text-blue-700">{rain24h ?? '—'} mm</p>
-                          <p className="text-[9px] text-gray-500 uppercase">Est. last 24 hrs</p>
-                          {rain24h > 0 && rain24hInfo?.peakLabel && <p className="text-[9px] text-gray-400 leading-tight mt-0.5">{rain24hInfo.peakLabel}</p>}
+                          <p className="text-[9px] text-gray-500 uppercase">Last 24 hrs</p>
                         </div>
                         <div className="bg-amber-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-amber-700">{todayDischarge ?? '—'}</p>
                           <p className="text-[9px] text-gray-500 uppercase">River m³/s{dischargeRatio != null ? ` · ${dischargeRatio.toFixed(1)}× normal` : ''}</p>
                         </div>
                       </div>
-                      <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
+                      <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1 cursor-help"
+                        title="Source: Open-Meteo and GloFAS. Refreshes every 5 minutes. Rain figures are weather-model estimates for the area around the city centre, not a rain gauge reading, so they can differ from what fell where you are. River discharge is volume flow, not water depth.">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                         Updated {liveUpdatedAt ? liveUpdatedAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—'}
-                        <span className="text-gray-400">· auto every 5 min</span>
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1 cursor-help" title="Refreshes every 5 minutes. &quot;Rain now&quot; is the rain at this moment and shows 0 during a pause. River discharge is volume flow, not water depth.">
-                        Source: Open-Meteo, GloFAS
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-1 leading-snug">
-                        Rain figures are weather-model estimates for the area around the city centre, including nearby hills, not a rain gauge reading. They can differ from what fell where you are.
                       </p>
                     </>
                   )}
@@ -595,17 +588,17 @@ export default function FloodSimulationControl() {
                       <span className="text-xs text-gray-500">meters</span>
                       <button className="btn-primary text-xs px-3 py-1.5" onClick={handleUpdate} disabled={saving}>{saving ? 'Updating…' : 'Update'}</button>
                     </div>
-                    {floodLevel > 0 && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving}>Reset to Normal</button>}
+                    {floodLevel > 0 && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving} title="The flood level stays in effect until you change it or reset it.">Reset to Normal</button>}
                     {floodLevel > 0 ? (
-                      <p className={`text-xs font-medium mt-2 flex items-start gap-1.5 ${heavyRain ? 'text-red-600' : 'text-amber-700'}`}>
+                      <p className={`text-xs font-medium mt-2 flex items-start gap-1.5 cursor-help ${heavyRain ? 'text-red-600' : 'text-amber-700'}`}
+                        title={heavyRain ? 'Heavy rain detected: puroks in flood-prone areas are red.' : 'Puroks turn red only when heavy rain is detected.'}>
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        <span>Flood level: <strong>{floodLevel} m</strong> — {heavyRain ? 'ACTIVE (heavy rain): puroks in flood-prone areas are red' : 'standby: puroks turn red only when heavy rain is detected'}</span>
+                        <span>Flood level <strong>{floodLevel} m</strong>: {heavyRain ? 'ACTIVE' : 'Standby'}</span>
                       </p>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-2">No flood level set. Heavy rain is treated as a 1 m flood.</p>
+                      <p className="text-xs text-gray-500 mt-2 cursor-help" title="During heavy rain, a 1 m flood is used.">No flood level set.</p>
                     )}
-                    {updatedAt && <p className="text-[10px] text-gray-400 mt-1">Last updated: {updatedAt}</p>}
-                    {floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Stays in effect until you change it or press Reset to Normal.</p>}
+                    {updatedAt && floodLevel > 0 && <p className="text-[10px] text-gray-400 mt-1">Set {updatedAt}</p>}
 
                     {!simulateRain && autoFloodedBarangayNames.length > 0 && (
                       <p className="text-xs text-red-600 font-medium mt-2 flex items-start gap-1.5 pt-2 border-t border-gray-100">
@@ -618,7 +611,7 @@ export default function FloodSimulationControl() {
                         rain, for drills and demos when it isn't really raining. */}
                     <div className={`mt-3 pt-3 border-t border-gray-100 rounded-lg ${simulateRain ? 'bg-red-50 -mx-2 px-2 pb-2' : ''}`}>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-gray-700">Simulate heavy rain (test)</span>
+                        <span className="text-xs font-semibold text-gray-700 cursor-help" title="For drills and demos: acts as if heavy rain is falling in every barangay, so puroks in flood-prone areas turn red at the flood level set above.">Simulate heavy rain (test)</span>
                         <button
                           type="button" role="switch" aria-checked={simulateRain} onClick={handleToggleSimulate} disabled={saving}
                           className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${simulateRain ? 'bg-red-500' : 'bg-gray-300'} disabled:opacity-50`}
@@ -627,15 +620,10 @@ export default function FloodSimulationControl() {
                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${simulateRain ? 'translate-x-4' : 'translate-x-0.5'}`} />
                         </button>
                       </div>
-                      <p className={`text-[10px] mt-1 leading-snug ${simulateRain ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
-                        {simulateRain
-                          ? `ON — drill only. All puroks in flood-prone areas are red at ${activeFloodLevel} m. Turn off when done.`
-                          : 'For drills and demos: acts as if heavy rain is falling in every barangay.'}
-                      </p>
+                      {simulateRain && (
+                        <p className="text-[10px] mt-1 leading-snug text-red-600 font-medium">ON (drill only). Turn off when done.</p>
+                      )}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-2 pt-2 border-t border-gray-100 cursor-help" title="A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours and the river is 20% above normal; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.">
-                      Auto-detect: every 5 minutes, based on live rainfall and river data.
-                    </p>
                     {(() => {
                       // Auto-detect status — green: the server checks by itself;
                       // amber: the server is blocked by the weather service's
@@ -645,13 +633,14 @@ export default function FloodSimulationControl() {
                       if (!st.last_success_at && st.server_ok === undefined) return null
                       const mins = st.last_success_at ? (Date.now() - new Date(st.last_success_at).getTime()) / 60000 : Infinity
                       const at = st.last_success_at ? new Date(st.last_success_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : null
-                      const [dot, text, color] = st.server_ok && mins <= 12
-                        ? ['bg-green-500', `Auto-detect running on the server · last check ${at}`, 'text-gray-500']
+                      const rules = 'Checks every 5 minutes. A barangay is flagged when: (1) rain exceeds 30 mm/hr and the river is 50% above normal; (2) 100 mm or more falls within 24 hours and the river is 20% above normal; or (3) 150 mm over 3 days or 250 mm over 7 days while the river is 20% above normal.'
+                      const [dot, text, color, tip] = st.server_ok && mins <= 12
+                        ? ['bg-green-500', `Auto-detect on (last check ${at})`, 'text-gray-500', rules]
                         : st.last_source === 'browser' && mins <= 12
-                          ? ['bg-amber-500', `Weather service is blocking the server (daily limit), so a CDRRMO computer is checking instead · last check ${at}. Keep the system open on this computer.`, 'text-amber-700']
-                          : ['bg-red-500', 'Auto-detect paused: the weather service limit was reached on the server. Keep the system open on a CDRRMO computer so it can check from there.', 'text-red-600']
+                          ? ['bg-amber-500', `Auto-detect on this computer (last check ${at})`, 'text-amber-700', 'The weather service is blocking the server (daily limit), so this CDRRMO computer is checking instead. Keep the system open here. ' + rules]
+                          : ['bg-red-500', 'Auto-detect paused', 'text-red-600', 'The weather service limit was reached on the server. Keep the system open on a CDRRMO computer so it can check from there. ' + rules]
                       return (
-                        <p className={`text-[10px] mt-1 leading-snug flex items-start gap-1.5 ${color}`}>
+                        <p className={`text-[10px] mt-2 pt-2 border-t border-gray-100 leading-snug flex items-start gap-1.5 cursor-help ${color}`} title={tip}>
                           <span className={`w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 ${dot}`} />
                           <span>{text}</span>
                         </p>
