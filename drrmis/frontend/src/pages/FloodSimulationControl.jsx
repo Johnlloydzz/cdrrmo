@@ -178,7 +178,10 @@ export default function FloodSimulationControl() {
   const [liveError, setLiveError] = useState(false)
   const [liveUpdatedAt, setLiveUpdatedAt] = useState(null) // when the live data was last refreshed
 
-  const [autoFloodedIds, setAutoFloodedIds] = useState([])
+  const [autoFloodedIds, setAutoFloodedIds] = useState([]) // all flagged: detected + reported (+ test)
+  const [detectedIds, setDetectedIds] = useState([])          // heavy rain detected by the live check
+  const [reportedIds, setReportedIds] = useState([])          // flooding reported by CDRRMO
+  const [reportPick, setReportPick] = useState('')
   // "Simulate heavy rain" TEST switch (drills / defense demo): while on,
   // every barangay counts as having heavy rain.
   const [simulateRain, setSimulateRain] = useState(false)
@@ -281,7 +284,7 @@ export default function FloodSimulationControl() {
         }
         setFloodLevel(fl.level_m); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
       }).catch(() => {})
-      apiGet('/settings/auto-flood-barangays').then(af => { setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate); setAutoStatus(af.status || {}) }).catch(() => {})
+      apiGet('/settings/auto-flood-barangays').then(af => { setAutoFloodedIds(af.barangay_ids || []); setDetectedIds(af.detected_ids || af.barangay_ids || []); setReportedIds(af.reported_ids || []); setSimulateRain(!!af.simulate); setAutoStatus(af.status || {}) }).catch(() => {})
       // At-risk flags come from the server (same geofence everywhere), so
       // refresh the selected barangay's purok pins too.
       if (selectedIdRef.current) {
@@ -305,7 +308,7 @@ export default function FloodSimulationControl() {
     ])
       .then(([fl, af, b]) => {
         setFloodLevel(fl.level_m); setInput(String(fl.level_m)); setUpdatedAt(fl.updated_at); setFloodSource(fl.source || 'manual')
-        setAutoFloodedIds(af.barangay_ids || []); setSimulateRain(!!af.simulate); setAutoStatus(af.status || {})
+        setAutoFloodedIds(af.barangay_ids || []); setDetectedIds(af.detected_ids || af.barangay_ids || []); setReportedIds(af.reported_ids || []); setSimulateRain(!!af.simulate); setAutoStatus(af.status || {})
         setBarangays(b)
         const id = selectedIdRef.current
         if (id) apiGet(`/risk-assessment/puroks?barangay_id=${id}`).then(rows => { if (selectedIdRef.current === id) setPurokRows(rows) }).catch(() => {})
@@ -325,7 +328,7 @@ export default function FloodSimulationControl() {
   }
 
   const handleReset = async () => {
-    if (!window.confirm('Reset to normal? This clears the reported flood level for the WHOLE system (Dashboard, GIS Map and this page).')) return
+    if (!window.confirm('Reset to normal? This clears the reported flood level and the barangays where flooding was reported, for the WHOLE system (Dashboard, GIS Map and this page).')) return
     setSaving(true)
     try { await apiPut('/settings/flood-level', { level_m: 0, source: 'manual' }); load({ silent: true }) }
     catch (err) { alert(err.message) } finally { setSaving(false) }
@@ -338,6 +341,14 @@ export default function FloodSimulationControl() {
       : 'Stop the TEST heavy rain simulation? Flood risk goes back to live rainfall data.')) return
     setSaving(true)
     try { await apiPut('/settings/simulate-heavy-rain', { on }); await load({ silent: true }) }
+    catch (err) { alert(err.message) } finally { setSaving(false) }
+  }
+
+  // Barangays where flooding is reported: only these (plus any with detected
+  // heavy rain) are flagged, so the rest of the city isn't affected.
+  const saveReported = async (ids) => {
+    setSaving(true)
+    try { await apiPut('/settings/reported-flood-barangays', { barangay_ids: ids }); await load({ silent: true }) }
     catch (err) { alert(err.message) } finally { setSaving(false) }
   }
 
@@ -373,7 +384,8 @@ export default function FloodSimulationControl() {
     return () => { cancelled = true }
   }, [isFlood, heavyRain, simulateRain, floodLevel, autoFloodedIds.join(',')])
 
-  const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => autoFloodedIds.includes(b.id)).map(b => b.name)
+  const autoFloodedBarangayNames = barangaysWithCentroid.filter(b => detectedIds.includes(b.id)).map(b => b.name)
+  const reportedBarangays = barangaysWithCentroid.filter(b => reportedIds.includes(b.id))
 
   const filteredBarangays = barangaysWithCentroid.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -595,11 +607,11 @@ export default function FloodSimulationControl() {
                       <span className="text-xs text-gray-500">meters</span>
                       <button className="btn-primary text-xs px-3 py-1.5" onClick={handleUpdate} disabled={saving}>{saving ? 'Updating…' : 'Update'}</button>
                     </div>
-                    {floodLevel > 0 && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving}>Reset to Normal</button>}
+                    {(floodLevel > 0 || reportedIds.length > 0) && <button className="btn-secondary text-xs px-3 py-1.5 mt-2" onClick={handleReset} disabled={saving}>Reset to Normal</button>}
                     {floodLevel > 0 ? (
                       <p className={`text-xs font-medium mt-2 flex items-start gap-1.5 ${heavyRain ? 'text-red-600' : 'text-amber-700'}`}>
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                        <span>Flood level: <strong>{floodLevel} m</strong> — {heavyRain ? 'ACTIVE (heavy rain): puroks in flood-prone areas are red' : 'standby: puroks turn red only when heavy rain is detected'}</span>
+                        <span>Flood level: <strong>{floodLevel} m</strong> — {heavyRain ? 'ACTIVE: puroks in flood-prone areas of the flagged barangays are red' : 'standby: puroks turn red only when heavy rain is detected or flooding is reported'}</span>
                       </p>
                     ) : (
                       <p className="text-xs text-gray-500 mt-2">No flood level set. Heavy rain is treated as a 1 m flood.</p>
@@ -613,6 +625,41 @@ export default function FloodSimulationControl() {
                         <span>Heavy rain detected: <strong>{autoFloodedBarangayNames.join(', ')}</strong></span>
                       </p>
                     )}
+
+                    {/* Flooding reported in specific barangays (real reports, not a
+                        test). Only these barangays are flagged — others in the
+                        flood area are not affected. */}
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-gray-700">Flooding reported in</p>
+                      <p className="text-[10px] text-gray-400 leading-snug mt-0.5">
+                        Add the barangays where flooding is actually reported. Only these (and any with detected heavy rain) are flagged; other barangays are not affected.
+                      </p>
+                      {reportedBarangays.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {reportedBarangays.map(b => (
+                            <span key={b.id} className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-[11px] font-medium pl-2 pr-1 py-0.5">
+                              {b.name}
+                              <button type="button" disabled={saving} onClick={() => saveReported(reportedIds.filter(id => id !== b.id))}
+                                className="rounded-full p-0.5 hover:bg-red-100 disabled:opacity-50" aria-label={`Remove ${b.name}`} title="Remove">
+                                <X size={11} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-1.5 mt-2">
+                        <select className="input text-xs py-1.5 flex-1 min-w-0" value={reportPick} onChange={e => setReportPick(e.target.value)} disabled={saving}>
+                          <option value="">Add a barangay…</option>
+                          {barangaysWithCentroid.filter(b => !reportedIds.includes(b.id)).slice().sort((a, b) => a.name.localeCompare(b.name)).map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                        <button type="button" disabled={!reportPick || saving}
+                          onClick={() => { const id = Number(reportPick); setReportPick(''); saveReported([...reportedIds, id]) }}
+                          className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50">Add</button>
+                      </div>
+                      {reportedBarangays.length > 0 && <p className="text-[10px] text-gray-400 mt-1">Cleared by Reset to Normal.</p>}
+                    </div>
 
                     {/* TEST switch — makes every barangay count as having heavy
                         rain, for drills and demos when it isn't really raining. */}

@@ -31,6 +31,7 @@ async function expireStaleFloodData() {
     )
     if (level && parseFloat(level.value) > 0 && level.age_hours != null && level.age_hours >= levelHours) {
       await run(`UPDATE system_settings SET value = '0', updated_at = datetime('now', '+8 hours') WHERE key = 'current_flood_level_m'`)
+      await run(`UPDATE system_settings SET value = '[]', updated_at = datetime('now', '+8 hours') WHERE key = 'reported_flood_barangay_ids'`)
     }
   }
 
