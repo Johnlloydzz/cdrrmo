@@ -248,6 +248,20 @@ router.get('/system-info', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// CDRRMO office number: a mobile number (09XXXXXXXXX or +639XXXXXXXXX),
+// a landline with area code (e.g. (088) 861-1234), or a short local number
+// or hotline (e.g. 861-1234, 911). Returns an error message, or '' if valid.
+function officeNumberError(v) {
+  const s = String(v || '').trim()
+  if (!s) return ''
+  if (!/^[0-9+()\- ]+$/.test(s)) return 'Use digits only (spaces, +, - and ( ) are allowed).'
+  const d = s.replace(/\D/g, '')
+  if (s.startsWith('+')) return /^639\d{9}$/.test(d) ? '' : `Must be +63 followed by 10 digits, e.g. +639171234567 (${d.length}/12).`
+  if (d.startsWith('09')) return d.length === 11 ? '' : `Mobile number must be 11 digits, e.g. 09171234567 (${d.length}/11).`
+  if (d.startsWith('0')) return d.length >= 9 && d.length <= 10 ? '' : 'Landline with area code must be 9 to 10 digits, e.g. (088) 861-1234.'
+  return d.length >= 3 && d.length <= 8 ? '' : 'Enter a valid number, e.g. 09171234567, (088) 861-1234 or 911.'
+}
+
 // PUT /api/settings/system-info — CDRRMO Personnel only.
 router.put('/system-info', async (req, res) => {
   try {
@@ -260,7 +274,8 @@ router.put('/system-info', async (req, res) => {
     const email = String(req.body.email ?? '').trim()
     if (name.length > 100 || address.length > 200) return res.status(400).json({ error: 'System name or address is too long.' })
     // Office number may be a landline or hotline, e.g. (088) 861-1234 or 911.
-    if (contact && !/^[0-9+()\- ]{3,20}$/.test(contact)) return res.status(400).json({ error: 'Contact number may only use digits, spaces, +, - and ( ) (max 20 characters).' })
+    const contactError = officeNumberError(contact)
+    if (contactError) return res.status(400).json({ error: `Contact number: ${contactError}` })
     if (email && (email.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return res.status(400).json({ error: 'Enter a valid email address.' })
     const entries = [['system_name', name], ['system_address', address], ['system_contact', contact], ['system_email', email]]
     await Promise.all(entries.map(([key, value]) =>

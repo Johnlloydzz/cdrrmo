@@ -6,6 +6,20 @@ import { Skeleton } from '../components/Skeleton'
 const InputSkeleton = () => <Skeleton className="h-[38px] w-full rounded-lg" />
 import { apiGet, apiPut } from '../utils/api'
 
+// CDRRMO office number: a mobile number (09XXXXXXXXX or +639XXXXXXXXX),
+// a landline with area code (e.g. (088) 861-1234), or a short local number
+// or hotline (e.g. 861-1234, 911). Returns an error message, or '' if valid.
+function officeNumberError(v) {
+  const s = String(v || '').trim()
+  if (!s) return ''
+  if (!/^[0-9+()\- ]+$/.test(s)) return 'Use digits only (spaces, +, - and ( ) are allowed).'
+  const d = s.replace(/\D/g, '')
+  if (s.startsWith('+')) return /^639\d{9}$/.test(d) ? '' : `Must be +63 followed by 10 digits, e.g. +639171234567 (${d.length}/12).`
+  if (d.startsWith('09')) return d.length === 11 ? '' : `Mobile number must be 11 digits, e.g. 09171234567 (${d.length}/11).`
+  if (d.startsWith('0')) return d.length >= 9 && d.length <= 10 ? '' : 'Landline with area code must be 9 to 10 digits, e.g. (088) 861-1234.'
+  return d.length >= 3 && d.length <= 8 ? '' : 'Enter a valid number, e.g. 09171234567, (088) 861-1234 or 911.'
+}
+
 export default function Settings({ currentUser }) {
   const isCdrrmo = currentUser?.role === 'CDRRMO Personnel'
   const isBarangayOfficial = currentUser?.role === 'Barangay Official'
@@ -38,7 +52,10 @@ export default function Settings({ currentUser }) {
     }
   }, [])
 
+  const officeContactError = officeNumberError(system.contact)
+
   const handleSave = async () => {
+    if (officeContactError) return
     setSaving(true)
     setError('')
     try {
@@ -120,7 +137,8 @@ export default function Settings({ currentUser }) {
           </div>
           <div>
             <label className="label">Contact Number</label>
-            {loading ? <InputSkeleton /> : <input className="input" type="tel" maxLength={20} placeholder="e.g. 09171234567 or (088) 861-1234" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value.replace(/[^0-9+()\- ]/g, '') })} />}
+            {loading ? <InputSkeleton /> : <input className={`input ${officeContactError ? 'border-amber-400' : ''}`} type="tel" maxLength={16} placeholder="e.g. 09171234567 or (088) 861-1234" value={system.contact} disabled={!isCdrrmo} onChange={e => setSystem({ ...system, contact: e.target.value.replace(/[^0-9+()\- ]/g, '') })} />}
+            {!loading && officeContactError && <p className="text-xs text-amber-600 mt-1">{officeContactError}</p>}
           </div>
           <div className="col-span-2">
             <label className="label">Email</label>
@@ -132,7 +150,7 @@ export default function Settings({ currentUser }) {
 
       {isCdrrmo && (
         <div className="flex justify-end">
-          <button className="btn-primary flex items-center gap-2" onClick={handleSave} disabled={saving || loading || systemLoadFailed}>
+          <button className="btn-primary flex items-center gap-2" onClick={handleSave} disabled={saving || loading || systemLoadFailed || !!officeContactError}>
             <Save size={15} /> {saving ? 'Saving…' : 'Save Settings'}
           </button>
         </div>
