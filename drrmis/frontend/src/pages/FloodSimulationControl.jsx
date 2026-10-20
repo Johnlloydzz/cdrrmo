@@ -33,17 +33,18 @@ function getRainfallWarning(mm) {
   return { level: 'None', color: '#16a34a', bg: '#f0fdf4', message: 'No heavy rainfall.' }
 }
 
-// What the weather model says it is doing right now (WMO weather code from
-// Open-Meteo). Light drizzle is often less than 0.1 mm, so "Rain now" can
-// read 0 mm while the model itself says it is raining — this label shows it.
-function weatherCodeLabel(code) {
-  if (code == null) return null
-  if ([51, 53, 55, 56, 57].includes(code)) return 'Drizzle'
-  if (code === 61 || code === 80) return 'Light rain'
-  if (code === 63 || code === 81) return 'Moderate rain'
-  if (code === 65 || code === 82) return 'Heavy rain'
-  if (code >= 95) return 'Thunderstorm'
-  return null
+// Short description of the rain right now. The weather model's own code
+// (WMO weather_code from Open-Meteo) is only a guess for a ~10 km area: it
+// often says "thunderstorm" when it merely expects convective showers, even
+// with 0–0.2 mm of rain. So the label follows the actual amount (mm/hr), and
+// "thunderstorm" is only shown when the rain is really heavy too.
+function weatherCodeLabel(code, mm) {
+  if (code == null || code < 51) return null // clear, cloudy or fog: no rain label
+  const rain = Number(mm) || 0
+  if (rain >= 7.5) return code >= 95 ? 'Thunderstorm likely' : 'Heavy rain'
+  if (rain >= 2.5) return 'Moderate rain'
+  if (rain > 0) return 'Light rain'
+  return 'Light drizzle possible'
 }
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors —
@@ -557,8 +558,8 @@ export default function FloodSimulationControl() {
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
                           <p className="text-sm font-bold text-blue-700">{liveWeather?.current?.precipitation ?? '—'} mm</p>
                           <p className="text-[9px] text-gray-500 uppercase">Rain now</p>
-                          {weatherCodeLabel(liveWeather?.current?.weather_code) && (
-                            <p className="text-[9px] text-blue-600 leading-tight mt-0.5">{weatherCodeLabel(liveWeather.current.weather_code)}</p>
+                          {weatherCodeLabel(liveWeather?.current?.weather_code, liveWeather?.current?.precipitation) && (
+                            <p className="text-[9px] text-blue-600 leading-tight mt-0.5">{weatherCodeLabel(liveWeather.current.weather_code, liveWeather.current.precipitation)}</p>
                           )}
                         </div>
                         <div className="bg-blue-50 rounded-lg p-2 text-center">
