@@ -793,12 +793,9 @@ export default function GISMap() {
                     ? { color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.18 }
                     : { color: '#2563eb', weight: 3, fillColor: '#2563eb', fillOpacity: 0.08 }}
                 >
-                  <Tooltip permanent direction="center" className="purok-name-label">
-                    <div style={{ textAlign: 'center', lineHeight: 1.2 }}>
-                      <div>{p.name}</div>
-                      <div style={{ fontWeight: 600 }}>{p.resident_count ?? 0} residents</div>
-                    </div>
-                  </Tooltip>
+                  {/* Name shows on hover only (same as Flood Simulation Control),
+                      so labels don't cover the map when zoomed out. */}
+                  <Tooltip sticky>{p.name} · {p.resident_count ?? 0} residents</Tooltip>
                   <Popup>
                     <strong>{p.name}</strong> — {b.name}<br />
                     Registered residents: {p.resident_count ?? 0}<br />
@@ -820,7 +817,7 @@ export default function GISMap() {
               position={[p.lat, p.lng]}
               icon={L.divIcon({
                 className: '',
-                html: `<div style="font-size:11px;font-weight:700;color:#57534e;text-align:center;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${escapeHtml(String(p.name).toUpperCase())}<br/>${Number(p.residents) || 0} residents</div>`,
+                html: `<div style="transform:translate(-50%,-50%);font-size:9px;font-weight:600;color:#57534e;text-align:center;text-shadow:0 1px 2px rgba(255,255,255,0.9),0 -1px 2px rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none">${escapeHtml(String(p.name))}</div>`,
                 iconSize: [0, 0],
               })}
             />

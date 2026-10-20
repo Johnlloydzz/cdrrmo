@@ -803,7 +803,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                     data={geo}
                     pathOptions={{ color: atRisk ? '#dc2626' : '#2563eb', weight: 3, fillColor: atRisk ? '#dc2626' : '#2563eb', fillOpacity: 0.1 }}
                   >
-                    <Tooltip permanent direction="center" className="purok-name-label">{p.name}</Tooltip>
+                    <Tooltip sticky>{p.name}</Tooltip>
                     <Popup>
                       <strong>{p.name}</strong> — {selectedBarangay.name}<br />
                       Households: {p.household_count ?? 0}<br />
