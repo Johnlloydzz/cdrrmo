@@ -380,7 +380,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       <div className="flex-shrink-0">
         <h1 className="text-lg font-semibold text-gray-800">Risk Assessment Dashboard</h1>
         <p className="text-xs text-gray-500 mt-0.5">
-          Projected households and population within high flood-risk zones, based on CDRA-aligned purok classification (geofencing).
+          Households and population in high flood-risk zones, based on the CDRA purok classification.
         </p>
       </div>
       {wakingUp && (
@@ -432,12 +432,12 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       <div className="flex-shrink-0">
         <h1 className="text-lg font-semibold text-gray-800">Risk Assessment Dashboard</h1>
         <p className="text-xs text-gray-500 mt-0.5">
-          Projected households and population within high flood-risk zones, based on CDRA-aligned purok classification (geofencing).
+          Households and population in high flood-risk zones, based on the CDRA purok classification.
         </p>
         {selectedBarangay && (
           <p className="text-xs text-primary-700 font-medium mt-1 flex items-center gap-1">
-            <Building2 size={12} /> Showing figures for {selectedBarangay.name} only
-            <button type="button" onClick={() => setSelectedBarangay(null)} className="text-gray-400 hover:text-gray-600 underline ml-1">clear</button>
+            <Building2 size={12} /> Barangay: {selectedBarangay.name}
+            <button type="button" onClick={() => setSelectedBarangay(null)} className="text-gray-400 hover:text-gray-600 underline ml-1">Show all</button>
           </p>
         )}
       </div>
@@ -453,15 +453,15 @@ export default function RiskAssessmentDashboard({ currentUser }) {
             <p className={`text-xs ${heavyRain ? 'text-red-700' : 'text-amber-800'}`}>
               {!heavyRain ? (
                 <>
-                  <strong>Flood level set: {floodLevel} m (standby)</strong> — no heavy rain right now, so no purok is flagged. Puroks in flood-prone areas turn red as soon as heavy rain is detected in their barangay.
+                  <strong>Flood level: {floodLevel} m (Standby).</strong> No heavy rain detected. Puroks in flood-prone areas will be flagged once heavy rain is detected.
                 </>
               ) : simulateRain ? (
                 <>
-                  <strong>TEST: heavy rain simulation</strong> (drill, not real rain) — all puroks in flood-prone areas are flagged at-risk at {activeFloodLevel} m.
+                  <strong>Drill: Heavy rain simulation.</strong> All puroks in flood-prone areas are flagged at {activeFloodLevel} m.
                 </>
               ) : (
                 <>
-                  <strong>LIVE flood alert — heavy rain detected</strong> (real-time rainfall + river data, flood level {activeFloodLevel} m) — puroks in flood-prone areas of these barangays are flagged at-risk:
+                  <strong>Flood Alert: Heavy rain detected.</strong> Flood level: {activeFloodLevel} m. Puroks in flood-prone areas of the following barangays are flagged:
                   {(() => {
                     // Long lists (a typhoon can flag dozens of barangays) are
                     // cut to the first few so the banner doesn't push the
@@ -470,9 +470,9 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                     const flagged = barangays.filter(b => autoFloodedIds.includes(b.id))
                     return <>
                       {flagged.slice(0, 5).map(b => (
-                        <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong> — {autoFloodReasons[b.id] || 'heavy rain detected'}</span>
+                        <span key={b.id} className="block mt-0.5">• <strong>{b.name}</strong>: {autoFloodReasons[b.id] || 'Heavy rain detected'}</span>
                       ))}
-                      {flagged.length > 5 && <span className="block mt-0.5">• and {flagged.length - 5} more barangay{flagged.length - 5 > 1 ? 's' : ''} — see "Barangays in Risk Zone" below</span>}
+                      {flagged.length > 5 && <span className="block mt-0.5">• {flagged.length - 5} more barangay{flagged.length - 5 > 1 ? 's' : ''} (see Barangays in Risk Zone)</span>}
                     </>
                   })()}
                 </>
@@ -727,7 +727,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                     pathOptions={{ color: '#555', weight: 0.5, fillColor: b.flood_area_geojson ? FLOOD_COLOR.Low : color, fillOpacity: 0.55 }}
                     eventHandlers={{ click: () => setSelectedBarangay(b) }}
                   >
-                    <Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip>
+                    <Tooltip sticky><strong>{b.name}</strong><br />Flood susceptibility: {level}<br />At-risk households: {atRiskByBarangay[b.id]?.at_risk_households || 0}</Tooltip>
                   </GeoJSON>
                   {(() => {
               // CDRRMO-adjusted hazard area: only this shape gets the
@@ -739,7 +739,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               return (
                 <GeoJSON key={`d-area-${b.id}-${b.updated_at}`} data={area} pane="hazard-areas"
                   pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — {level} flood susceptibility — {atRiskByBarangay[b.id]?.at_risk_households || 0} at-risk household{atRiskByBarangay[b.id]?.at_risk_households === 1 ? '' : 's'}</Tooltip></GeoJSON>
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky><strong>{b.name}</strong><br />Flood susceptibility: {level}<br />At-risk households: {atRiskByBarangay[b.id]?.at_risk_households || 0}</Tooltip></GeoJSON>
               )
             })()}
   {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
@@ -749,7 +749,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
                   return (
                     <GeoJSON data={res} pane="hazard-residential" pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
-                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
+                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky><strong>{b.name}</strong><br />Residential area</Tooltip></GeoJSON>
                   )
                 })()}
                 </React.Fragment>
@@ -805,20 +805,20 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   >
                     <Tooltip sticky>{p.name}</Tooltip>
                     <Popup>
-                      <strong>{p.name}</strong> — {selectedBarangay.name}<br />
+                      <strong>{p.name}</strong>, {selectedBarangay.name}<br />
                       Households: {p.household_count ?? 0}<br />
                       Population: {p.resident_count ?? 0}<br />
-                      Flood Risk: {p.flood_risk} · Landslide Risk: {p.landslide_risk}<br />
+                      Flood risk: {p.flood_risk}<br />Landslide risk: {p.landslide_risk}<br />
                       {autoFlooded && autoFloodReasons[selectedBarangay.id] && <>Reason: {autoFloodReasons[selectedBarangay.id]}<br /></>}
                       {lowBarangay
-                        ? <span style={{ color: '#16a34a' }}>Low flood susceptibility — not high risk</span>
+                        ? <span style={{ color: '#16a34a' }}>Status: Not at risk (low flood susceptibility)</span>
                         : outsideArea
-                        ? <span style={{ color: '#16a34a' }}>Outside the flood-prone area — not at risk</span>
+                        ? <span style={{ color: '#16a34a' }}>Status: Not at risk (outside flood-prone area)</span>
                         : activeLevel === 0
-                        ? <span style={{ color: '#16a34a' }}>No heavy rain right now — not at risk</span>
+                        ? <span style={{ color: '#16a34a' }}>Status: Not at risk (no heavy rain)</span>
                         : atRisk
-                          ? <span style={{ color: '#dc2626', fontWeight: 600 }}>WARNING: Flooded at {activeLevel} m ({simulateRain ? 'TEST simulation' : 'heavy rain, live'})</span>
-                          : <span style={{ color: '#16a34a' }}>Above flood level ({activeLevel} m) — not at risk</span>}
+                          ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Status: At risk, flood level {activeLevel} m{simulateRain ? ' (drill)' : ''}</span>
+                          : <span style={{ color: '#16a34a' }}>Status: Not at risk (above {activeLevel} m flood level)</span>}
                     </Popup>
                   </GeoJSON>
                 )
@@ -844,7 +844,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
       </div>
 
       <p className="text-[11px] text-gray-400 italic flex-shrink-0">
-        "At-risk" = within puroks classified High flood-risk (CDRRMO's CDRA data). Red dot in barangay list = has at-risk households.
+        At-risk: households in puroks classified as high flood risk (CDRA). A red dot marks a barangay with at-risk households.
       </p>
 
       {/* Total Households drill-down — docked to the right (away from the
