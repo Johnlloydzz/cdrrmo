@@ -727,7 +727,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                     pathOptions={{ color: '#555', weight: 0.5, fillColor: b.flood_area_geojson ? FLOOD_COLOR.Low : color, fillOpacity: 0.55 }}
                     eventHandlers={{ click: () => setSelectedBarangay(b) }}
                   >
-                    <Tooltip sticky><strong>{b.name}</strong><br />Flood susceptibility: {level}<br />At-risk households: {atRiskByBarangay[b.id]?.at_risk_households || 0}</Tooltip>
+                    <Popup><strong>{b.name}</strong><br />Flood susceptibility: {level}<br />At-risk households: {atRiskByBarangay[b.id]?.at_risk_households || 0}</Popup>
                   </GeoJSON>
                   {(() => {
               // CDRRMO-adjusted hazard area: only this shape gets the
@@ -739,7 +739,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
               return (
                 <GeoJSON key={`d-area-${b.id}-${b.updated_at}`} data={area} pane="hazard-areas"
                   pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky><strong>{b.name}</strong><br />Flood susceptibility: {level}<br />At-risk households: {atRiskByBarangay[b.id]?.at_risk_households || 0}</Tooltip></GeoJSON>
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}><Popup><strong>{b.name}</strong><br />Flood susceptibility: {level}<br />At-risk households: {atRiskByBarangay[b.id]?.at_risk_households || 0}</Popup></GeoJSON>
               )
             })()}
   {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
@@ -749,7 +749,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
                   return (
                     <GeoJSON data={res} pane="hazard-residential" pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
-                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky><strong>{b.name}</strong><br />Residential area</Tooltip></GeoJSON>
+                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Popup><strong>{b.name}</strong><br />Residential area</Popup></GeoJSON>
                   )
                 })()}
                 </React.Fragment>
