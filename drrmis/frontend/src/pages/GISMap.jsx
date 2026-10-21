@@ -191,6 +191,18 @@ export default function GISMap() {
   const [showPurokList, setShowPurokList] = useState(false)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
   const [shareCopied, setShareCopied] = useState(false)
+  const [callCopied, setCallCopied] = useState(false)
+
+  // Phones open the dialer (tel: link). Computers have no phone app, so the
+  // link would do nothing; there the number is copied instead, with a
+  // "Number copied" confirmation.
+  const handleCall = (e, number) => {
+    if (window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return
+    e.preventDefault()
+    const done = () => { setCallCopied(true); setTimeout(() => setCallCopied(false), 2000) }
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(number).then(done, done)
+    else done()
+  }
 
   useEffect(() => {
     setShowPurokList(false)
@@ -460,9 +472,10 @@ export default function GISMap() {
             {selectedBarangay.contact_number ? (
               <a
                 href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
+                onClick={e => handleCall(e, selectedBarangay.contact_number)}
                 className="mt-2 flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
               >
-                📞 Call {selectedBarangay.contact_number}
+                {callCopied ? '✓ Number copied' : `📞 Call ${selectedBarangay.contact_number}`}
               </a>
             ) : (
               <p className="text-xs text-amber-600 mt-2">No emergency contact number on file.</p>
@@ -478,15 +491,16 @@ export default function GISMap() {
             <div className="flex items-center gap-2 mt-3">
               <a
                 href={selectedBarangay.contact_number ? `tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}` : undefined}
+                onClick={e => selectedBarangay.contact_number && handleCall(e, selectedBarangay.contact_number)}
                 className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium transition-colors ${
                   selectedBarangay.contact_number
                     ? 'bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer'
                     : 'bg-gray-50 text-gray-300 pointer-events-none'
                 }`}
-                title={selectedBarangay.contact_number ? `Call ${selectedBarangay.contact_number}` : 'No contact number on file'}
+                title={selectedBarangay.contact_number ? `Call ${selectedBarangay.contact_number} (on a computer, copies the number)` : 'No contact number on file'}
               >
                 <Phone size={16} />
-                Call
+                {callCopied ? 'Copied!' : 'Call'}
               </a>
               {(selectedBarangay.centroid || geocodedCenter) ? (
                 <button
