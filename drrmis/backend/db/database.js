@@ -1,4 +1,5 @@
 const { createClient } = require('@libsql/client')
+const crypto = require('crypto')
 const { hashPassword } = require('../utils/password')
 
 // Hosted on Turso (libSQL) instead of a local file — Render's free tier has
@@ -231,6 +232,17 @@ async function initDb() {
   console.log('Database initialized.')
 }
 
+// Demo-account passwords are NEVER written in this file (the repo may be seen
+// by others). Before the FIRST start of a brand-new database you can set
+// SEED_CDRRMO_PASSWORD and SEED_BRGY_PASSWORD (min. 12 characters) in
+// Render → Environment. If they are not set, a random password is generated
+// and printed ONCE in the server log. Either way, change it after first sign-in.
+function seedPassword(envName) {
+  const fromEnv = process.env[envName]
+  if (fromEnv && fromEnv.length >= 12) return { value: fromEnv, generated: false }
+  return { value: crypto.randomBytes(12).toString('base64url'), generated: true }
+}
+
 // ── Demo accounts — 2 roles only: CDRRMO Personnel, Barangay Official ────────
 async function seedDefaultAdmin() {
   const brgy = await get('SELECT id FROM barangays WHERE name = ?', ['San Juan'])
@@ -240,7 +252,7 @@ async function seedDefaultAdmin() {
       name: 'Carlos Mendoza',
       username: 'cdrrmo01',
       email: 'carlos@cdrrmo.gov.ph',
-      password: 'Cdrrmo@1234',
+      passwordEnv: 'SEED_CDRRMO_PASSWORD',
       role: 'CDRRMO Personnel',
       barangay_id: null,
     },
@@ -248,7 +260,7 @@ async function seedDefaultAdmin() {
       name: 'Ana Villanueva',
       username: 'brgy.sanjuan',
       email: 'ana@sanjuan.gov.ph',
-      password: 'Brgy@1234',
+      passwordEnv: 'SEED_BRGY_PASSWORD',
       role: 'Barangay Official',
       barangay_id: brgy ? brgy.id : null,
     },
@@ -261,13 +273,16 @@ async function seedDefaultAdmin() {
   if ((existingCount?.c || 0) > 0) return
 
   for (const user of demoUsers) {
-    const hash = await hashPassword(user.password)
+    const { value: plainPassword, generated } = seedPassword(user.passwordEnv)
+    const hash = await hashPassword(plainPassword)
     await run(
       `INSERT INTO users (name, username, email, password_hash, role, barangay_id, status)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [user.name, user.username, user.email, hash, user.role, user.barangay_id, 'Active']
     )
-    console.log(`Demo user created: ${user.username} (change its password after first sign-in)`)
+    console.log(generated
+      ? `Demo user created: ${user.username} — temporary password: ${plainPassword} (shown only once; change it after first sign-in)`
+      : `Demo user created: ${user.username} — password taken from ${user.passwordEnv} (change it after first sign-in)`)
   }
 }
 

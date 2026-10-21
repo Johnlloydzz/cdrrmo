@@ -1,30 +1,6 @@
-// Demo user accounts — frontend-only (no backend)
-// In production these would come from the database via API.
+// Role-based page access for PDRA. User accounts live in the database (never in this file).
 // PDRA (Pre-Disaster Risk Assessment) — restricted to two user roles
 // per Section 1.5 (Scope): CDRRMO Personnel and Barangay Officials.
-
-export const DEMO_USERS = [
-  {
-    id: 1,
-    name: 'Carlos Mendoza',
-    username: 'cdrrmo01',
-    password: 'Cdrrmo@1234',
-    role: 'CDRRMO Personnel',
-    barangay: 'All',
-    email: 'carlos@cdrrmo.gov.ph',
-    avatar: 'CM',
-  },
-  {
-    id: 2,
-    name: 'Ana Villanueva',
-    username: 'brgy.sanjuan',
-    password: 'Brgy@1234',
-    role: 'Barangay Official',
-    barangay: 'San Juan',
-    email: 'ana@sanjuan.gov.ph',
-    avatar: 'AV',
-  },
-]
 
 // ─── Role-based page access ───────────────────────────────────────────────────
 // Matches exactly the 5 modules in Section 1.5 (Scope): Household and

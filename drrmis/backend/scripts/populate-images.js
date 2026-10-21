@@ -8,12 +8,19 @@
 //
 // Already-set image_url values are NOT overwritten — only blank ones are filled in.
 //
-// HOW TO RUN:
+// HOW TO RUN (PowerShell, from drrmis/backend/scripts):
+//   $env:PDRA_USERNAME="your-username"
+//   $env:PDRA_PASSWORD="your-password"
 //   node populate-images.js
 // Requires Node 18+ (for built-in fetch). Check with: node -v
 
 const API_URL = 'https://cdrrmo-backend.onrender.com/api'
-const LOGIN = { username: 'cdrrmo01', password: 'Cdrrmo@1234' }
+// Credentials come from environment variables — never write a password in this file.
+const LOGIN = { username: process.env.PDRA_USERNAME, password: process.env.PDRA_PASSWORD }
+if (!LOGIN.username || !LOGIN.password) {
+  console.error('Set PDRA_USERNAME and PDRA_PASSWORD first (see HOW TO RUN above).')
+  process.exit(1)
+}
 
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php'
 const USER_AGENT = 'DRRMIS-Gingoog-Capstone/1.0 (student capstone project; Gingoog City Colleges)'
