@@ -564,7 +564,7 @@ export default function FloodSimulationControl() {
                       <div className="grid grid-cols-3 gap-2">
                         <div className="bg-blue-50 rounded-lg px-1 py-2 text-center min-w-0">
                           <p className="text-sm font-bold text-blue-700 whitespace-nowrap">{liveWeather?.current?.precipitation ?? '—'}<span className="text-[10px] font-semibold"> mm</span></p>
-                          <p className="text-[9px] text-gray-500 uppercase whitespace-nowrap">Rain now</p>
+                          <p className="text-[9px] text-gray-500 uppercase whitespace-nowrap">{Number(liveWeather?.current?.precipitation) > 0 ? 'Raining now' : 'No rain'}</p>
                           {weatherCodeLabel(liveWeather?.current?.weather_code, liveWeather?.current?.precipitation) && (
                             <p className="text-[9px] text-blue-600 leading-tight mt-0.5">{weatherCodeLabel(liveWeather.current.weather_code, liveWeather.current.precipitation)}</p>
                           )}
