@@ -470,13 +470,7 @@ export default function GISMap() {
               </div>
             )}
             {selectedBarangay.contact_number ? (
-              <a
-                href={`tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}`}
-                onClick={e => handleCall(e, selectedBarangay.contact_number)}
-                className="mt-2 flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors"
-              >
-                {callCopied ? '✓ Number copied' : `📞 Call ${selectedBarangay.contact_number}`}
-              </a>
+              <p className="text-xs text-gray-500 mt-2">Contact number: {selectedBarangay.contact_number}</p>
             ) : (
               <p className="text-xs text-amber-600 mt-2">No emergency contact number on file.</p>
             )}
