@@ -41,10 +41,10 @@ function getRainfallWarning(mm) {
 function weatherCodeLabel(code, mm) {
   if (code == null || code < 51) return null // clear, cloudy or fog: no rain label
   const rain = Number(mm) || 0
+  if (rain <= 0) return null // 0 mm: the card already says "No rain"
   if (rain >= 7.5) return code >= 95 ? 'Thunderstorm likely' : 'Heavy rain'
   if (rain >= 2.5) return 'Moderate rain'
-  if (rain > 0) return 'Light rain'
-  return 'Light drizzle possible'
+  return 'Light rain'
 }
 
 // Official CDRA (Climate and Disaster Risk Assessment) susceptibility colors —
