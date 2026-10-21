@@ -422,7 +422,6 @@ export default function GISMap() {
               />
             )}
             <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain_name || '—'}</p>
-            <p className="text-xs text-gray-500">Contact number: {selectedBarangay.contact_number || '—'}</p>
             <p className="text-xs text-gray-500">Population: {(liveSelected.resident_count || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
             <div className="grid grid-cols-3 gap-2 mt-2 mb-1">
@@ -457,6 +456,11 @@ export default function GISMap() {
                   </div>
                 ))}
               </div>
+            )}
+            {selectedBarangay.contact_number ? (
+              <p className="text-xs text-gray-500 mt-2">Contact number: {selectedBarangay.contact_number}</p>
+            ) : (
+              <p className="text-xs text-amber-600 mt-2">No emergency contact number on file.</p>
             )}
             {(selectedBarangay.centroid || geocodedCenter) && (
               <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
