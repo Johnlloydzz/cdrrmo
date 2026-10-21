@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON, Polyline, Tooltip, useMap, Pane } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { Layers, Search, MapPin, Navigation, Building2, Phone, Share2, Route } from 'lucide-react'
+import { Layers, Search, MapPin, Navigation, Building2, Share2, Route } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { flyToSafe, flyToBoundsSafe } from '../utils/mapFly'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
@@ -191,18 +191,6 @@ export default function GISMap() {
   const [showPurokList, setShowPurokList] = useState(false)
   const [geojsonLayerRef, setGeojsonLayerRef] = useState(null)
   const [shareCopied, setShareCopied] = useState(false)
-  const [callCopied, setCallCopied] = useState(false)
-
-  // Phones open the dialer (tel: link). Computers have no phone app, so the
-  // link would do nothing; there the number is copied instead, with a
-  // "Number copied" confirmation.
-  const handleCall = (e, number) => {
-    if (window.matchMedia?.('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return
-    e.preventDefault()
-    const done = () => { setCallCopied(true); setTimeout(() => setCallCopied(false), 2000) }
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(number).then(done, done)
-    else done()
-  }
 
   useEffect(() => {
     setShowPurokList(false)
@@ -434,6 +422,7 @@ export default function GISMap() {
               />
             )}
             <p className="text-xs text-gray-500">Captain: {selectedBarangay.captain_name || '—'}</p>
+            <p className="text-xs text-gray-500">Contact number: {selectedBarangay.contact_number || '—'}</p>
             <p className="text-xs text-gray-500">Population: {(liveSelected.resident_count || 0).toLocaleString()}</p>
             <p className="text-xs text-gray-500">Risk level: {selectedBarangay.risk_level}</p>
             <div className="grid grid-cols-3 gap-2 mt-2 mb-1">
@@ -469,11 +458,6 @@ export default function GISMap() {
                 ))}
               </div>
             )}
-            {selectedBarangay.contact_number ? (
-              <p className="text-xs text-gray-500 mt-2">Contact number: {selectedBarangay.contact_number}</p>
-            ) : (
-              <p className="text-xs text-amber-600 mt-2">No emergency contact number on file.</p>
-            )}
             {(selectedBarangay.centroid || geocodedCenter) && (
               <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
                 <span className="w-2 h-0.5 bg-emerald-600 inline-block flex-shrink-0" />
@@ -483,19 +467,6 @@ export default function GISMap() {
               </p>
             )}
             <div className="flex items-center gap-2 mt-3">
-              <a
-                href={selectedBarangay.contact_number ? `tel:${selectedBarangay.contact_number.replace(/\s+/g, '')}` : undefined}
-                onClick={e => selectedBarangay.contact_number && handleCall(e, selectedBarangay.contact_number)}
-                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  selectedBarangay.contact_number
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer'
-                    : 'bg-gray-50 text-gray-300 pointer-events-none'
-                }`}
-                title={selectedBarangay.contact_number ? `Call ${selectedBarangay.contact_number} (on a computer, copies the number)` : 'No contact number on file'}
-              >
-                <Phone size={16} />
-                {callCopied ? 'Copied!' : 'Call'}
-              </a>
               {(selectedBarangay.centroid || geocodedCenter) ? (
                 <button
                   type="button"
