@@ -20,6 +20,9 @@ const WEBM = '/tutorial/request-access.webm' + V
 const POSTER = '/tutorial/request-access.jpg' + V
 const CAPTIONS = '/tutorial/request-access.vtt' + V
 
+// Show the "jump to a step" chapter buttons under the video? (false = hidden)
+const SHOW_CHAPTERS = false
+
 // Where each step starts in the video (seconds).
 const CHAPTERS = [
   { t: 0, label: 'Open PDRA' },
@@ -120,19 +123,21 @@ export default function RequestAccountTutorial() {
       </div>
 
       {/* Chapters: jump to a step */}
-      <div className="mt-3 flex flex-wrap gap-2" aria-label="Jump to a step">
-        {CHAPTERS.map((c, i) => (
-          <button key={c.label} type="button" onClick={() => jump(c.t)}
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-              started && i === current
-                ? 'border-primary-600 bg-primary-50 text-primary-800'
-                : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:text-primary-700'
-            }`}>
-            <span className="tabular-nums text-gray-400">{clock(c.t)}</span>
-            {c.label}
-          </button>
-        ))}
-      </div>
+      {SHOW_CHAPTERS && (
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Jump to a step">
+          {CHAPTERS.map((c, i) => (
+            <button key={c.label} type="button" onClick={() => jump(c.t)}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                started && i === current
+                  ? 'border-primary-600 bg-primary-50 text-primary-800'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 hover:text-primary-700'
+              }`}>
+              <span className="tabular-nums text-gray-400">{clock(c.t)}</span>
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
