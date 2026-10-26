@@ -76,6 +76,16 @@ export default function ResidentManagement({ currentUser }) {
     return () => { cancelled = true }
   }, [showModal, purokFilter])
 
+  // The cards above the table (totals per age group) refresh by themselves too,
+  // like the list (see usePagedList): every 15 s while this tab is visible, and
+  // again when the user returns to the tab.
+  useEffect(() => {
+    const tick = () => { if (!document.hidden) loadStats() }
+    const timer = setInterval(tick, 15000)
+    document.addEventListener('visibilitychange', tick)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick) }
+  }, [])
+
   useEffect(() => {
     loadStats()
     // Already scoped to the Barangay Official's own barangay server-side —
