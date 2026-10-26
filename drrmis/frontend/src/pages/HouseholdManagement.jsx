@@ -5,6 +5,7 @@ import { Search, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import usePagedList from '../utils/usePagedList'
 import Pagination from '../components/Pagination'
+import DropdownSelect from '../components/DropdownSelect'
 import { Skeleton, SkeletonTableRows, useSkeletonRows } from '../components/Skeleton'
 
 const emptyForm = { household_code: '', barangay_id: '', purok_id: '', head_resident_id: '' }
@@ -193,10 +194,14 @@ export default function HouseholdManagement({ currentUser }) {
                 </div>
                 <div className="col-span-2">
                   <label className="label">Head of Family</label>
-                  <select className="input" value={form.head_resident_id} onChange={e => setForm({...form, head_resident_id: e.target.value})} disabled={headsLoading}>
-                    <option value="">{headsLoading ? 'Loading residents…' : 'Select the Head of Family…'}</option>
-                    {headOptions.map(r => <option key={r.id} value={r.id}>{r.name} ({residentNo(r, currentUser)})</option>)}
-                  </select>
+                  <DropdownSelect
+                    searchable
+                    disabled={headsLoading}
+                    value={form.head_resident_id}
+                    placeholder={headsLoading ? 'Loading residents…' : 'Select the Head of Family…'}
+                    options={headOptions.map(r => ({ value: r.id, label: `${r.name} (${residentNo(r, currentUser)})` }))}
+                    onChange={v => setForm({ ...form, head_resident_id: v === '' ? '' : String(v) })}
+                  />
                   {!headsLoading && headOptions.length === 0 ? (
                     <p className="text-xs text-amber-600 mt-1">
                       No available Head of Family. Register the head first in <Link to="/residents" className="underline font-medium">Residents</Link> with Relation to Head set to "Head".

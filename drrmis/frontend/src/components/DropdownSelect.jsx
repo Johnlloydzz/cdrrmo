@@ -6,11 +6,13 @@ import { ChevronDown } from 'lucide-react'
 // lets the browser flip it upward near the bottom of the screen). The list
 // is portaled to <body> with fixed positioning, so the modal's scroll area
 // never clips it; it follows the button while the modal scrolls.
-export default function DropdownSelect({ value, placeholder, options, onChange, className = 'input' }) {
+export default function DropdownSelect({ value, placeholder, options, onChange, className = 'input', searchable = false, disabled = false }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState(null)
   const btnRef = useRef(null)
   const listRef = useRef(null)
+  const searchRef = useRef(null)
+  const [query, setQuery] = useState('')
 
   const place = () => {
     const r = btnRef.current?.getBoundingClientRect()
@@ -24,6 +26,13 @@ export default function DropdownSelect({ value, placeholder, options, onChange, 
     const sel = listRef.current?.querySelector('[data-selected="true"]')
     if (sel) sel.scrollIntoView({ block: 'center' })
   }, [open])
+
+  // Searchable lists: put the cursor in the search box as soon as the list
+  // shows, and clear the search again when the list closes.
+  useEffect(() => {
+    if (!open) { setQuery(''); return }
+    if (searchable && pos) searchRef.current?.focus()
+  }, [open, searchable, pos !== null])
 
   useEffect(() => {
     if (!open) return
@@ -47,14 +56,19 @@ export default function DropdownSelect({ value, placeholder, options, onChange, 
 
   const same = (a, b) => a !== '' && a != null && String(a) === String(b)
   const current = options.find(o => same(o.value, value))
+  const q = query.trim().toLowerCase()
+  const shown = searchable && q
+    ? options.filter(o => `${o.label} ${o.note || ''}`.toLowerCase().includes(q))
+    : options
 
   return (
     <>
       <button
         type="button"
         ref={btnRef}
-        className={`${className} flex items-center justify-between text-left`}
-        onClick={() => setOpen(o => !o)}
+        className={`${className} flex items-center justify-between text-left ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+        disabled={disabled}
+        onClick={() => { if (!disabled) setOpen(o => !o) }}
       >
         <span className={`truncate ${current ? '' : 'text-gray-500'}`}>{current ? current.label : placeholder}</span>
         <ChevronDown size={16} className="text-gray-500 shrink-0" />
@@ -65,13 +79,37 @@ export default function DropdownSelect({ value, placeholder, options, onChange, 
           className="fixed z-[10000] bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto py-1"
           style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
         >
-          <li
-            className="px-3 py-1.5 text-sm text-gray-500 cursor-pointer hover:bg-gray-100"
-            onClick={() => { onChange(''); setOpen(false) }}
-          >
-            {placeholder}
-          </li>
-          {options.map(o => (
+          {searchable && (
+            <li className="sticky top-0 z-10 bg-white px-2 pb-1.5 pt-1 border-b border-gray-100">
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  const first = shown.find(o => !o.disabled)
+                  if (first && q) { onChange(first.value); setOpen(false) }
+                }}
+                placeholder="Search…"
+                autoComplete="off"
+                className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:border-primary-500"
+              />
+            </li>
+          )}
+          {!q && (
+            <li
+              className="px-3 py-1.5 text-sm text-gray-500 cursor-pointer hover:bg-gray-100"
+              onClick={() => { onChange(''); setOpen(false) }}
+            >
+              {placeholder}
+            </li>
+          )}
+          {searchable && q && shown.length === 0 && (
+            <li className="px-3 py-2 text-sm text-gray-500">No match found</li>
+          )}
+          {shown.map(o => (
             <li
               key={o.value}
               data-selected={same(o.value, value)}
