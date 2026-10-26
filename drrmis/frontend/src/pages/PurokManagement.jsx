@@ -345,7 +345,7 @@ export default function PurokManagement({ currentUser }) {
               {boundaryEditable && form.barangay_id && (
                 <div>
                   <label className="label flex items-center gap-1.5"><MapPin size={13} /> Purok Boundary</label>
-                  <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point (needs at least 3). Drag any point afterward to fine-tune it.</p>
+                  <p className="text-xs text-gray-500 mb-2">Click on the map to trace the boundary, point by point (needs at least 3). Drag any point afterward to fine-tune it.{puroks.some(p => String(p.barangay_id) === String(form.barangay_id) && p.boundary_geojson && p.id !== editing) && ' Orange dashed areas are puroks already drawn in this barangay.'}</p>
                   <div className="h-56 rounded-lg overflow-hidden border border-gray-200 relative">
                     <MapErrorBoundary>
                     <MapContainer center={GINGOOG_CENTER} zoom={13} className="w-full h-full">
@@ -369,6 +369,30 @@ export default function PurokManagement({ currentUser }) {
                           />
                         )
                       })()}
+
+                      {/* Other puroks of this barangay that already have a drawn
+                          boundary (orange, dashed) — read-only, so a new purok can
+                          be traced next to them without overlapping. interactive:
+                          false lets clicks pass through to the map underneath. */}
+                      {puroks
+                        .filter(p => String(p.barangay_id) === String(form.barangay_id) && p.boundary_geojson && p.id !== editing)
+                        .map(p => {
+                          let geo
+                          try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
+                          return (
+                            <GeoJSON
+                              key={`other-${p.id}-${String(p.boundary_geojson).length}`}
+                              data={geo}
+                              pathOptions={{ color: '#f59e0b', weight: 2, dashArray: '6 4', fillColor: '#f59e0b', fillOpacity: 0.12, interactive: false }}
+                              onEachFeature={(_, layer) => {
+                                // textContent (not HTML) so a purok name can never inject markup
+                                const label = document.createElement('span')
+                                label.textContent = p.name
+                                layer.bindTooltip(label, { permanent: true, direction: 'center' })
+                              }}
+                            />
+                          )
+                        })}
 
                       {/* The purok's own existing boundary, if it already
                           has one — shown only until the user starts
