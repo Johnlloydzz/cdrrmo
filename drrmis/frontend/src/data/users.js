@@ -16,6 +16,7 @@ export const ROLE_ACCESS = {
   'CDRRMO Personnel': [
     '/',                // Risk Assessment Dashboard Module (landing page)
     '/map',             // Web-Based Hazard Mapping Module (+ Geofencing overlay)
+    '/reports',         // Pre-disaster Reports — households at risk (print / CSV)
     '/flood-control',   // Flood Simulation Control — separate from the Dashboard where results are viewed
     '/flood-control/display', // Fullscreen big-screen display mode (no sidebar/header)
     '/barangays',       // Barangay reference data

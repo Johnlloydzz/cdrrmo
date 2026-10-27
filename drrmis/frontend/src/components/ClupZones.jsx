@@ -109,14 +109,9 @@ export function ClupZonesLayer({ s, colors }) {
   const insertPoint = (i, ll) => setDraft(d => { const pts = [...d.points]; pts.splice(i + 1, 0, [ll.lat, ll.lng]); return { ...d, points: pts } })
   const removePoint = (i) => setDraft(d => d.points.length <= 3 ? d : ({ ...d, points: d.points.filter((_, j) => j !== i) }))
 
-  return (
-    <>
-      {/* Areas are solid inside these panes and the whole pane is see-through,
-          so a small area on top of a big one does not look darker. */}
-      <Pane name="clup-view" style={{ zIndex: 350, opacity: 0.6 }} />
-      <Pane name="clup-edit" style={{ zIndex: 450, opacity: 0.65 }} />
-      <Pane name="clup-handles" style={{ zIndex: 650 }} />
-      {shown.map(z => (
+  // The areas are built once and rebuilt only when their own inputs change, so
+  // unrelated page updates (clicks, typing) no longer restyle all of them.
+  const areaPolys = useMemo(() => shown.map(z => (
         <Polygon
           key={`${pane}-${z.id}-${z.updated_at}`}
           pane={pane}
@@ -130,7 +125,16 @@ export function ClupZonesLayer({ s, colors }) {
             else s.select(z)
           } } : undefined}
         />
-      ))}
+  )), [shown, pane, editMode, colors, editMode ? s : null])
+
+  return (
+    <>
+      {/* Areas are solid inside these panes and the whole pane is see-through,
+          so a small area on top of a big one does not look darker. */}
+      <Pane name="clup-view" style={{ zIndex: 350, opacity: 0.6 }} />
+      <Pane name="clup-edit" style={{ zIndex: 450, opacity: 0.65 }} />
+      <Pane name="clup-handles" style={{ zIndex: 650 }} />
+      {areaPolys}
 
       {draft && (
         <>
@@ -331,13 +335,14 @@ export function ClupEditorMap({ s, boundary, others = [], heightClass = 'h-[42vh
 // shapes with "Edit CLUP colors" (CLUP layer) or Barangays → CLUP Map.
 const LANDSLIDE_VIEW = { HL: '#dc2626', ML: '#15803d', LL: '#eab308', HF: '#eab308', LF: '#eab308' }
 export function ClupLandslideLayer({ zones }) {
+  const polys = useMemo(() => zones.map(z => (
+        <Polygon key={`ls-${z.id}-${z.updated_at}`} pane="clup-landslide" positions={toLatLngs(z.geojson)} interactive={false}
+          pathOptions={{ color: LANDSLIDE_VIEW[z.hazard], weight: 0.5, fillColor: LANDSLIDE_VIEW[z.hazard], fillOpacity: 1 }} />
+  )), [zones])
   return (
     <>
       <Pane name="clup-landslide" style={{ zIndex: 350, opacity: 0.6 }} />
-      {zones.map(z => (
-        <Polygon key={`ls-${z.id}-${z.updated_at}`} pane="clup-landslide" positions={toLatLngs(z.geojson)} interactive={false}
-          pathOptions={{ color: LANDSLIDE_VIEW[z.hazard], weight: 0.5, fillColor: LANDSLIDE_VIEW[z.hazard], fillOpacity: 1 }} />
-      ))}
+      {polys}
     </>
   )
 }

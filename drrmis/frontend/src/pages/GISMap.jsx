@@ -365,6 +365,107 @@ export default function GISMap() {
     return () => { cancelled = true }
   }, [destination])
 
+  // All the barangay / hazard polygon layers, built once and re-built only when
+  // their own inputs change. Before, every click, search keystroke or selection
+  // rebuilt ~300 polygons (re-parsing their GeoJSON each time), which froze the
+  // map. React skips elements that did not change, so these layers now stay put.
+  const mapLayers = useMemo(() => (
+    <>
+          {/* Drawn in the same see-through pane as the CLUP areas and after
+              them, so they fully cover the colors below (no mixed colors). */}
+          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.boundary_geojson && b.flood_susceptibility === 'High').map(b => {
+            let geo
+            try { geo = JSON.parse(b.flood_area_geojson || b.boundary_geojson) } catch { return null }
+            return <GeoJSON key={`clup-fl-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
+              style={{ stroke: false, fillColor: FLOOD_COLOR.High, fillOpacity: 1 }} />
+          })}
+          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.residential_area_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.residential_area_geojson) } catch { return null }
+            return <GeoJSON key={`clup-res-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
+              style={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 1 }} />
+          })}
+          {/* CLUP map: thin barangay lines on top of the colors (same look as
+              Landslide Zones); click a barangay to see its details. */}
+          {clupOn && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+            return (
+              <GeoJSON key={`clup-line-${b.id}`} data={geo} style={{ color: '#555', weight: 0.5, fillOpacity: 0 }}
+                eventHandlers={{ click: () => setSelectedBarangay(b) }} />
+            )
+          })}
+          {hazardLayer === 'landslide' && <ClupLandslideLayer zones={clup.zones} />}
+
+          {/* Roads reference overlay — free public Esri tiles, no
+              API key. Always mounted with opacity 0/1 (rather than
+              mounted/unmounted) so the CSS transition in index.css fades
+              them in/out smoothly instead of popping. */}
+          {activeOverlays.includes('Roads') && <TileLayer url={ROADS_OVERLAY_URL} opacity={0.9} zIndex={5} />}
+
+          {/* Barangay Boundaries — plain outline, no fill, independent of
+              whichever hazard choropleth (or none) is currently showing, so
+              boundaries stay visible even with hazard layers off. */}
+          {activeOverlays.includes('Barangay Boundaries') && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+            return (
+              <GeoJSON
+                key={`outline-${b.id}`}
+                data={geo}
+                style={{ color: '#334155', weight: 1.5, fillOpacity: 0, opacity: 0.8 }}
+                eventHandlers={{ click: () => setSelectedBarangay(b) }}
+              />
+            )
+          })}
+
+          {/* CDRA Hazard Susceptibility choropleth — all barangays, colored to match the official CDRA maps */}
+          {hazardLayer !== 'none' && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
+            let geo
+            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
+            const colors = hazardLayer === 'landslide' ? LANDSLIDE_COLOR : FLOOD_COLOR
+            const color = colors[hazardLayer === 'landslide' ? b.landslide_susceptibility : b.flood_susceptibility] || colors.Low
+            const areaStr = hazardLayer === 'landslide' ? b.landslide_area_geojson : b.flood_area_geojson
+            return (
+              <React.Fragment key={`hz-${hazardLayer}-${b.id}-${b.updated_at}`}>
+                {hazardLayer === 'landslide' ? (
+                  <GeoJSON data={geo} style={{ color: '#555', weight: 0.5, fillOpacity: 0 }} eventHandlers={{ click: () => setSelectedBarangay(b) }} />
+                ) : (
+                <GeoJSON
+                  data={areaStr ? withHole(geo, areaStr) : geo}
+                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? colors.Low : color, fillOpacity: 0.55 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
+                />
+                )}
+                {hazardLayer !== 'landslide' && (() => {
+              // CDRRMO-adjusted hazard area: only this shape gets the
+              // susceptibility color; the rest of the barangay shows as Low.
+              if (!areaStr) return null
+              let area
+              try { area = JSON.parse(areaStr) } catch { return null }
+              return (
+                <GeoJSON key={`hz-area-${b.id}-${b.updated_at}`} data={area} pane="hazard-areas"
+                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
+                  eventHandlers={{ click: () => setSelectedBarangay(b) }}></GeoJSON>
+              )
+            })()}
+  {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
+                    Map) — on top of the flood colors, flood layer only. */}
+                {hazardLayer === 'flood' && b.residential_area_geojson && (() => {
+                  let res
+                  try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
+                  return (
+                    <GeoJSON data={res} pane="hazard-residential" pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
+                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
+                  )
+                })()}
+              </React.Fragment>
+            )
+          })}
+    </>
+  ), [barangaysWithCentroid, clupOn, clup.loaded, clup.zones, hazardLayer, activeOverlays])
+
+
   return (
     <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-140px)] lg:min-h-96">
       {/* Left panel */}
@@ -588,7 +689,7 @@ export default function GISMap() {
         {barangaysLoading ? (
           <SkeletonBlock className="w-full h-full rounded-none" />
         ) : (
-        <MapContainer center={CENTER} zoom={13} className="w-full h-full animate-fade-in" zoomControl={true}>
+        <MapContainer center={CENTER} zoom={13} className="w-full h-full animate-fade-in" zoomControl={true} preferCanvas>
           <MapResizeHandler />
             {/* Drawn hazard areas (and residential) sit ABOVE every barangay's own
                 color, so a drawn area that goes a little past its barangay's
@@ -606,97 +707,7 @@ export default function GISMap() {
               barangays) + the SAME flood areas as Flood Zones / Flood
               Simulation Control (violet + yellow residential) on top. */}
           {clupOn && <ClupZonesLayer s={clup} />}
-          {/* Drawn in the same see-through pane as the CLUP areas and after
-              them, so they fully cover the colors below (no mixed colors). */}
-          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.boundary_geojson && b.flood_susceptibility === 'High').map(b => {
-            let geo
-            try { geo = JSON.parse(b.flood_area_geojson || b.boundary_geojson) } catch { return null }
-            return <GeoJSON key={`clup-fl-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
-              style={{ stroke: false, fillColor: FLOOD_COLOR.High, fillOpacity: 1 }} />
-          })}
-          {clupOn && clup.loaded && barangaysWithCentroid.filter(b => b.residential_area_geojson).map(b => {
-            let geo
-            try { geo = JSON.parse(b.residential_area_geojson) } catch { return null }
-            return <GeoJSON key={`clup-res-${b.id}-${b.updated_at}-${clup.zones.length}`} data={geo} pane="clup-view" interactive={false}
-              style={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 1 }} />
-          })}
-          {/* CLUP map: thin barangay lines on top of the colors (same look as
-              Landslide Zones); click a barangay to see its details. */}
-          {clupOn && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
-            let geo
-            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-            return (
-              <GeoJSON key={`clup-line-${b.id}`} data={geo} style={{ color: '#555', weight: 0.5, fillOpacity: 0 }}
-                eventHandlers={{ click: () => setSelectedBarangay(b) }} />
-            )
-          })}
-          {hazardLayer === 'landslide' && <ClupLandslideLayer zones={clup.zones} />}
-
-          {/* Roads reference overlay — free public Esri tiles, no
-              API key. Always mounted with opacity 0/1 (rather than
-              mounted/unmounted) so the CSS transition in index.css fades
-              them in/out smoothly instead of popping. */}
-          <TileLayer url={ROADS_OVERLAY_URL} opacity={activeOverlays.includes('Roads') ? 0.9 : 0} zIndex={5} />
-
-          {/* Barangay Boundaries — plain outline, no fill, independent of
-              whichever hazard choropleth (or none) is currently showing, so
-              boundaries stay visible even with hazard layers off. */}
-          {activeOverlays.includes('Barangay Boundaries') && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
-            let geo
-            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-            return (
-              <GeoJSON
-                key={`outline-${b.id}`}
-                data={geo}
-                style={{ color: '#334155', weight: 1.5, fillOpacity: 0, opacity: 0.8 }}
-                eventHandlers={{ click: () => setSelectedBarangay(b) }}
-              />
-            )
-          })}
-
-          {/* CDRA Hazard Susceptibility choropleth — all barangays, colored to match the official CDRA maps */}
-          {hazardLayer !== 'none' && barangaysWithCentroid.filter(b => b.boundary_geojson).map(b => {
-            let geo
-            try { geo = JSON.parse(b.boundary_geojson) } catch { return null }
-            const colors = hazardLayer === 'landslide' ? LANDSLIDE_COLOR : FLOOD_COLOR
-            const color = colors[hazardLayer === 'landslide' ? b.landslide_susceptibility : b.flood_susceptibility] || colors.Low
-            const areaStr = hazardLayer === 'landslide' ? b.landslide_area_geojson : b.flood_area_geojson
-            return (
-              <React.Fragment key={`hz-${hazardLayer}-${b.id}-${b.updated_at}`}>
-                {hazardLayer === 'landslide' ? (
-                  <GeoJSON data={geo} style={{ color: '#555', weight: 0.5, fillOpacity: 0 }} eventHandlers={{ click: () => setSelectedBarangay(b) }} />
-                ) : (
-                <GeoJSON
-                  data={areaStr ? withHole(geo, areaStr) : geo}
-                  style={{ color: '#555', weight: 0.5, fillColor: areaStr ? colors.Low : color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}
-                />
-                )}
-                {hazardLayer !== 'landslide' && (() => {
-              // CDRRMO-adjusted hazard area: only this shape gets the
-              // susceptibility color; the rest of the barangay shows as Low.
-              if (!areaStr) return null
-              let area
-              try { area = JSON.parse(areaStr) } catch { return null }
-              return (
-                <GeoJSON key={`hz-area-${b.id}-${b.updated_at}`} data={area} pane="hazard-areas"
-                  pathOptions={{ color: '#555', weight: 0.5, fillColor: color, fillOpacity: 0.55 }}
-                  eventHandlers={{ click: () => setSelectedBarangay(b) }}></GeoJSON>
-              )
-            })()}
-  {/* Yellow "Residential Area" (CDRA Population Flooding Exposure
-                    Map) — on top of the flood colors, flood layer only. */}
-                {hazardLayer === 'flood' && b.residential_area_geojson && (() => {
-                  let res
-                  try { res = JSON.parse(b.residential_area_geojson) } catch { return null }
-                  return (
-                    <GeoJSON data={res} pane="hazard-residential" pathOptions={{ color: '#a16207', weight: 0.5, fillColor: '#facc15', fillOpacity: 0.7 }}
-                      eventHandlers={{ click: () => setSelectedBarangay(b) }}><Tooltip sticky>{b.name} — Residential Area</Tooltip></GeoJSON>
-                  )
-                })()}
-              </React.Fragment>
-            )
-          })}
+          {mapLayers}
 
           {/* Selected barangay boundary outline */}
           {selectedGeojson && (

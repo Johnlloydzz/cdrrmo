@@ -15,6 +15,7 @@ const navGroups = [
     items: [
       { to: '/',    icon: LayoutDashboard, label: 'Risk Assessment Dashboard', exact: true },
       { to: '/map', icon: Map,             label: 'Hazard Map & Geofencing' },
+      { to: '/reports', icon: FileText,    label: 'Reports' },
       // Full-page tool (no sidebar) for setting the live flood level and the
       // big-screen display. Shown only to roles allowed to open it (CDRRMO).
       { to: '/flood-control', icon: Waves, label: 'Flood Simulation Control', fullPage: true },
