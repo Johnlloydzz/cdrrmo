@@ -1,0 +1,794 @@
+{
+  "summary": {
+    "run_at": "2026-10-27T22:36:57.613Z",
+    "node": "v25.2.1",
+    "total": 87,
+    "passed": 87,
+    "failed": 0
+  },
+  "results": [
+    {
+      "id": "TC-AUTH-01",
+      "module": "Authentication and sessions",
+      "title": "CDRRMO Personnel can sign in",
+      "expected": "HTTP 200, token and role \"CDRRMO Personnel\"",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 300
+    },
+    {
+      "id": "TC-AUTH-02",
+      "module": "Authentication and sessions",
+      "title": "Barangay Official can sign in",
+      "expected": "HTTP 200, token and role \"Barangay Official\"",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 94
+    },
+    {
+      "id": "TC-AUTH-03",
+      "module": "Authentication and sessions",
+      "title": "Wrong password is rejected",
+      "expected": "HTTP 401 \"Invalid credentials\"",
+      "actual": "HTTP 401",
+      "result": "PASS",
+      "ms": 83
+    },
+    {
+      "id": "TC-AUTH-04",
+      "module": "Authentication and sessions",
+      "title": "Unknown username is rejected",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-AUTH-05",
+      "module": "Authentication and sessions",
+      "title": "Sign-in with missing fields is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-AUTH-06",
+      "module": "Authentication and sessions",
+      "title": "Old hard-coded demo passwords no longer work (security fix)",
+      "expected": "Both attempts HTTP 401",
+      "actual": "HTTP 401 / 401",
+      "result": "PASS",
+      "ms": 167
+    },
+    {
+      "id": "TC-AUTH-07",
+      "module": "Authentication and sessions",
+      "title": "Protected page data needs a sign-in",
+      "expected": "HTTP 401 without a token",
+      "actual": "HTTP 401",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-AUTH-08",
+      "module": "Authentication and sessions",
+      "title": "A tampered token is refused",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-AUTH-09",
+      "module": "Authentication and sessions",
+      "title": "Account locks after 5 wrong tries",
+      "expected": "6th attempt returns HTTP 429",
+      "actual": "6th attempt HTTP 429",
+      "result": "PASS",
+      "ms": 14
+    },
+    {
+      "id": "TC-AUTH-10",
+      "module": "Authentication and sessions",
+      "title": "Signed-in user can read their own profile",
+      "expected": "HTTP 200 with the username",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 13
+    },
+    {
+      "id": "TC-USER-01",
+      "module": "User management (CDRRMO only)",
+      "title": "CDRRMO sees the user list",
+      "expected": "HTTP 200, at least 2 users",
+      "actual": "HTTP 200, 2 users",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-USER-02",
+      "module": "User management (CDRRMO only)",
+      "title": "CDRRMO creates a Barangay Official for another barangay",
+      "expected": "HTTP 201",
+      "actual": "HTTP 201 ",
+      "result": "PASS",
+      "ms": 96
+    },
+    {
+      "id": "TC-USER-03",
+      "module": "User management (CDRRMO only)",
+      "title": "Creating a user with missing fields is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-USER-04",
+      "module": "User management (CDRRMO only)",
+      "title": "Duplicate username is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400 Username or email already exists",
+      "result": "PASS",
+      "ms": 85
+    },
+    {
+      "id": "TC-USER-05",
+      "module": "User management (CDRRMO only)",
+      "title": "Only one Barangay Official per barangay",
+      "expected": "HTTP 400 for a second official in the same barangay",
+      "actual": "HTTP 400 Brgy. Barangay 18-A (Pob.) already has a Barangay Official account.",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-USER-06",
+      "module": "User management (CDRRMO only)",
+      "title": "Barangay Official cannot open User Management data",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-USER-07",
+      "module": "User management (CDRRMO only)",
+      "title": "Barangay Official cannot create users",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-USER-08",
+      "module": "User management (CDRRMO only)",
+      "title": "CDRRMO edits a user",
+      "expected": "HTTP 200",
+      "actual": "HTTP 200 ",
+      "result": "PASS",
+      "ms": 9
+    },
+    {
+      "id": "TC-AUTH-11",
+      "module": "User management (CDRRMO only)",
+      "title": "Change password: too short, wrong current, then success",
+      "expected": "400, 400, then 200 and the new password works, the old one does not",
+      "actual": "400, 400, 200, new 200, old 401",
+      "result": "PASS",
+      "ms": 506
+    },
+    {
+      "id": "TC-ACC-01",
+      "module": "Account requests",
+      "title": "The request form can load barangays without signing in",
+      "expected": "HTTP 200, a list",
+      "actual": "HTTP 200, 79 barangays",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "id": "TC-ACC-02",
+      "module": "Account requests",
+      "title": "A valid request is accepted",
+      "expected": "HTTP 201",
+      "actual": "HTTP 201 ",
+      "result": "PASS",
+      "ms": 16
+    },
+    {
+      "id": "TC-ACC-03",
+      "module": "Account requests",
+      "title": "Missing fields are refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-ACC-04",
+      "module": "Account requests",
+      "title": "An invalid mobile number is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-ACC-05",
+      "module": "Account requests",
+      "title": "The same mobile number cannot request twice",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-ACC-06",
+      "module": "Account requests",
+      "title": "An email that already has an account cannot request",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "id": "TC-ACC-07",
+      "module": "Account requests",
+      "title": "CDRRMO sees the pending request",
+      "expected": "HTTP 200, request listed",
+      "actual": "HTTP 200, 1 request(s)",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-ACC-08",
+      "module": "Account requests",
+      "title": "Barangay Official cannot see account requests",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-ACC-09",
+      "module": "Account requests",
+      "title": "CDRRMO approves a request",
+      "expected": "HTTP 200 and the request status becomes \"Approved\" (the account itself is created in User Management, see TC-USER-02)",
+      "actual": "HTTP 200, status Approved",
+      "result": "PASS",
+      "ms": 15
+    },
+    {
+      "id": "TC-ACC-10",
+      "module": "Account requests",
+      "title": "CDRRMO rejects a request",
+      "expected": "HTTP 200 and the status becomes \"Rejected\"",
+      "actual": "HTTP 200, status Rejected",
+      "result": "PASS",
+      "ms": 25
+    },
+    {
+      "id": "TC-PUR-01",
+      "module": "Purok management",
+      "title": "Barangay Official adds a purok",
+      "expected": "HTTP 201",
+      "actual": "HTTP 201",
+      "result": "PASS",
+      "ms": 15
+    },
+    {
+      "id": "TC-PUR-02",
+      "module": "Purok management",
+      "title": "A duplicate purok name is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-PUR-03",
+      "module": "Purok management",
+      "title": "An empty purok name is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-PUR-04",
+      "module": "Purok management",
+      "title": "CDRRMO cannot add a purok (view-only)",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-PUR-05",
+      "module": "Purok management",
+      "title": "Barangay Official renames their own purok",
+      "expected": "HTTP 200",
+      "actual": "HTTP 200 ",
+      "result": "PASS",
+      "ms": 11
+    },
+    {
+      "id": "TC-PUR-06",
+      "module": "Purok management",
+      "title": "An official of another barangay cannot edit it",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-PUR-07",
+      "module": "Purok management",
+      "title": "CDRRMO cannot delete a purok",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-RES-01",
+      "module": "Resident management",
+      "title": "Barangay Official registers a resident",
+      "expected": "HTTP 201",
+      "actual": "HTTP 201 ",
+      "result": "PASS",
+      "ms": 11
+    },
+    {
+      "id": "TC-RES-02",
+      "module": "Resident management",
+      "title": "A purok is required",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-RES-03",
+      "module": "Resident management",
+      "title": "An invalid contact number is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-RES-04",
+      "module": "Resident management",
+      "title": "A future birthdate is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-RES-05",
+      "module": "Resident management",
+      "title": "A missing first name is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "id": "TC-RES-06",
+      "module": "Resident management",
+      "title": "CDRRMO cannot register residents (view-only)",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-RES-07",
+      "module": "Resident management",
+      "title": "CDRRMO sees the new resident right away (list and cards)",
+      "expected": "Resident in the list; total went up",
+      "actual": "list HTTP 200, total 7",
+      "result": "PASS",
+      "ms": 13
+    },
+    {
+      "id": "TC-RES-08",
+      "module": "Resident management",
+      "title": "Search finds the resident; a bad search returns none",
+      "expected": "Found for \"maria\"; 0 for \"zzzz\"",
+      "actual": "maria 1, zzzz 0",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "id": "TC-RES-09",
+      "module": "Resident management",
+      "title": "Pagination limits the page size",
+      "expected": "limit=2 returns at most 2 rows and a total",
+      "actual": "2 row(s), total 7",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "id": "TC-RES-10",
+      "module": "Resident management",
+      "title": "Barangay Official edits their resident",
+      "expected": "HTTP 200",
+      "actual": "HTTP 200 ",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "id": "TC-RES-11",
+      "module": "Resident management",
+      "title": "An official of another barangay cannot edit or see it",
+      "expected": "Not editable (403/404) and not in their list",
+      "actual": "PUT HTTP 403, their list total 0",
+      "result": "PASS",
+      "ms": 9
+    },
+    {
+      "id": "TC-RES-12",
+      "module": "Resident management",
+      "title": "Age-group cards count residents correctly",
+      "expected": "Stats include Child, Teen, Adult and Senior counts",
+      "actual": "{\"total\":7,\"Child (1-12)\":1,\"Teen (13-17)\":0,\"Adult (18-59)\":5,\"Senior (60+)\":1}",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-HH-01",
+      "module": "Household management",
+      "title": "A household needs a head of family",
+      "expected": "HTTP 400 without a head",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-HH-02",
+      "module": "Household management",
+      "title": "Only a resident marked \"Head\" can be head",
+      "expected": "HTTP 400 for a \"Child\" resident",
+      "actual": "HTTP 400 The selected resident is not registered as \"Head\" (Relation to Head).",
+      "result": "PASS",
+      "ms": 15
+    },
+    {
+      "id": "TC-HH-03",
+      "module": "Household management",
+      "title": "Barangay Official registers a household",
+      "expected": "HTTP 201",
+      "actual": "HTTP 201 ",
+      "result": "PASS",
+      "ms": 17
+    },
+    {
+      "id": "TC-HH-04",
+      "module": "Household management",
+      "title": "The same head cannot start a second household",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "id": "TC-HH-05",
+      "module": "Household management",
+      "title": "CDRRMO cannot register households (view-only)",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-HH-06",
+      "module": "Household management",
+      "title": "CDRRMO sees the new household right away",
+      "expected": "Household in the list",
+      "actual": "HTTP 200, total 4",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-HH-07",
+      "module": "Household management",
+      "title": "An official of another barangay cannot see or delete it",
+      "expected": "Not in their list; DELETE refused",
+      "actual": "their list has it: false, DELETE HTTP 403",
+      "result": "PASS",
+      "ms": 9
+    },
+    {
+      "id": "TC-RISK-09",
+      "module": "Geofencing rule for puroks without a map location",
+      "title": "A purok without a map location in a flood-prone barangay is counted as at risk (cautious rule)",
+      "expected": "The official's household (purok with no location) appears in the planning report",
+      "actual": "HTTP 200, 1 household(s)",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "id": "TC-DEL-01",
+      "module": "Deleting records",
+      "title": "Barangay Official deletes a household, resident and purok",
+      "expected": "HTTP 200 for each",
+      "actual": "200, 200, 200, 200",
+      "result": "PASS",
+      "ms": 38
+    },
+    {
+      "id": "TC-RISK-01",
+      "module": "Risk assessment and geofencing",
+      "title": "Risk summary lists every barangay",
+      "expected": "HTTP 200 and 79 barangays",
+      "actual": "HTTP 200, 79 barangays",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-RISK-02",
+      "module": "Risk assessment and geofencing",
+      "title": "No heavy rain: nobody is flagged at risk",
+      "expected": "Inside and outside puroks are both not at risk",
+      "actual": "inside false, outside false",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-RISK-03",
+      "module": "Risk assessment and geofencing",
+      "title": "Only CDRRMO can switch the heavy-rain drill",
+      "expected": "Official HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-RISK-04",
+      "module": "Risk assessment and geofencing",
+      "title": "Heavy-rain drill flags the purok inside the flood area only (geofencing)",
+      "expected": "Inside = at risk, outside = not",
+      "actual": "drill HTTP 200, inside true, outside false",
+      "result": "PASS",
+      "ms": 18
+    },
+    {
+      "id": "TC-RISK-05",
+      "module": "Risk assessment and geofencing",
+      "title": "A low flood level (0.5 m) stays under the 0.86 m threshold",
+      "expected": "Inside purok not at risk",
+      "actual": "set HTTP 200, inside false",
+      "result": "PASS",
+      "ms": 23
+    },
+    {
+      "id": "TC-RISK-06",
+      "module": "Risk assessment and geofencing",
+      "title": "A higher flood level (1.0 m) puts the inside purok at risk",
+      "expected": "Inside purok at risk",
+      "actual": "set HTTP 200, inside true",
+      "result": "PASS",
+      "ms": 21
+    },
+    {
+      "id": "TC-RISK-07",
+      "module": "Risk assessment and geofencing",
+      "title": "Flood level validation",
+      "expected": "25 m and \"abc\" refused (400); Official refused (403)",
+      "actual": "400, 400, 403",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "id": "TC-RISK-08",
+      "module": "Risk assessment and geofencing",
+      "title": "Heavy-rain drill sends a notification to Barangay Officials",
+      "expected": "The official's notifications mention the drill",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-RPT-01",
+      "module": "Reports: Households at Risk (new)",
+      "title": "Planning view counts the households inside the flood area",
+      "expected": "1 purok, 2 households, 5 residents at risk",
+      "actual": "HTTP 200: 1 purok, 2 HH, 5 residents",
+      "result": "PASS",
+      "ms": 19
+    },
+    {
+      "id": "TC-RPT-02",
+      "module": "Reports: Households at Risk (new)",
+      "title": "Residents at risk are split correctly by age and sex",
+      "expected": "Child 1, Teen 0, Adult 3, Senior 1; Male 2, Female 3",
+      "actual": "{\"total\":5,\"child\":1,\"teen\":0,\"adult\":3,\"senior\":1,\"unknown_age\":0,\"male\":2,\"female\":3}",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-RPT-03",
+      "module": "Reports: Households at Risk (new)",
+      "title": "The household outside the flood area is not listed as at risk",
+      "expected": "Only \"Reg Head One/Two\" listed",
+      "actual": "Reg Head One,Reg Head Two",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "id": "TC-RPT-04",
+      "module": "Reports: Households at Risk (new)",
+      "title": "Live view follows the current alert",
+      "expected": "Drill on: same as planning (2 HH); drill off: 0",
+      "actual": "drill on 2, drill off 0",
+      "result": "PASS",
+      "ms": 39
+    },
+    {
+      "id": "TC-RPT-05",
+      "module": "Reports: Households at Risk (new)",
+      "title": "Planning view does not depend on the weather",
+      "expected": "Still 2 households with the drill off",
+      "actual": "2",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-RPT-06",
+      "module": "Reports: Households at Risk (new)",
+      "title": "Purok filter narrows the report",
+      "expected": "Only the chosen purok (2 households)",
+      "actual": "1 purok, 2 HH",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-RPT-07",
+      "module": "Reports: Households at Risk (new)",
+      "title": "Landslide report works",
+      "expected": "HTTP 200 with a summary",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-RPT-08",
+      "module": "Reports: Households at Risk (new)",
+      "title": "A Barangay Official only gets their own barangay",
+      "expected": "One barangay in scope, even if another id is requested",
+      "actual": "scope 1, HH 0",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "id": "TC-RPT-09",
+      "module": "Reports: Households at Risk (new)",
+      "title": "The official who owns the barangay sees its households",
+      "expected": "2 households at risk",
+      "actual": "HTTP 200, HH 2",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "id": "TC-RPT-10",
+      "module": "Reports: Households at Risk (new)",
+      "title": "The report needs a sign-in",
+      "expected": "HTTP 401",
+      "actual": "HTTP 401",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-RPT-11",
+      "module": "Reports: Households at Risk (new)",
+      "title": "The report carries who made it and when",
+      "expected": "generated_at, generated_by and role present",
+      "actual": "Carlos Mendoza / CDRRMO Personnel",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "id": "TC-SET-01",
+      "module": "System settings",
+      "title": "A 20-digit contact number is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-SET-02",
+      "module": "System settings",
+      "title": "A mobile number and a landline are accepted",
+      "expected": "HTTP 200 for both",
+      "actual": "200, 200",
+      "result": "PASS",
+      "ms": 34
+    },
+    {
+      "id": "TC-SET-03",
+      "module": "System settings",
+      "title": "An invalid email is refused",
+      "expected": "HTTP 400",
+      "actual": "HTTP 400",
+      "result": "PASS",
+      "ms": 3
+    },
+    {
+      "id": "TC-SET-04",
+      "module": "System settings",
+      "title": "Barangay Official cannot change system information",
+      "expected": "HTTP 403",
+      "actual": "HTTP 403",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-SYS-01",
+      "module": "Built-in data and platform",
+      "title": "Health check answers",
+      "expected": "HTTP 200 status ok",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-SYS-02",
+      "module": "Built-in data and platform",
+      "title": "All 79 barangays have a drawn boundary",
+      "expected": "79 with boundary data",
+      "actual": "79 barangays, 79 with boundary",
+      "result": "PASS",
+      "ms": 15
+    },
+    {
+      "id": "TC-SYS-03",
+      "module": "Built-in data and platform",
+      "title": "CDRA flood areas are loaded (barangays with a drawn flood area)",
+      "expected": "At least 12 barangays with a drawn flood area",
+      "actual": "12 barangays",
+      "result": "PASS",
+      "ms": 11
+    },
+    {
+      "id": "TC-SYS-04",
+      "module": "Built-in data and platform",
+      "title": "CLUP zones are loaded",
+      "expected": "210 zones",
+      "actual": "210 zones",
+      "result": "PASS",
+      "ms": 18
+    },
+    {
+      "id": "TC-SYS-05",
+      "module": "Built-in data and platform",
+      "title": "An unknown address returns \"not found\"",
+      "expected": "HTTP 404",
+      "actual": "HTTP 404",
+      "result": "PASS",
+      "ms": 2
+    },
+    {
+      "id": "TC-SYS-06",
+      "module": "Built-in data and platform",
+      "title": "The server log shows no errors during the whole run",
+      "expected": "No \"error\" lines",
+      "actual": "no error lines",
+      "result": "PASS",
+      "ms": 0
+    },
+    {
+      "id": "TC-DEL-02",
+      "module": "Clean-up",
+      "title": "CDRRMO deletes a test user",
+      "expected": "HTTP 200",
+      "actual": "HTTP 200",
+      "result": "PASS",
+      "ms": 11
+    }
+  ]
+}

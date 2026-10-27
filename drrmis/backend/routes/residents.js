@@ -3,7 +3,7 @@ const router = require('express').Router()
 // Philippine mobile number: 11 digits starting with 09, and not a dummy
 // like 09999999999 / 09000000000 (same digit repeated).
 const isPhMobile = (n) => /^09\d{9}$/.test(n) && !/^09(\d)\1{8}$/.test(n)
-const { all, get, run } = require('../db/database')
+const { all, get, run, getDb } = require('../db/database')
 const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
@@ -221,6 +221,141 @@ router.post('/', async (req, res) => {
     )
     const newRow = await get('SELECT * FROM residents WHERE id = ?', [result.lastID])
     res.status(201).json(newRow)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// ───────────────────────────────────────────────────────────────────────
+// Import residents from a spreadsheet saved as CSV (Barangay Official only).
+// The browser reads the file and sends the rows here as JSON. Every row is
+// checked with the SAME rules as the Register Resident form; rows with a
+// problem are skipped and reported, the good rows are saved together in one
+// transaction. Nothing is saved unless `commit` is true (the preview step).
+// ───────────────────────────────────────────────────────────────────────
+const IMPORT_MAX_ROWS = 500
+const IMPORT_RELATIONS = ['Head', 'Spouse', 'Child', 'Parent', 'Sibling', 'Other']
+const squash = (v) => String(v ?? '').replace(/\s+/g, ' ').trim()
+const pad2 = (n) => String(n).padStart(2, '0')
+
+// Accepts YYYY-MM-DD or DD-MM-YYYY (also with / or .). Returns YYYY-MM-DD or
+// null. The date must really exist (31-02-2000 is refused).
+function importBirthdate(value) {
+  const s = squash(value)
+  let y, m, d, mt
+  if ((mt = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/))) { y = +mt[1]; m = +mt[2]; d = +mt[3] }
+  else if ((mt = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/))) { d = +mt[1]; m = +mt[2]; y = +mt[3] }
+  else return null
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null
+  return `${y}-${pad2(m)}-${pad2(d)}`
+}
+
+// Excel drops the leading 0 of 09171234567, so 9171234567 (10 digits) and
+// +63 917 123 4567 are accepted and turned into 09171234567.
+function importMobile(value) {
+  let digits = squash(value).replace(/[\s\-().+]/g, '')
+  if (!digits) return ''
+  if (/^639\d{9}$/.test(digits)) digits = '0' + digits.slice(2)
+  else if (/^9\d{9}$/.test(digits)) digits = '0' + digits
+  return digits
+}
+
+async function validateImportRows(rows, barangayId) {
+  const purokRows = await all('SELECT id, name FROM puroks WHERE barangay_id = ?', [barangayId])
+  const purokByName = new Map(purokRows.map(p => [squash(p.name).toLowerCase(), p.id]))
+  const existing = await all(
+    `SELECT r.first_name, r.last_name, r.birthdate ${RESIDENT_FROM}
+     WHERE (r.barangay_id = ? OR (r.barangay_id IS NULL AND h.barangay_id = ?))`, [barangayId, barangayId])
+  const seen = new Set(existing.map(r => `${squash(r.first_name).toLowerCase()}|${squash(r.last_name).toLowerCase()}|${r.birthdate}`))
+
+  return rows.map((raw, i) => {
+    const row = Number.isInteger(raw?.row) ? raw.row : i + 2
+    const errors = []
+    const last = squash(raw?.last_name), first = squash(raw?.first_name), middle = squash(raw?.middle_name)
+    if (!last) errors.push('Last name is missing.')
+    if (!first) errors.push('First name is missing.')
+    if (last.length > 60 || first.length > 60 || middle.length > 60) errors.push('A name is too long (60 letters at most).')
+
+    let birthdate = null
+    if (!squash(raw?.birthdate)) errors.push('Birthdate is missing.')
+    else {
+      birthdate = importBirthdate(raw.birthdate)
+      if (!birthdate) errors.push('Birthdate must look like 1985-03-02 or 02-03-1985.')
+      else if (birthdateError(birthdate)) { errors.push(birthdateError(birthdate)); birthdate = null }
+    }
+
+    let sex = null
+    const sx = squash(raw?.sex).toLowerCase()
+    if (sx) {
+      if (sx === 'male' || sx === 'm') sex = 'Male'
+      else if (sx === 'female' || sx === 'f') sex = 'Female'
+      else errors.push('Sex must be Male or Female.')
+    }
+
+    let contact = null
+    const mobile = importMobile(raw?.contact_number)
+    if (mobile) { if (isPhMobile(mobile)) contact = mobile; else errors.push('Contact number must be 11 digits starting with 09.') }
+
+    let relation = null
+    const rl = squash(raw?.relation_to_head).toLowerCase()
+    if (rl) {
+      relation = IMPORT_RELATIONS.find(x => x.toLowerCase() === rl) || null
+      if (!relation) errors.push(`Relation to Head must be one of: ${IMPORT_RELATIONS.join(', ')}.`)
+    }
+
+    let purok_id = null
+    const purokName = squash(raw?.purok)
+    if (!purokName) errors.push('Purok is missing.')
+    else {
+      purok_id = purokByName.get(purokName.toLowerCase()) || null
+      if (!purok_id) errors.push(`Purok "${purokName}" is not one of your puroks.`)
+    }
+
+    // Same person (name + birthdate) already registered, or twice in the file.
+    if (last && first && birthdate) {
+      const key = `${first.toLowerCase()}|${last.toLowerCase()}|${birthdate}`
+      if (seen.has(key)) errors.push('This resident is already registered (or appears twice in the file).')
+      else if (!errors.length) seen.add(key)
+    }
+
+    const name = [toProperCase(first), toProperCase(middle), toProperCase(last)].filter(Boolean).join(' ')
+    return { row, errors, name, purok: purokName, data: errors.length ? null : {
+      last_name: toProperCase(last), first_name: toProperCase(first), middle_name: toProperCase(middle) || null,
+      name, birthdate, sex, contact_number: contact, relation_to_head: relation, purok_id } }
+  })
+}
+
+// POST /api/residents/import   body: { rows: [...], commit: false|true }
+router.post('/import', async (req, res) => {
+  try {
+    if (req.user.role !== 'Barangay Official') {
+      return res.status(403).json({ error: 'Only Barangay Officials can import residents.' })
+    }
+    const { rows, commit } = req.body || {}
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'The file has no residents to import.' })
+    if (rows.length > IMPORT_MAX_ROWS) return res.status(400).json({ error: `Import at most ${IMPORT_MAX_ROWS} residents at a time. Split the file and import it in parts.` })
+    const barangayId = req.user.barangay_id
+    if (!barangayId) return res.status(400).json({ error: 'Your account has no barangay.' })
+
+    const checked = await validateImportRows(rows, barangayId)
+    const good = checked.filter(r => !r.errors.length)
+    const summary = checked.map(({ row, errors, name, purok }) => ({ row, errors, name, purok }))
+
+    if (!commit) {
+      return res.json({ total: checked.length, valid: good.length, invalid: checked.length - good.length, rows: summary })
+    }
+    if (good.length === 0) return res.status(400).json({ error: 'No row can be imported. Fix the problems and try again.', total: checked.length, valid: 0, invalid: checked.length, rows: summary })
+
+    // Next free RES-xxxxx numbers, then every good row in ONE transaction.
+    const maxRow = await get("SELECT MAX(CAST(SUBSTR(resident_id, 5) AS INTEGER)) AS n FROM residents WHERE resident_id LIKE 'RES-%'")
+    let next = (maxRow?.n || 0) + 1
+    const statements = good.map(({ data: d }) => ({
+      sql: `INSERT INTO residents (resident_id, household_id, barangay_id, purok_id, name, last_name, first_name, middle_name, birthdate, age_bracket, relation_to_head, sex, contact_number)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [`RES-${String(next++).padStart(5, '0')}`, barangayId, d.purok_id, d.name, d.last_name, d.first_name, d.middle_name,
+             d.birthdate, computeAgeBracket(d.birthdate), d.relation_to_head, d.sex, d.contact_number],
+    }))
+    await getDb().batch(statements, 'write')
+    res.status(201).json({ imported: good.length, skipped: checked.length - good.length, total: checked.length, rows: summary })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

@@ -350,6 +350,46 @@ async function main() {
     await tc('TC-SET-04', 'Barangay Official cannot change system information', 'HTTP 403', async () => {
       const r = await api('PUT', '/settings/system-info', { ...base, contact: '09373536567' }, O); return [r.status === 403, `HTTP ${r.status}`] })
 
+    // ───────────────────────────────────────────── 9b. Import residents (spreadsheet)
+    mod('Import residents (spreadsheet)')
+    const impPurok = idOf((await api('POST', '/puroks', { name: 'Import Test Purok' }, O)).body, 'purok')
+    const impRow = (o = {}) => ({ last_name: 'imptest', first_name: 'ana', birthdate: '02-03-1985', sex: 'female', contact_number: '9171234567', purok: 'import test purok', relation_to_head: 'spouse', ...o })
+    const countImp = async () => (await api('GET', '/residents?page=1&limit=50&search=Imptest', undefined, O)).body?.total
+    await tc('TC-IMP-01', 'The preview checks the file but saves nothing', 'valid = 1, nobody saved yet', async () => {
+      const r = await api('POST', '/residents/import', { rows: [impRow()], commit: false }, O)
+      return [r.status === 200 && r.body?.valid === 1 && r.body?.invalid === 0 && (await countImp()) === 0, `HTTP ${r.status}, valid ${r.body?.valid}, saved ${await countImp()}`] })
+    await tc('TC-IMP-02', 'A good file is imported and tidied up', '201; names in Proper Case, DD-MM-YYYY date and a 10-digit mobile are fixed', async () => {
+      const r = await api('POST', '/residents/import', { rows: [impRow(), impRow({ first_name: 'BEN', birthdate: '1990-12-31', sex: 'M', contact_number: '', relation_to_head: '' })], commit: true }, O)
+      const list = (await api('GET', '/residents?page=1&limit=50&search=Imptest', undefined, O)).body?.rows || []
+      const ana = list.find(x => x.first_name === 'Ana')
+      return [r.status === 201 && r.body?.imported === 2 && list.length === 2 && ana?.name === 'Ana Imptest' && ana?.birthdate === '1985-03-02' && ana?.contact_number === '09171234567' && ana?.sex === 'Female' && ana?.relation_to_head === 'Spouse', `HTTP ${r.status}, imported ${r.body?.imported}, ${JSON.stringify(ana && { name: ana.name, bd: ana.birthdate, tel: ana.contact_number })}`] })
+    await tc('TC-IMP-03', 'Rows with problems are reported and skipped', 'Every bad row gets a message; the good row still imports', async () => {
+      const bad = [impRow({ last_name: '' , first_name: 'c1' }), impRow({ first_name: 'c2', birthdate: '31-02-2000' }), impRow({ first_name: 'c3', birthdate: '2099-01-01' }), impRow({ first_name: 'c4', sex: 'x' }),
+        impRow({ first_name: 'c5', contact_number: '123' }), impRow({ first_name: 'c6', purok: 'No Such Purok' }), impRow({ first_name: 'c7', relation_to_head: 'Cousin' }), impRow({ first_name: 'c8', purok: '' })]
+      const r = await api('POST', '/residents/import', { rows: [...bad, impRow({ first_name: 'Good', birthdate: '1999-05-05' })], commit: true }, O)
+      const allBad = (r.body?.rows || []).slice(0, 8).every(x => x.errors.length > 0)
+      return [r.status === 201 && r.body?.imported === 1 && r.body?.skipped === 8 && allBad, `HTTP ${r.status}, imported ${r.body?.imported}, skipped ${r.body?.skipped}`] })
+    await tc('TC-IMP-04', 'The same person is not imported twice', 'Already-registered and repeated rows are refused', async () => {
+      const again = await api('POST', '/residents/import', { rows: [impRow()], commit: false }, O)
+      const twice = await api('POST', '/residents/import', { rows: [impRow({ first_name: 'Dora', birthdate: '2001-01-01' }), impRow({ first_name: 'dora', birthdate: '01-01-2001' })], commit: false }, O)
+      return [again.body?.invalid === 1 && twice.body?.valid === 1 && twice.body?.invalid === 1, `again invalid ${again.body?.invalid}; in-file valid ${twice.body?.valid}, invalid ${twice.body?.invalid}`] })
+    await tc('TC-IMP-05', 'CDRRMO cannot import residents (view-only)', 'HTTP 403', async () => {
+      const r = await api('POST', '/residents/import', { rows: [impRow()], commit: true }, C); return [r.status === 403, `HTTP ${r.status}`] })
+    await tc('TC-IMP-06', 'An official can only import into their own puroks', 'The other barangay\'s official gets "not one of your puroks"', async () => {
+      const r = await api('POST', '/residents/import', { rows: [impRow({ first_name: 'Intruder' })], commit: true }, O2)
+      return [r.status === 400 && r.body?.invalid === 1 && has(r.body, 'not one of your puroks'), `HTTP ${r.status}, ${(r.body?.rows?.[0]?.errors || [])[0] || r.body?.error || ''}`] })
+    await tc('TC-IMP-07', 'An empty file and an oversized file are refused', 'HTTP 400 for 0 rows and for 501 rows', async () => {
+      const none = await api('POST', '/residents/import', { rows: [], commit: false }, O)
+      const big = await api('POST', '/residents/import', { rows: Array.from({ length: 501 }, (_, i) => impRow({ first_name: 'n' + i })), commit: false }, O)
+      return [none.status === 400 && big.status === 400, `empty ${none.status}, 501 rows ${big.status}`] })
+    await tc('TC-IMP-08', 'CDRRMO sees the imported residents', 'Imported residents are in the CDRRMO list', async () => {
+      const r = await api('GET', '/residents?page=1&limit=50&search=Imptest', undefined, C); return [r.body?.total === 3, `total ${r.body?.total}`] })
+    await tc('TC-IMP-09', 'Imported residents can be deleted (clean-up)', 'All imported residents and the test purok are removed', async () => {
+      const list = (await api('GET', '/residents?page=1&limit=50&search=Imptest', undefined, O)).body?.rows || []
+      for (const x of list) await api('DELETE', `/residents/${x.id}`, undefined, O)
+      const del = await api('DELETE', `/puroks/${impPurok}`, undefined, O)
+      return [(await countImp()) === 0 && del.status === 200, `left ${await countImp()}, purok delete HTTP ${del.status}`] })
+
     // ───────────────────────────────────────────── 10. Data and platform
     mod('Built-in data and platform')
     await tc('TC-SYS-01', 'Health check answers', 'HTTP 200 status ok', async () => { const r = await api('GET', '/health'); return [r.status === 200 && r.body?.status === 'ok', `HTTP ${r.status}`] })

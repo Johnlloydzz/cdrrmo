@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect } from 'react'
-import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone, MapPin } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, UserPlus, Home, Phone, MapPin, Upload } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BirthdateInput from '../components/BirthdateInput'
 import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api'
 import usePagedList from '../utils/usePagedList'
 import Pagination from '../components/Pagination'
+import ImportResidentsModal from '../components/ImportResidentsModal'
 
 // Philippine mobile number: 11 digits starting with 09, and not a dummy
 // like 09999999999 / 09000000000 (same digit repeated).
@@ -62,6 +63,7 @@ export default function ResidentManagement({ currentUser }) {
   const error = list.error
   const [saving, setSaving] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
 
@@ -161,7 +163,10 @@ export default function ResidentManagement({ currentUser }) {
           <input className="input pl-9" placeholder={canAdd ? 'Search resident or purok…' : 'Search resident or barangay…'} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         {canAdd && (
-          <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Register Resident</button>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary flex items-center gap-2 text-sm" onClick={() => setShowImport(true)}><Upload size={15} /> Import Residents</button>
+            <button className="btn-primary flex items-center gap-2 text-sm" onClick={openAdd}><Plus size={15} /> Register Resident</button>
+          </div>
         )}
       </div>
 
@@ -202,6 +207,8 @@ export default function ResidentManagement({ currentUser }) {
         </div>
         <div className="px-4 py-3 border-t text-xs text-gray-500">{loading ? <span className="inline-flex h-4 items-center"><Skeleton className="h-3 w-24" /></span> : <Pagination list={list} noun="residents" />}</div>
       </div>
+
+      {showImport && <ImportResidentsModal onClose={() => setShowImport(false)} onImported={load} />}
 
       {showModal && createPortal(
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
