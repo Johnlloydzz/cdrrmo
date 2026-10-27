@@ -102,12 +102,12 @@ router.post('/', authorize('CDRRMO Personnel'), async (req, res) => {
 router.put('/:id', authorize('CDRRMO Personnel'), async (req, res) => {
   try {
     const isSelf = String(req.params.id) === String(req.user.id)
-    const target = await get('SELECT id, role, barangay_id FROM users WHERE id = ?', [req.params.id])
+    const target = await get('SELECT id, role, barangay_id, status FROM users WHERE id = ?', [req.params.id])
     if (!target) return res.status(404).json({ error: 'User not found.' })
     const { name, email, password } = req.body
     // You can't demote or deactivate your own account (you'd lock yourself out).
     const role = isSelf ? req.user.role : req.body.role
-    const status = isSelf ? 'Active' : req.body.status
+    const status = isSelf ? 'Active' : (req.body.status || target.status)
     const barangay_id = role === 'CDRRMO Personnel' ? null : (req.body.barangay_id || null)
     if (!name || !email || !role) return res.status(400).json({ error: 'Name, email and role are required.' })
     const slotError = await checkBarangaySlot(role, barangay_id, req.params.id)
