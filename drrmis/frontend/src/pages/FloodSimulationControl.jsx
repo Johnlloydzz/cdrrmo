@@ -761,6 +761,9 @@ export default function FloodSimulationControl() {
               )
             })}
 
+            {/* Purok outlines and rings sit above the yellow residential layer (zIndex 406),
+                otherwise the red is painted over and looks orange. */}
+            <Pane name="purok-outlines" style={{ zIndex: 420 }}>
             {/* Purok boundaries — only for the barangay you clicked, same as
                 the Risk Assessment Dashboard (keeps the citywide view clean). */}
             {selectedBarangay && (barangaysWithCentroid.find(b => b.id === selectedBarangay.id)?.puroks || [])
@@ -786,6 +789,21 @@ export default function FloodSimulationControl() {
               })
             }
 
+            {/* An at-risk purok that has no drawn boundary can't get an outline, so it
+                gets a red ring around its pin instead (same red as the outline). */}
+            {selectedBarangay && (() => {
+              const drawn = new Set((barangaysWithCentroid.find(b => b.id === selectedBarangay.id)?.puroks || [])
+                .filter(p => p.boundary_geojson).map(p => String(p.id)))
+              return purokRows
+                .filter(p => p.barangay_id === selectedBarangay.id && p.households > 0 && p.lat != null && p.lng != null
+                  && p[atRiskKey] && !drawn.has(String(p.purok_id)))
+                .map(p => (
+                  <Circle key={`ring-${p.purok_id}-${hazard}`} center={[p.lat, p.lng]} radius={22} interactive={false}
+                    pathOptions={{ color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.2 }} />
+                ))
+            })()}
+            </Pane>
+
             {/* Highlighted outline for the selected barangay — same blue
                 style as Hazard Map & Geofencing */}
             {selectedBarangay?.boundary_geojson && (() => {
@@ -801,20 +819,6 @@ export default function FloodSimulationControl() {
                   />
                 </Pane>
               )
-            })()}
-
-            {/* An at-risk purok that has no drawn boundary can't get an outline, so it
-                gets a red ring around its pin instead (same red as the outline). */}
-            {selectedBarangay && (() => {
-              const drawn = new Set((barangaysWithCentroid.find(b => b.id === selectedBarangay.id)?.puroks || [])
-                .filter(p => p.boundary_geojson).map(p => String(p.id)))
-              return purokRows
-                .filter(p => p.barangay_id === selectedBarangay.id && p.households > 0 && p.lat != null && p.lng != null
-                  && p[atRiskKey] && !drawn.has(String(p.purok_id)))
-                .map(p => (
-                  <Circle key={`ring-${p.purok_id}-${hazard}`} center={[p.lat, p.lng]} radius={22} interactive={false}
-                    pathOptions={{ color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.2 }} />
-                ))
             })()}
 
             {/* One pin per PUROK (households aren't pinned individually):
