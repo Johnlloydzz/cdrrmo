@@ -768,14 +768,19 @@ export default function FloodSimulationControl() {
               .map(p => {
                 let geo
                 try { geo = JSON.parse(p.boundary_geojson) } catch { return null }
+                // Red outline (and a light red fill) when this purok is at risk
+                // for the picked hazard; blue otherwise.
+                const purokAtRisk = purokRows.some(r => String(r.purok_id) === String(p.id) && r[atRiskKey])
                 return (
                   <GeoJSON
-                    key={`purok-${p.id}`}
+                    key={`purok-${p.id}-${hazard}-${purokAtRisk ? 'risk' : 'ok'}`}
                     data={geo}
-                    pathOptions={{ color: '#2563eb', weight: 3, fillOpacity: 0 }}
+                    pathOptions={purokAtRisk
+                      ? { color: '#dc2626', weight: 4, fillColor: '#dc2626', fillOpacity: 0.2 }
+                      : { color: '#2563eb', weight: 3, fillOpacity: 0 }}
                     eventHandlers={{ click: markHandled }}
                   >
-                    <Tooltip sticky>{p.name}</Tooltip>
+                    <Tooltip sticky>{p.name}{purokAtRisk ? ' — at risk' : ''}</Tooltip>
                   </GeoJSON>
                 )
               })
