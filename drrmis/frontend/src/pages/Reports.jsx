@@ -11,6 +11,18 @@ const BASES = [
 ]
 
 const n = v => Number(v || 0).toLocaleString()
+
+// Affected barangays: puroks at risk added up per barangay (works for flood and landslide).
+function affectedBarangays(d) {
+  const m = new Map()
+  for (const p of d.by_purok || []) {
+    if (!p.at_risk) continue
+    const r = m.get(p.barangay_name) || { name: p.barangay_name, puroks: 0, households: 0, residents: 0 }
+    r.puroks += 1; r.households += Number(p.households || 0); r.residents += Number(p.residents || 0)
+    m.set(p.barangay_name, r)
+  }
+  return [...m.values()].sort((a, b) => (b.households - a.households) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }))
+}
 const fmtDate = iso => new Date(iso).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'long', timeStyle: 'short' })
 
 // A reference number made from the date and time the report was generated,
@@ -131,6 +143,20 @@ export default function Reports({ currentUser }) {
         .rp-sign .rp-edit.nm { padding-top: 3px; }
         .rp-foot { margin-top: 16px; padding-top: 5px; border-top: 1px solid #9ca3af; font-size: 10px; color: #4b5563; text-align: center; }
         /* margin 0 keeps the browser from printing its own date/title/URL header and footer; spacing is done by the wrapper table */
+        /* Phones and small tablets: the sheet fills the screen, the letterhead and
+           signatures stack, and wide tables scroll sideways instead of overflowing. */
+        @media screen and (max-width: 720px) {
+          .rp-sheet { padding: 14px 12px; font-size: 11px; box-shadow: none; border-radius: 0; }
+          .rp-letterhead { flex-direction: column; gap: 6px; text-align: center; }
+          .rp-letterhead img { width: 56px; height: 56px; }
+          .rp-title { font-size: 13px; letter-spacing: .02em; }
+          .rp-table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; font-size: 11px; }
+          .rp-table th, .rp-table td { padding: 4px 6px; }
+          .rp-info { display: table; overflow: visible; }
+          .rp-info th { width: 38%; }
+          .rp-sign { flex-direction: column; gap: 6px; }
+          .rp-foot { font-size: 9px; }
+        }
         @page { size: A4; margin: 0; }
         .rp-wrap { width: 100%; border-collapse: collapse; }
         .rp-wrap > thead, .rp-wrap > tfoot { display: none; }
@@ -250,7 +276,32 @@ export default function Reports({ currentUser }) {
             </table>
           </Section>
 
-          <Section no="IV" title="Summary by purok">
+          <Section no="IV" title="Affected barangays">
+            {(() => {
+              const rows = affectedBarangays(data)
+              const tot = rows.reduce((t, r) => ({ puroks: t.puroks + r.puroks, households: t.households + r.households, residents: t.residents + r.residents }), { puroks: 0, households: 0, residents: 0 })
+              return (
+                <>
+                  <p className="rp-note" style={{ marginBottom: 6 }}>
+                    {n(s.barangays_at_risk)} of {n(s.barangays_in_scope)} barangay{s.barangays_in_scope === 1 ? '' : 's'} in this report {s.barangays_at_risk === 1 ? 'has' : 'have'} puroks at risk
+                    {data.filters.hazard === 'landslide' ? ' of landslide' : ' of flooding'}.
+                  </p>
+                  <table className="rp-table">
+                    <thead><tr><th className="ctr" style={{ width: 34 }}>No.</th><th>Barangay</th><th className="num">Puroks at risk</th><th className="num">Households at risk</th><th className="num">Residents at risk</th></tr></thead>
+                    <tbody>
+                      {rows.length === 0 && <tr><td colSpan={5}>No barangay has a purok at risk for this selection.</td></tr>}
+                      {rows.map((r, i) => (
+                        <tr key={r.name}><td className="ctr">{i + 1}</td><td>{r.name}</td><td className="num">{n(r.puroks)}</td><td className="num">{n(r.households)}</td><td className="num">{n(r.residents)}</td></tr>
+                      ))}
+                      {rows.length > 0 && <tr className="total"><td colSpan={2}>Total</td><td className="num">{n(tot.puroks)}</td><td className="num">{n(tot.households)}</td><td className="num">{n(tot.residents)}</td></tr>}
+                    </tbody>
+                  </table>
+                </>
+              )
+            })()}
+          </Section>
+
+          <Section no="V" title="Summary by purok">
             <table className="rp-table">
               <thead><tr><th className="ctr" style={{ width: 34 }}>No.</th><th>Barangay</th><th>Purok</th><th className="num">Households</th><th className="num">Residents</th><th>Status</th></tr></thead>
               <tbody>
@@ -266,7 +317,7 @@ export default function Reports({ currentUser }) {
             </table>
           </Section>
 
-          <Section no="V" title={`List of households at risk (${n(data.households.length)})`}>
+          <Section no="VI" title={`List of households at risk (${n(data.households.length)})`}>
             <table className="rp-table">
               <thead><tr><th className="ctr" style={{ width: 34 }}>No.</th><th>HH No.</th><th>Barangay</th><th>Purok</th><th>Head of Family</th><th className="num">Members</th><th>Contact</th></tr></thead>
               <tbody>
