@@ -236,7 +236,7 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Households', 'Residents', ...(isCdrrmo ? ['Flood Risk','Flood Threshold (m)','Landslide Risk'] : []), 'Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Households', 'Residents', ...(isCdrrmo ? ['Flood Risk','Flood Threshold (m)','Landslide Risk'] : []), 'Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head" style={['Households', 'Residents', 'Flood Threshold (m)'].includes(h) ? { textAlign: 'center' } : undefined}>{h}</th>)}</tr></thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
               {loading ? <SkeletonTableRows columns={(isCdrrmo ? 8 : 4) + (canAdd ? 1 : 0)} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(p => (
