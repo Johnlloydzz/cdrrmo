@@ -97,6 +97,16 @@ export default function Reports({ currentUser }) {
   const [data, setData] = useState(null)
   const [office, setOffice] = useState(null) // address / contact / email from Settings
   const [loading, setLoading] = useState(true)
+  // Signatories typed by the office (kept in this browser; blank = default)
+  const [sig, setSig] = useState(() => {
+    try { return { ...{ prepName: '', prepTitle: '', notedName: '', notedTitle: 'Head of Office, City DRRMO' }, ...JSON.parse(localStorage.getItem('pdra_report_sig') || '{}') } }
+    catch { return { prepName: '', prepTitle: '', notedName: '', notedTitle: 'Head of Office, City DRRMO' } }
+  })
+  const setSigField = (k, v) => setSig(prev => {
+    const next = { ...prev, [k]: v }
+    try { localStorage.setItem('pdra_report_sig', JSON.stringify(next)) } catch { /* ignore */ }
+    return next
+  })
   const [error, setError] = useState('')
 
   useEffect(() => { apiGet('/barangays').then(r => setBarangays(Array.isArray(r) ? r : [])).catch(() => {}) }, [])
@@ -185,6 +195,18 @@ export default function Reports({ currentUser }) {
             )}
           </div>
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase">Prepared by (printed on report)</p>
+            <input className="input w-full" placeholder={`Full name (default: ${data?.generated_by || 'your account name'})`} value={sig.prepName} onChange={e => setSigField('prepName', e.target.value)} />
+            <input className="input w-full" placeholder={`Position / title (default: ${data?.role || 'your role'})`} value={sig.prepTitle} onChange={e => setSigField('prepTitle', e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase">Noted by (printed on report)</p>
+            <input className="input w-full" placeholder="Full name of Head of Office" value={sig.notedName} onChange={e => setSigField('notedName', e.target.value)} />
+            <input className="input w-full" placeholder="Position / title" value={sig.notedTitle} onChange={e => setSigField('notedTitle', e.target.value)} />
+          </div>
+        </div>
         {currentUser?.role !== 'Barangay Official' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
             <DropdownSelect searchable value={barangayId} placeholder="All barangays"
@@ -225,7 +247,7 @@ export default function Reports({ currentUser }) {
               <tr><th>Hazard</th><td>{hazardName}</td></tr>
               <tr><th>Basis</th><td>{basisLabel(data)}</td></tr>
               <tr><th>Coverage</th><td>{coverage}</td></tr>
-              <tr><th>Prepared by</th><td>{data.generated_by} ({data.role})</td></tr>
+              <tr><th>Prepared by</th><td>{sig.prepName.trim() || data.generated_by} ({sig.prepTitle.trim() || data.role})</td></tr>
             </tbody>
           </table>
 
@@ -296,14 +318,14 @@ export default function Reports({ currentUser }) {
           <div className="rp-sign">
             <div>
               <p style={{ textAlign: 'left', margin: 0 }}>Prepared by:</p>
-              <div className="line">{data.generated_by}</div>
-              <div className="cap">{data.role}</div>
+              <div className="line">{sig.prepName.trim() || data.generated_by}</div>
+              <div className="cap">{sig.prepTitle.trim() || data.role}</div>
               <div className="cap">Date: ____________________</div>
             </div>
             <div>
               <p style={{ textAlign: 'left', margin: 0 }}>Noted by:</p>
-              <div className="line">&nbsp;</div>
-              <div className="cap">Head of Office, City DRRMO</div>
+              <div className="line">{sig.notedName.trim() || '\u00a0'}</div>
+              <div className="cap">{sig.notedTitle.trim() || 'Head of Office, City DRRMO'}</div>
               <div className="cap">Date: ____________________</div>
             </div>
           </div>
