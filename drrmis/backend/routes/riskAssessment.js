@@ -72,6 +72,10 @@ router.get('/puroks', cached(30, (req) => `risk:puroks:${req.user.role === 'Bara
 // Per-purok breakdown for a single barangay (drill-down view)
 router.get('/barangay/:barangayId', async (req, res) => {
   try {
+    // A Barangay Official may only look at their own barangay (enforced here, not just in the UI).
+    if (req.user.role === 'Barangay Official' && Number(req.params.barangayId) !== Number(req.user.barangay_id)) {
+      return res.status(403).json({ error: 'You can only view your own barangay.' })
+    }
     const rows = await all(`
       SELECT
         p.id                                             AS purok_id,
