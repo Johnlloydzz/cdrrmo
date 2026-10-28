@@ -157,6 +157,14 @@ export default function Reports({ currentUser }) {
           .rp-sign { flex-direction: column; gap: 6px; }
           .rp-foot { font-size: 9px; }
         }
+        /* On screen the wrapper table must not size itself to the widest table inside it
+           (that pushed the sheet past the edge of a phone); it behaves like a plain block. */
+        @media screen {
+          .rp-wrap, .rp-wrap > tbody, .rp-wrap > tbody > tr, .rp-wrap > tbody > tr > td { display: block; }
+          .rp-sheet { width: 100%; min-width: 0; box-sizing: border-box; }
+          .rp-info { table-layout: fixed; width: 100%; }
+          .rp-info td, .rp-note, .rp-lh-text { overflow-wrap: anywhere; }
+        }
         @page { size: A4; margin: 0; }
         .rp-wrap { width: 100%; border-collapse: collapse; }
         .rp-wrap > thead, .rp-wrap > tfoot { display: none; }
