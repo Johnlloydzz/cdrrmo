@@ -48,10 +48,10 @@ function situationText(d) {
 const basisLabel = d => d.filters.hazard === 'landslide' ? 'CDRA classification' : (d.filters.basis === 'planning' ? 'Hazard-prone areas (planning view)' : 'Current alert (live view)')
 
 const Seg = ({ options, value, onChange }) => (
-  <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+  <div className="flex w-full sm:inline-flex sm:w-auto rounded-lg border border-gray-200 overflow-hidden bg-white">
     {options.map(o => (
       <button key={o.id} type="button" onClick={() => onChange(o.id)}
-        className={`px-3 py-1.5 text-sm font-medium ${value === o.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{o.label}</button>
+        className={`flex-1 sm:flex-none px-2 sm:px-3 py-2 sm:py-1.5 text-[13px] sm:text-sm leading-tight text-center font-medium ${value === o.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{o.label}</button>
     ))}
   </div>
 )
@@ -190,25 +190,25 @@ export default function Reports({ currentUser }) {
       `}</style>
 
       {/* Filters and actions (not printed) */}
-      <div className="no-print bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Seg options={HAZARDS} value={hazard} onChange={setHazard} />
-          {hazard === 'flood' && <Seg options={BASES} value={basis} onChange={setBasis} />}
-          <div className="ml-auto flex items-center gap-2">
-            <button type="button" className="btn-secondary flex items-center gap-1.5" onClick={load} disabled={loading}>
+      <div className="no-print bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+            <Seg options={HAZARDS} value={hazard} onChange={setHazard} />
+            {hazard === 'flood' && <Seg options={BASES} value={basis} onChange={setBasis} />}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 xl:flex xl:items-center xl:shrink-0">
+            <button type="button" className="btn-secondary flex items-center justify-center gap-1.5 whitespace-nowrap" onClick={load} disabled={loading}>
               <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
             {canExport && (
-              <>
-                <button type="button" className="btn-primary flex items-center gap-1.5" disabled={!data} onClick={() => window.print()}>
-                  <Printer size={15} /> Print / Save as PDF
-                </button>
-              </>
+              <button type="button" className="btn-primary flex items-center justify-center gap-1.5 whitespace-nowrap" disabled={!data} onClick={() => window.print()}>
+                <Printer size={15} /> Print / Save as PDF
+              </button>
             )}
           </div>
         </div>
         {currentUser?.role !== 'Barangay Official' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <DropdownSelect searchable value={barangayId} placeholder="All barangays"
               options={barangays.map(b => ({ value: b.id, label: b.name }))}
               onChange={v => setBarangayId(v === '' ? '' : String(v))} />
