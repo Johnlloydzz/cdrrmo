@@ -236,18 +236,18 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Households', 'Residents', 'Flood Risk','Flood Threshold (m)','Landslide Risk','Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Households', 'Residents', ...(isCdrrmo ? ['Flood Risk','Flood Threshold (m)','Landslide Risk'] : []), 'Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={(isCdrrmo ? 8 : 7) + (canAdd ? 1 : 0)} actions={canAdd} rows={skeletonRows} /> : (<>
+              {loading ? <SkeletonTableRows columns={(isCdrrmo ? 8 : 4) + (canAdd ? 1 : 0)} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{p.name}</td>
                   {isCdrrmo && <td className="table-cell">{p.barangay_name || '—'}</td>}
                   <td className="table-cell text-center">{Number(p.household_count || 0).toLocaleString()}</td>
                   <td className="table-cell text-center">{Number(p.resident_count || 0).toLocaleString()}</td>
-                  <td className="table-cell"><span className={RISK[p.flood_risk] || 'badge-gray'}>{p.flood_risk}</span></td>
-                  <td className="table-cell text-center">{p.flood_threshold_m} m</td>
-                  <td className="table-cell"><span className={RISK[p.landslide_risk] || 'badge-gray'}>{p.landslide_risk}</span></td>
+                  {isCdrrmo && <td className="table-cell"><span className={RISK[p.flood_risk] || 'badge-gray'}>{p.flood_risk}</span></td>}
+                  {isCdrrmo && <td className="table-cell text-center">{p.flood_threshold_m} m</td>}
+                  {isCdrrmo && <td className="table-cell"><span className={RISK[p.landslide_risk] || 'badge-gray'}>{p.landslide_risk}</span></td>}
                   <td className="table-cell text-xs text-gray-400">{p.boundary_geojson ? '✓ Drawn' : 'None'}</td>
                   {canAdd && (
                     <td className="table-cell">
@@ -259,7 +259,7 @@ export default function PurokManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={(isCdrrmo ? 8 : 7) + (canAdd ? 1 : 0)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={(isCdrrmo ? 8 : 4) + (canAdd ? 1 : 0)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
               </>)}
             </tbody>
           </table>
@@ -328,16 +328,7 @@ export default function PurokManagement({ currentUser }) {
                     <div><label className="label">Flood Threshold (meters)</label><input className="input" type="number" step="0.1" value={form.flood_threshold_m} onChange={e => setForm({...form, flood_threshold_m: e.target.value})} /></div>
                     <div className="col-span-2"><label className="label">Landslide Risk (CDRA)</label><select className="input" value={form.landslide_risk} onChange={e => setForm({...form, landslide_risk: e.target.value})}><option>Low</option><option>Medium</option><option>High</option></select></div>
                   </>
-                ) : (
-                  <div className="col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <p className="text-xs text-gray-500 mb-2">Flood/Landslide Risk (CDRA) — set by CDRRMO only:</p>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className={RISK[form.flood_risk] || 'badge-gray'}>Flood: {form.flood_risk || 'Low'}</span>
-                      <span className="badge-gray">Threshold: {form.flood_threshold_m || 1} m</span>
-                      <span className={RISK[form.landslide_risk] || 'badge-gray'}>Landslide: {form.landslide_risk || 'Low'}</span>
-                    </div>
-                  </div>
-                )}
+                ) : null}
               </div>
 
               {/* Boundary drawing map — only whoever can rename the purok
@@ -454,7 +445,7 @@ export default function PurokManagement({ currentUser }) {
               <p className="text-xs text-gray-400">
                 {isCdrrmo
                   ? 'Flood Risk and Threshold values are based on the CDRRMO\'s existing CDRA data and used for geofencing.'
-                  : 'You can add or rename puroks and draw their boundary — the risk classification above is set by CDRRMO based on official CDRA data.'}
+                  : 'You can add or rename puroks and draw their boundary. The CDRRMO sets the risk classification.'}
               </p>
             </div>
 
