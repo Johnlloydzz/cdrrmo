@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation, Link } from 'react-router-dom'
-import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, useMap, useMapEvents, Pane } from 'react-leaflet'
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip, Popup, Circle, useMap, useMapEvents, Pane } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, ChevronDown, Settings2, ArrowLeft, X } from 'lucide-react'
@@ -801,6 +801,20 @@ export default function FloodSimulationControl() {
                   />
                 </Pane>
               )
+            })()}
+
+            {/* An at-risk purok that has no drawn boundary can't get an outline, so it
+                gets a red ring around its pin instead (same red as the outline). */}
+            {selectedBarangay && (() => {
+              const drawn = new Set((barangaysWithCentroid.find(b => b.id === selectedBarangay.id)?.puroks || [])
+                .filter(p => p.boundary_geojson).map(p => String(p.id)))
+              return purokRows
+                .filter(p => p.barangay_id === selectedBarangay.id && p.households > 0 && p.lat != null && p.lng != null
+                  && p[atRiskKey] && !drawn.has(String(p.purok_id)))
+                .map(p => (
+                  <Circle key={`ring-${p.purok_id}-${hazard}`} center={[p.lat, p.lng]} radius={22} interactive={false}
+                    pathOptions={{ color: '#dc2626', weight: 3, fillColor: '#dc2626', fillOpacity: 0.2 }} />
+                ))
             })()}
 
             {/* One pin per PUROK (households aren't pinned individually):
