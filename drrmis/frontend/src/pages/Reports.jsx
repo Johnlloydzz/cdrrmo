@@ -159,6 +159,11 @@ export default function Reports({ currentUser }) {
         .rp-sign > div { flex: 1; text-align: center; }
         .rp-sign .line { border-top: 1px solid #111827; margin-top: 30px; padding-top: 3px; font-weight: 700; text-transform: uppercase; min-height: 16px; }
         .rp-sign .cap { font-size: 11px; color: #374151; }
+        .rp-edit { display: block; width: 100%; box-sizing: border-box; background: #fffbe6; border: 1px dashed #d4a72c; border-radius: 3px; text-align: center; font-family: inherit; color: inherit; outline: none; padding: 2px 4px; }
+        .rp-edit:focus { border-color: #2563eb; background: #eff6ff; }
+        .rp-edit.nm { font-weight: 700; text-transform: uppercase; font-size: 12px; margin-top: 26px; border-top: 1px solid #111827; }
+        .rp-edit.tt { font-size: 11px; color: #374151; margin-top: 2px; }
+        .rp-sign .rp-edit.nm { padding-top: 3px; }
         .rp-foot { margin-top: 16px; padding-top: 5px; border-top: 1px solid #9ca3af; font-size: 10px; color: #4b5563; text-align: center; }
         @page { size: A4; margin: 12mm 12mm 14mm; @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 9px; color: #4b5563; } }
         @media print {
@@ -168,6 +173,9 @@ export default function Reports({ currentUser }) {
           #pdra-report { position: absolute; left: 0; top: 0; width: 100%; }
           .no-print { display: none !important; }
           .rp-sheet { border: 0; box-shadow: none; padding: 0; max-width: none; margin: 0; }
+          .rp-edit { background: transparent !important; border: 0 !important; padding: 0 !important; }
+          .rp-edit.nm { border-top: 1px solid #111827 !important; padding-top: 3px !important; }
+          .rp-edit::placeholder { color: transparent; }
           .rp-table tr { break-inside: avoid; }
           .rp-table thead { display: table-header-group; }
           .rp-section.keep, .rp-sign { break-inside: avoid; }
@@ -193,18 +201,6 @@ export default function Reports({ currentUser }) {
                 </button>
               </>
             )}
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Prepared by (printed on report)</p>
-            <input className="input w-full" placeholder={`Full name (default: ${data?.generated_by || 'your account name'})`} value={sig.prepName} onChange={e => setSigField('prepName', e.target.value)} />
-            <input className="input w-full" placeholder={`Position / title (default: ${data?.role || 'your role'})`} value={sig.prepTitle} onChange={e => setSigField('prepTitle', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Noted by (printed on report)</p>
-            <input className="input w-full" placeholder="Full name of Head of Office" value={sig.notedName} onChange={e => setSigField('notedName', e.target.value)} />
-            <input className="input w-full" placeholder="Position / title" value={sig.notedTitle} onChange={e => setSigField('notedTitle', e.target.value)} />
           </div>
         </div>
         {currentUser?.role !== 'Barangay Official' && (
@@ -318,14 +314,14 @@ export default function Reports({ currentUser }) {
           <div className="rp-sign">
             <div>
               <p style={{ textAlign: 'left', margin: 0 }}>Prepared by:</p>
-              <div className="line">{sig.prepName.trim() || data.generated_by}</div>
-              <div className="cap">{sig.prepTitle.trim() || data.role}</div>
+              <input className="rp-edit nm" aria-label="Prepared by name" placeholder={data.generated_by} value={sig.prepName || data.generated_by} onChange={e => setSigField('prepName', e.target.value)} />
+              <input className="rp-edit tt" aria-label="Prepared by position" placeholder={data.role} value={sig.prepTitle || data.role} onChange={e => setSigField('prepTitle', e.target.value)} />
               <div className="cap">Date: ____________________</div>
             </div>
             <div>
               <p style={{ textAlign: 'left', margin: 0 }}>Noted by:</p>
-              <div className="line">{sig.notedName.trim() || '\u00a0'}</div>
-              <div className="cap">{sig.notedTitle.trim() || 'Head of Office, City DRRMO'}</div>
+              <input className="rp-edit nm" aria-label="Noted by name" placeholder="Name of Head of Office" value={sig.notedName} onChange={e => setSigField('notedName', e.target.value)} />
+              <input className="rp-edit tt" aria-label="Noted by position" placeholder="Head of Office, City DRRMO" value={sig.notedTitle} onChange={e => setSigField('notedTitle', e.target.value)} />
               <div className="cap">Date: ____________________</div>
             </div>
           </div>
