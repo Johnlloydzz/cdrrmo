@@ -7,6 +7,7 @@ import L from 'leaflet'
 import { AlertTriangle, X, MapPin, Search, Building2, ShieldAlert, Waves, ChevronDown, ArrowLeft } from 'lucide-react'
 import { apiGet } from '../utils/api'
 import { flyToSafe } from '../utils/mapFly'
+import { purokLabel } from '../utils/purokLabel'
 import { Skeleton, SkeletonBlock, SkeletonList } from '../components/Skeleton'
 import { purokInHazardArea, effectiveThreshold } from '../utils/geofence'
 
@@ -507,13 +508,13 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                   <span className="min-w-0">
                     <span className="block font-semibold text-gray-800 text-sm truncate">
                       {rzLevel === 'puroks' && rzBarangayObj?.name}
-                      {rzLevel === 'households' && `Purok ${rzPurokGroup?.name || ''}`}
+                      {rzLevel === 'households' && (rzPurokGroup?.name ? purokLabel(rzPurokGroup.name) : 'Purok')}
                       {rzLevel === 'residents' && `${rzHousehold?.household_id} · ${rzHousehold?.head_family}`}
                     </span>
                     <span className="block text-[11px] text-gray-400 truncate">
                       {rzLevel === 'puroks' && 'At-risk puroks'}
                       {rzLevel === 'households' && `${rzBarangayObj?.name} · at-risk households`}
-                      {rzLevel === 'residents' && `Purok ${rzHousehold?.purok_name || ''} · members of this household`}
+                      {rzLevel === 'residents' && `${rzHousehold?.purok_name ? purokLabel(rzHousehold.purok_name) : 'Purok'} · members of this household`}
                     </span>
                   </span>
                   {rzLevel === 'puroks' && <AlertTriangle size={15} className="text-red-500 flex-shrink-0 ml-auto" />}
@@ -547,7 +548,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                       <button key={g.id} type="button" onClick={() => setRzPurok(g.id)}
                         className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 text-left">
                         <span>
-                          <span className="block font-medium text-gray-800 text-sm">Purok {g.name}</span>
+                          <span className="block font-medium text-gray-800 text-sm">{purokLabel(g.name)}</span>
                           <span className="block text-xs text-gray-400">{g.households} household{g.households === 1 ? '' : 's'}</span>
                         </span>
                         <span className="text-right flex-shrink-0">
@@ -835,7 +836,7 @@ export default function RiskAssessmentDashboard({ currentUser }) {
                 icon={focusedHousehold.in_flood_risk_zone ? redPinIcon : bluePinIcon}
               >
                 <Popup eventHandlers={{ remove: () => setFocusedHousehold(null) }}>
-                  <strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />Purok {focusedHousehold.purok_name}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
+                  <strong>{focusedHousehold.household_id}</strong> - {focusedHousehold.head_family}<br />{purokLabel(focusedHousehold.purok_name)}<br />{focusedHousehold.in_flood_risk_zone ? 'WARNING: Within high flood-risk zone (geofenced)' : 'Outside high-risk zone'}
                 </Popup>
               </Marker>
             )}

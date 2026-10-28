@@ -8,6 +8,7 @@ import { Waves, Mountain, AlertTriangle, Search, Building2, ExternalLink, Chevro
 import { prepareSessionHandoff } from '../utils/storage'
 import { SkeletonList, SkeletonBlock } from '../components/Skeleton'
 import { apiGet, apiPut } from '../utils/api'
+import { purokLabel } from '../utils/purokLabel'
 import { flyToSafe, closeTooltipsOnDrag } from '../utils/mapFly'
 import { useClupZones, ClupLandslideLayer } from '../components/ClupZones'
 
@@ -831,7 +832,7 @@ export default function FloodSimulationControl() {
               .map(g => (
               <Marker key={`purok-${g.id}`} position={[g.lat, g.lng]} icon={g.atRisk ? redPin : bluePin}>
                 <Popup>
-                  <strong>Purok {g.name}</strong> — {g.barangay}<br />
+                  <strong>{purokLabel(g.name)}</strong> — {g.barangay}<br />
                   Households: {g.households} · Residents in households: {g.members}<br />
                   {g.atRisk ? (isFlood ? `WARNING: ${g.atRisk} household(s) flooded at ${activeFloodLevel} m (${simulateRain ? 'TEST simulation' : 'heavy rain, live'})` : `WARNING: ${g.atRisk} household(s) within high ${hazard}-risk zone`) : 'Outside high-risk zone'}
                 </Popup>
@@ -842,7 +843,7 @@ export default function FloodSimulationControl() {
             {!selectedBarangay && cityAtRiskPuroks.map(p => (
               <Marker key={`city-purok-${p.purok_id}`} position={[p.lat, p.lng]} icon={redPin}>
                 <Popup>
-                  <strong>Purok {p.purok_name}</strong> — {p.barangay_name}<br />
+                  <strong>{purokLabel(p.purok_name)}</strong> — {p.barangay_name}<br />
                   Households: {p.households} · Residents in households: {p.members}<br />
                   {`WARNING: ${p.households} household(s) flooded at ${activeFloodLevel} m (${simulateRain ? 'TEST simulation' : 'heavy rain, live'})`}
                 </Popup>
