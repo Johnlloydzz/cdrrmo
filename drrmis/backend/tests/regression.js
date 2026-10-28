@@ -136,6 +136,21 @@ async function main() {
     await tc('TC-AUTH-10', 'Signed-in user can read their own profile', 'HTTP 200 with the username', async () => {
       const r = await api('GET', '/auth/me', undefined, C); return [r.status === 200 && has(r.body, 'cdrrmo01'), `HTTP ${r.status}`] })
 
+    const tinyJpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=='
+    await tc('TC-AUTH-12', 'Profile picture: a small picture is saved and read back', 'PUT then GET return the same picture', async () => {
+      const p = await api('PUT', '/auth/photo', { photo: tinyJpeg }, C); const g = await api('GET', '/auth/photo', undefined, C)
+      return [p.status === 200 && g.status === 200 && g.body?.photo === tinyJpeg, `PUT ${p.status}, GET ${g.status}`] })
+    await tc('TC-AUTH-13', 'Profile picture: a file that is not a picture, or too big, is refused', 'Both HTTP 400', async () => {
+      const a = await api('PUT', '/auth/photo', { photo: 'data:text/html;base64,PGgxPmhpPC9oMT4=' }, C)
+      const b = await api('PUT', '/auth/photo', { photo: 'data:image/jpeg;base64,' + 'A'.repeat(70000) }, C)
+      return [a.status === 400 && b.status === 400, `HTTP ${a.status} / ${b.status}`] })
+    await tc('TC-AUTH-14', 'Profile picture: needs a sign-in, and each user has their own', 'HTTP 401 without a token; the other user sees no picture', async () => {
+      const a = await api('PUT', '/auth/photo', { photo: tinyJpeg }); const g = await api('GET', '/auth/photo', undefined, O)
+      return [a.status === 401 && g.body?.photo === null, `HTTP ${a.status}, other user photo ${g.body?.photo === null ? 'none' : 'LEAK'}`] })
+    await tc('TC-AUTH-15', 'Profile picture can be removed', 'HTTP 200 and the picture is gone', async () => {
+      const r = await api('PUT', '/auth/photo', { photo: null }, C); const g = await api('GET', '/auth/photo', undefined, C)
+      return [r.status === 200 && g.body?.photo === null, `HTTP ${r.status}`] })
+
     // ───────────────────────────────────────────── 2. User management
     mod('User management (CDRRMO only)')
     let u2id = null

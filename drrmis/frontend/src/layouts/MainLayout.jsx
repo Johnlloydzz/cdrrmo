@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import Sidebar from '../components/Sidebar'
 import NotificationPanel, { useNotifications } from '../components/NotificationPanel'
 import ProfilePanel from '../components/ProfilePanel'
+import Avatar from '../components/Avatar'
 import { Menu, Bell, ChevronDown } from 'lucide-react'
 
 
@@ -104,8 +105,8 @@ export default function MainLayout({ onLogout, currentUser }) {
                 className="flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200"
                 aria-label="Profile menu"
               >
-                <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs font-bold">{currentUser?.avatar || (currentUser?.name || 'U').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}</span>
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-primary-600 flex items-center justify-center flex-shrink-0">
+                  <Avatar user={currentUser} />
                 </div>
                 <div className="hidden sm:block text-left">
                   <p className="text-sm font-medium text-gray-800 leading-tight">{currentUser?.name || 'User'}</p>

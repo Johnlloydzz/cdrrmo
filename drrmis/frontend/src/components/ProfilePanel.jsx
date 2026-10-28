@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, MapPin, ShieldCheck, LogIn, Clock } from 'lucide-react'
+import { X, MapPin, ShieldCheck, LogIn, Clock, Camera } from 'lucide-react'
+import Avatar from './Avatar'
+import { shrinkImage, savePhoto, usePhoto } from '../utils/profilePhoto'
 import { apiGet } from '../utils/api'
 import { getStoredToken } from '../utils/storage'
 
@@ -53,6 +55,24 @@ export default function ProfilePanel({ currentUser, open, onClose }) {
     return () => { cancelled = true }
   }, [open])
 
+  const fileRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const [photoErr, setPhotoErr] = useState('')
+  const hasPhoto = !!usePhoto(currentUser?.id)
+  const onPick = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = ''
+    if (!file) return
+    setBusy(true); setPhotoErr('')
+    try { await savePhoto(currentUser.id, await shrinkImage(file)) }
+    catch (err) { setPhotoErr(err.message || 'Could not save the picture.') }
+    setBusy(false)
+  }
+  const onRemove = async () => {
+    setBusy(true); setPhotoErr('')
+    try { await savePhoto(currentUser.id, null) } catch (err) { setPhotoErr(err.message) }
+    setBusy(false)
+  }
+
   if (!open) return null
 
   const role = currentUser?.role || ''
@@ -82,9 +102,20 @@ export default function ProfilePanel({ currentUser, open, onClose }) {
         >
           <X size={16} />
         </button>
-        <div className="mx-auto w-16 h-16 rounded-full bg-white/15 ring-4 ring-white/20 flex items-center justify-center">
-          <span className="text-white text-xl font-bold tracking-wide">{currentUser?.avatar || initials(name)}</span>
+        <div className="mx-auto w-16 h-16 rounded-full bg-white/15 ring-4 ring-white/20 flex items-center justify-center overflow-hidden">
+          <Avatar user={currentUser} className="text-white text-xl font-bold tracking-wide" />
         </div>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onPick} />
+        <div className="mt-2 flex items-center justify-center gap-3 text-[11px]">
+          <button onClick={() => fileRef.current?.click()} disabled={busy}
+            className="inline-flex items-center gap-1 text-white/90 hover:text-white underline-offset-2 hover:underline disabled:opacity-60">
+            <Camera size={12} /> {busy ? 'Saving…' : hasPhoto ? 'Change photo' : 'Upload photo'}
+          </button>
+          {hasPhoto && !busy && (
+            <button onClick={onRemove} className="text-white/70 hover:text-white underline-offset-2 hover:underline">Remove</button>
+          )}
+        </div>
+        {photoErr && <p className="mt-1 text-[11px] text-red-200">{photoErr}</p>}
         <h3 className="mt-3 text-white font-semibold text-base leading-tight">{name}</h3>
         {email && <p className="text-white/75 text-xs mt-0.5 truncate">{email}</p>}
         <div className="mt-3 flex items-center justify-center gap-2">

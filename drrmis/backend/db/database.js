@@ -47,7 +47,7 @@ async function all(sql, params = []) {
 const EXPECTED_COLUMNS = {
   // Wrong-code tries per reset code (locked after 5).
   password_resets: { attempts: `INTEGER DEFAULT 0` },
-  users: { name: `TEXT`, email: `TEXT`, barangay_id: `INTEGER REFERENCES barangays(id)`, status: `TEXT DEFAULT 'Active'`, last_login: `TEXT`, last_active: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
+  users: { profile_photo: `TEXT`, name: `TEXT`, email: `TEXT`, barangay_id: `INTEGER REFERENCES barangays(id)`, status: `TEXT DEFAULT 'Active'`, last_login: `TEXT`, last_active: `TEXT`, created_at: `TEXT`, updated_at: `TEXT` },
   barangays: { risk_level: `TEXT DEFAULT 'Low'`, flood_susceptibility: `TEXT DEFAULT 'Low'`, landslide_susceptibility: `TEXT DEFAULT 'Low'`, population: `INTEGER DEFAULT 0`, boundary_geojson: `TEXT`, created_at: `TEXT`, updated_at: `TEXT`, captain_name: `TEXT`, contact_number: `TEXT`, flood_area_geojson: `TEXT`, landslide_area_geojson: `TEXT`, residential_area_geojson: `TEXT`,
     // Landslide level for the part of the barangay OUTSIDE the drawn
     // landslide area (the drawn area uses landslide_susceptibility).

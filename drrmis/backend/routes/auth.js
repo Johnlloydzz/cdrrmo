@@ -120,6 +120,39 @@ router.get('/me', authenticate, async (req, res) => {
   }
 })
 
+// Profile photo: a small picture the browser already shrank (about 192 px, a
+// few KB) and sends as a data URL. It is saved in the database (not in
+// Firebase Hosting), so it does not use hosting storage or bandwidth.
+const PHOTO_MAX_CHARS = 60000 // about 45 KB
+const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/
+
+// GET /api/auth/photo
+router.get('/photo', authenticate, async (req, res) => {
+  try {
+    const row = await get('SELECT profile_photo FROM users WHERE id = ?', [req.user.id])
+    res.json({ photo: row?.profile_photo || null })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// PUT /api/auth/photo  { photo: "data:image/jpeg;base64,..." }  (null or "" removes it)
+router.put('/photo', authenticate, async (req, res) => {
+  try {
+    const photo = req.body?.photo
+    if (photo === null || photo === '' || photo === undefined) {
+      await run('UPDATE users SET profile_photo = NULL WHERE id = ?', [req.user.id])
+      return res.json({ photo: null })
+    }
+    if (typeof photo !== 'string' || !PHOTO_RE.test(photo)) {
+      return res.status(400).json({ error: 'Please choose a picture (JPG, PNG or WebP).' })
+    }
+    if (photo.length > PHOTO_MAX_CHARS) {
+      return res.status(400).json({ error: 'The picture is too big. Choose a smaller one.' })
+    }
+    await run('UPDATE users SET profile_photo = ? WHERE id = ?', [photo, req.user.id])
+    res.json({ photo })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 // ── Forgot password: 6-digit code by email ─────────────────────────────────
 // 1. /forgot-password  — username or email → a code is emailed (10 min)
 // 2. /verify-otp       — check the code (max 5 wrong tries per code)
