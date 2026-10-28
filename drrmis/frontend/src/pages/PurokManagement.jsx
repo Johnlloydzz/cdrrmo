@@ -236,13 +236,15 @@ export default function PurokManagement({ currentUser }) {
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Flood Risk','Flood Threshold (m)','Landslide Risk','Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-200"><tr>{['Purok', ...(isCdrrmo ? ['Barangay'] : []), 'Households', 'Residents', 'Flood Risk','Flood Threshold (m)','Landslide Risk','Boundary', ...(canAdd ? ['Actions'] : [])].map(h => <th key={h} className="table-head">{h}</th>)}</tr></thead>
             <tbody key={loading ? 'loading' : 'loaded'} className={`divide-y divide-gray-100 ${loading ? '' : 'animate-fade-in'}`}>
-              {loading ? <SkeletonTableRows columns={(isCdrrmo ? 6 : 5) + (canAdd ? 1 : 0)} actions={canAdd} rows={skeletonRows} /> : (<>
+              {loading ? <SkeletonTableRows columns={(isCdrrmo ? 8 : 7) + (canAdd ? 1 : 0)} actions={canAdd} rows={skeletonRows} /> : (<>
               {filtered.map(p => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="table-cell font-medium">{p.name}</td>
                   {isCdrrmo && <td className="table-cell">{p.barangay_name || '—'}</td>}
+                  <td className="table-cell text-center">{Number(p.household_count || 0).toLocaleString()}</td>
+                  <td className="table-cell text-center">{Number(p.resident_count || 0).toLocaleString()}</td>
                   <td className="table-cell"><span className={RISK[p.flood_risk] || 'badge-gray'}>{p.flood_risk}</span></td>
                   <td className="table-cell text-center">{p.flood_threshold_m} m</td>
                   <td className="table-cell"><span className={RISK[p.landslide_risk] || 'badge-gray'}>{p.landslide_risk}</span></td>
@@ -257,7 +259,7 @@ export default function PurokManagement({ currentUser }) {
                   )}
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={isCdrrmo ? 6 : (canAdd ? 5 : 6)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={(isCdrrmo ? 8 : 7) + (canAdd ? 1 : 0)} className="table-cell text-center text-gray-400 py-6">No puroks found.</td></tr>}
               </>)}
             </tbody>
           </table>
