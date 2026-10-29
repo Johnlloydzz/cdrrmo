@@ -6,8 +6,8 @@ import DropdownSelect from '../components/DropdownSelect'
 
 const HAZARDS = [{ id: 'flood', label: 'Flood' }, { id: 'landslide', label: 'Landslide' }]
 const BASES = [
-  { id: 'planning', label: 'Hazard-prone areas (planning)' },
-  { id: 'live', label: 'Current alert (live)' },
+  { id: 'planning', label: 'Hazard-prone areas' },
+  { id: 'live', label: 'Current alert' },
 ]
 
 const n = v => Number(v || 0).toLocaleString()
@@ -42,14 +42,14 @@ const csvCell = v => { const s = String(v ?? ''); return /[",\r\n]/.test(s) ? `"
 
 function situationText(d) {
   const { hazard, basis } = d.filters
-  if (hazard === 'landslide') return 'Landslide uses the official CDRA classification of each purok. There is no live landslide reading.'
-  if (basis === 'planning') return 'Planning view: every purok inside the flood area drawn from the CDRA flood map, as if heavy rain hit now. It does not depend on today’s weather.'
+  if (hazard === 'landslide') return 'Landslide uses the official CDRA classification of each purok. There is no real-time landslide reading.'
+  if (basis === 'planning') return 'Hazard-prone areas: every purok inside the flood area drawn from the CDRA flood map, as if heavy rain hit now. It does not depend on today’s weather.'
   if (d.situation.simulate_rain) return 'A drill (Simulate heavy rain) is running, so every barangay counts as having heavy rain.'
   if (d.situation.flagged_barangays > 0) return `Heavy rain with a high river was detected in ${d.situation.flagged_barangays} barangay(s) right now. Only their flood-area puroks are counted.`
-  return 'No heavy rain with a high river is detected right now, so no household is flagged. Use the planning view to see the flood-prone households.'
+  return 'No heavy rain with a high river is detected right now, so no household is flagged. Switch to Hazard-prone areas to see the flood-prone households.'
 }
 
-const basisLabel = d => d.filters.hazard === 'landslide' ? 'CDRA classification' : (d.filters.basis === 'planning' ? 'Hazard-prone areas (planning view)' : 'Current alert (live view)')
+const basisLabel = d => d.filters.hazard === 'landslide' ? 'CDRA classification' : (d.filters.basis === 'planning' ? 'Hazard-prone areas' : 'Current alert')
 
 const Seg = ({ options, value, onChange }) => (
   <div className="flex w-full sm:inline-flex sm:w-auto rounded-lg border border-gray-200 overflow-hidden bg-white">
