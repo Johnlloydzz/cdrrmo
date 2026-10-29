@@ -23,6 +23,10 @@ function affectedBarangays(d) {
   }
   return [...m.values()].sort((a, b) => (b.households - a.households) || String(a.name).localeCompare(String(b.name), undefined, { numeric: true }))
 }
+// A typed name is shown in proper case in the sheet ("carlos MendozA" -> "Carlos Mendoza"),
+// but Roman numerals such as III stay as they are.
+const properName = (v = '') => String(v).trim().split(/\s+/).filter(Boolean)
+  .map(w => /^[IVX]+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 const fmtDate = iso => new Date(iso).toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'long', timeStyle: 'short' })
 
 // A reference number made from the date and time the report was generated,
@@ -249,7 +253,7 @@ export default function Reports({ currentUser }) {
               <tr><th>Hazard</th><td>{hazardName}</td></tr>
               <tr><th>Basis</th><td>{basisLabel(data)}</td></tr>
               <tr><th>Coverage</th><td>{coverage}</td></tr>
-              <tr><th>Prepared by</th><td>{sig.prepName.trim() || data.generated_by} ({sig.prepTitle.trim() || data.role})</td></tr>
+              <tr><th>Prepared by</th><td>{properName(sig.prepName.trim() || data.generated_by)} ({sig.prepTitle.trim() || data.role})</td></tr>
             </tbody>
           </table>
 
