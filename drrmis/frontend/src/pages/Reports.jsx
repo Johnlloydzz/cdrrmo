@@ -169,6 +169,24 @@ export default function Reports({ currentUser }) {
           .rp-info { table-layout: fixed; width: 100%; }
           .rp-info td, .rp-note, .rp-lh-text { overflow-wrap: anywhere; }
         }
+        /* ON SCREEN the report is normal app UI (cards); the bond-paper look above applies only when printing / saving as PDF. */
+        .rp-screen-only { display: none; }
+        @media screen {
+          .rp-screen-only { display: block; }
+          .rp-sheet { background: transparent; border: 0; box-shadow: none; padding: 0; max-width: none; margin: 0; font-size: 14px; }
+          .rp-letterhead, .rp-foot { display: none; }
+          .rp-head, .rp-section, .rp-sign { background: #fff; border: 1px solid #f3f4f6; border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05); padding: 16px; }
+          .rp-section, .rp-sign { margin-top: 16px; }
+          .rp-sign { gap: 16px; flex-wrap: wrap; }
+          .rp-title { text-align: left; margin: 0; font-size: 18px; letter-spacing: 0; text-transform: none; }
+          .rp-subtitle { text-align: left; margin: 2px 0 12px; color: #6b7280; }
+          .rp-h { font-size: 15px; text-transform: none; letter-spacing: 0; border: 0; margin-bottom: 8px; color: #111827; }
+          .rp-table { font-size: 14px; }
+          .rp-table th, .rp-table td { border-color: #e5e7eb; padding: 6px 10px; }
+          .rp-table th { background: #f9fafb; }
+          .rp-note { border: 0; border-radius: 10px; background: #f9fafb; padding: 8px 12px; }
+          .rp-sign > div { min-width: 220px; }
+        }
         @page { size: A4; margin: 0; }
         .rp-wrap { width: 100%; border-collapse: collapse; }
         .rp-wrap > thead, .rp-wrap > tfoot { display: none; }
@@ -243,6 +261,7 @@ export default function Reports({ currentUser }) {
             <div style={{ width: 72, flexShrink: 0 }} aria-hidden="true" />
           </div>
 
+          <div className="rp-head">
           <p className="rp-title">Households at Risk (Potentially Affected)</p>
           <p className="rp-subtitle">Pre-Disaster Report · {hazardName} · {data.filters.barangay_name || 'All barangays'}{data.filters.purok_name ? ` · ${data.filters.purok_name}` : ''}</p>
 
@@ -256,6 +275,7 @@ export default function Reports({ currentUser }) {
               <tr><th>Prepared by</th><td>{properName(sig.prepName.trim() || data.generated_by)} ({sig.prepTitle.trim() || data.role})</td></tr>
             </tbody>
           </table>
+          </div>
 
           <Section no="I" title="Situation">
             <p className="rp-note">{situationText(data)}</p>
@@ -347,6 +367,7 @@ export default function Reports({ currentUser }) {
 
           {/* Signatures */}
           <div className="rp-sign">
+            <p className="rp-screen-only rp-h" style={{ flexBasis: '100%', margin: 0 }}>Signatories (printed on the report)</p>
             <div>
               <p style={{ textAlign: 'left', margin: 0 }}>Prepared by:</p>
               <input className="rp-edit nm" aria-label="Prepared by name" placeholder={data.generated_by} value={sig.prepName || data.generated_by} onChange={e => setSigField('prepName', e.target.value)} />
