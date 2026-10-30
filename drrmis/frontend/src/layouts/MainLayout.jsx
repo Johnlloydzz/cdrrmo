@@ -30,7 +30,14 @@ const pageTitles = {
   '/change-password': 'Change Password',
 }
 
-export default function MainLayout({ onLogout, currentUser }) {
+export default function MainLayout({ onLogout: doLogout, currentUser }) {
+  // Short "Signing out…" screen (like Facebook) before the session is cleared.
+  const [signingOut, setSigningOut] = useState(false)
+  const onLogout = () => {
+    if (signingOut) return
+    setSigningOut(true)
+    setTimeout(doLogout, 1200)
+  }
   const [mobileOpen, setMobileOpen]       = useState(false)
   const [notifOpen, setNotifOpen]         = useState(false)
   const [profileOpen, setProfileOpen]     = useState(false)
@@ -47,6 +54,13 @@ export default function MainLayout({ onLogout, currentUser }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
+      {signingOut && (
+        <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-4 bg-white" role="status" aria-live="polite">
+          <img src="/cdrrmo-logo.png" alt="" className="w-16 h-16 object-contain" />
+          <div className="w-7 h-7 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-600">Signing out…</p>
+        </div>
+      )}
       <Sidebar
         onLogout={onLogout}
         currentUser={currentUser}
